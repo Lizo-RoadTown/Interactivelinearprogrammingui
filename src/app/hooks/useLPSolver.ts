@@ -11,9 +11,13 @@ import {
   PivotRecord, Point, SimplexStep,
 } from '../types';
 
-// In dev, Vite proxies /api → localhost:8000.  In production, same origin.
+// Dev: proxied through Vite to localhost:8000
+// Production: set VITE_API_URL env var to your Render backend URL
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const API_BASE = (import.meta as any).env?.DEV ? 'http://localhost:8000/api' : '/api';
+const _env = (import.meta as any).env ?? {};
+const API_BASE = _env.VITE_API_URL ? `${_env.VITE_API_URL}/api`
+               : _env.DEV            ? 'http://localhost:8000/api'
+               : '/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
