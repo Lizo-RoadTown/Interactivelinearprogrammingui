@@ -1443,6 +1443,17 @@ function SolvingScreen({
   const stepType  = currentStep?.stepType;
   const isAtPivot = stepType === 'select_pivot';
 
+  // At initial-type steps (before any pivot), show pivot MC using the *next* step's data.
+  // The next step is always select_pivot and carries enteringVar / leavingVar / ratios.
+  // When the student completes the MC we jump past select_pivot directly to after_pivot.
+  const isAtInitialPivot =
+    (stepType === 'initial' || stepType === 'phase1_initial' || stepType === 'phase2_initial') &&
+    currentStepIndex + 1 < steps.length &&
+    steps[currentStepIndex + 1]?.stepType === 'select_pivot';
+  const showPivotMC  = isAtPivot || isAtInitialPivot;
+  // Data source for PivotMCPanel: borrow the next step when at initial pivot
+  const pivotDataStep = (isAtInitialPivot && steps[currentStepIndex + 1]) ?? currentStep;
+
   // Hints from word problem or generic
   function getHint(): string {
     if (!stepType) return '';
@@ -1529,7 +1540,7 @@ function SolvingScreen({
             currentStep={currentStep}
             showRatioTest={false}
             isInteractive={false}
-            hideSelectionHints={isAtPivot}
+            hideSelectionHints={showPivotMC}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -1597,7 +1608,7 @@ function SolvingScreen({
             )}
 
             {/* Hint */}
-            {hint && !isAtPivot && (
+            {hint && !showPivotMC && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Lightbulb className="w-3.5 h-3.5 text-blue-600" />
@@ -1607,18 +1618,37 @@ function SolvingScreen({
               </div>
             )}
 
-            {/* Pivot MC at select_pivot steps */}
-            {isAtPivot && currentStep && (
+            {/* Pivot MC — shown at select_pivot steps AND at initial-type steps */}
+            {showPivotMC && pivotDataStep && (
               <PivotMCPanel
                 key={currentStepIndex}
-                step={currentStep}
-                onPivotApplied={stepForward}
-                onShowMe={stepForward}
+                step={pivotDataStep}
+                onPivotApplied={
+                  isAtInitialPivot
+                    ? () => {
+                        // Skip over the select_pivot step to the after_pivot step
+                        const target = steps.findIndex(
+                          (s, i) => i > currentStepIndex && s.stepType !== 'select_pivot',
+                        );
+                        jumpToStep(target >= 0 ? target : currentStepIndex + 2);
+                      }
+                    : stepForward
+                }
+                onShowMe={
+                  isAtInitialPivot
+                    ? () => {
+                        const target = steps.findIndex(
+                          (s, i) => i > currentStepIndex && s.stepType !== 'select_pivot',
+                        );
+                        jumpToStep(target >= 0 ? target : currentStepIndex + 2);
+                      }
+                    : stepForward
+                }
               />
             )}
 
             {/* Solver explanation (non-pivot steps) */}
-            {currentStep?.explanation && !isAtPivot && (
+            {currentStep?.explanation && !showPivotMC && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <p className="text-xs font-bold text-gray-500 mb-1">Solver</p>
                 <p className="text-xs text-gray-700 font-mono leading-relaxed whitespace-pre-wrap">
@@ -1672,8 +1702,8 @@ function SolvingScreen({
           </Button>
           <div className="flex-1 flex items-center gap-1 overflow-x-auto">
             {steps.map((s, i) => {
-              // At pivot steps, only allow jumping to already-visited steps
-              const canJump = isAtPivot ? i < currentStepIndex : true;
+              // At pivot / initial-pivot steps, only allow jumping to already-visited steps
+              const canJump = showPivotMC ? i < currentStepIndex : true;
               return (
                 <button
                   key={i}
@@ -1695,7 +1725,7 @@ function SolvingScreen({
             size="sm"
             variant="outline"
             onClick={stepForward}
-            disabled={!canStepForward || isAtPivot}
+            disabled={!canStepForward || showPivotMC}
             className="text-xs"
           >
             Next
