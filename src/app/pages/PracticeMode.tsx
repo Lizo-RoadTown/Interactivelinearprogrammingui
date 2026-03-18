@@ -27,6 +27,7 @@ import {
   WPCategory,
 } from '../data/wordProblems';
 import { Constraint, LPProblem, SimplexStep, StepType } from '../types';
+import { normVar, sameVar, indexOfVar } from '../utils/varName';
 import {
   ArrowLeft, BookOpen, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, Lightbulb, AlertTriangle,
@@ -1210,9 +1211,6 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
   const basis    = tableau.basisVariables ?? [];
   const ratios   = tableau.ratios ?? [];
 
-  // Normalise variable names for comparison — backend uses "X2", tableau uses "x2"
-  const norm = (s: string | undefined) => (s ?? '').toLowerCase().trim();
-
   // If the backend didn't supply enteringVar, fall back to most-negative Z-row col
   const cols = allVars.slice(0, -1).map((name, idx) => ({
     name,
@@ -1220,7 +1218,8 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
   }));
   const negCols = cols.filter(c => c.zVal < -1e-9).sort((a, b) => a.zVal - b.zVal);
   const fallbackEntering = negCols[0]?.name ?? '';
-  const correctEntering  = step.enteringVar ? norm(step.enteringVar) : norm(fallbackEntering);
+  // normVar from shared util — backend "X2" matches tableau "x2"
+  const correctEntering  = normVar(step.enteringVar || fallbackEntering);
 
   // Similarly for leaving var
   const validRows = basis
@@ -1231,7 +1230,7 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
     const bRatio = bIdx >= 0 ? (ratios[bIdx] as number ?? Infinity) : Infinity;
     return (r.ratio as number) < bRatio ? r.name : best;
   }, validRows[0]?.name ?? '');
-  const correctLeaving = step.leavingVar ? norm(step.leavingVar) : norm(fallbackLeaving);
+  const correctLeaving = normVar(step.leavingVar || fallbackLeaving);
 
   // Entering options: all non-RHS columns
   const enteringOptions = useMemo(() => {
@@ -1246,7 +1245,7 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
     return shuffled.map(c => ({
       label:     `${c.name}   (Z-row = ${fmtNum(c.zVal)})`,
       value:     c.name,
-      isCorrect: norm(c.name) === correctEntering,
+      isCorrect: normVar(c.name) === correctEntering,
     }));
   }, [step.iteration]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1261,7 +1260,7 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
     return shuffled.map(r => ({
       label:     `${r.name}   (ratio = ${fmtNum(r.ratio as number)})`,
       value:     r.name,
-      isCorrect: norm(r.name) === correctLeaving,
+      isCorrect: normVar(r.name) === correctLeaving,
     }));
   }, [step.iteration, mcPhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1269,10 +1268,10 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
     if (selected !== null) return;
     setSelected(v);
     if (mcPhase === 'entering') {
-      const correct = norm(v) === correctEntering;
-      // Find the display name of the correct entering variable from the tableau
-      const correctDisplayName = cols.find(c => norm(c.name) === correctEntering)?.name ?? correctEntering;
-      const zIdx = cols.findIndex(c => norm(c.name) === correctEntering);
+      const correct = normVar(v) === correctEntering;
+      // Use the display name from the tableau (not the backend's capitalized version)
+      const correctDisplayName = cols.find(c => normVar(c.name) === correctEntering)?.name ?? correctEntering;
+      const zIdx = indexOfVar(cols.map(c => c.name), correctEntering);
       const zVal = zIdx >= 0 ? cols[zIdx].zVal : 0;
       setFeedback({
         correct,
@@ -1281,9 +1280,9 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
           : `Not the optimal choice. The most-negative rule says pick the variable with the smallest (most negative) Z-row entry. That's ${correctDisplayName} (${fmtNum(zVal)}).`,
       });
     } else {
-      const correct = norm(v) === correctLeaving;
-      const correctDisplayName = validRows.find(r => norm(r.name) === correctLeaving)?.name ?? correctLeaving;
-      const correctRatio = validRows.find(r => norm(r.name) === correctLeaving)?.ratio ?? 0;
+      const correct = normVar(v) === correctLeaving;
+      const correctDisplayName = validRows.find(r => normVar(r.name) === correctLeaving)?.name ?? correctLeaving;
+      const correctRatio = validRows.find(r => normVar(r.name) === correctLeaving)?.ratio ?? 0;
       setFeedback({
         correct,
         msg: correct
@@ -1528,8 +1527,9 @@ function SolvingScreen({
             tableau={currentStep.tableau}
             previousTableau={prevStep?.tableau}
             currentStep={currentStep}
-            showRatioTest={isAtPivot}
+            showRatioTest={false}
             isInteractive={false}
+            hideSelectionHints={isAtPivot}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-400 text-sm">

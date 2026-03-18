@@ -13,6 +13,12 @@ interface TableauWorkspaceProps {
   selectedCell?: { row: number; col: number };
   isInteractive?: boolean;
   interactivePhase?: InteractivePhase;
+  /**
+   * When true, suppress all pivot-selection highlighting (optimal entering
+   * column, candidate columns, min-ratio annotation). Used in Practice Mode
+   * so the tableau doesn't reveal the answer before the student picks.
+   */
+  hideSelectionHints?: boolean;
   // Controlled afterStep (lifted to parent so narrative can use it)
   afterStep?: number;
   onAfterStepChange?: (step: number) => void;
@@ -27,6 +33,7 @@ export default function TableauWorkspace({
   selectedCell,
   isInteractive = false,
   interactivePhase,
+  hideSelectionHints = false,
   afterStep: afterStepProp,
   onAfterStepChange,
 }: TableauWorkspaceProps) {
@@ -125,8 +132,8 @@ export default function TableauWorkspace({
               {showRatios && (
                 <td className="px-3 py-2 bg-purple-50 border border-gray-300 text-center text-xs">
                   {ratios?.[rIdx] != null ? (
-                    <span className={rIdx === pivotRowForSelect ? 'font-bold text-amber-700' : ''}>
-                      {fmt(ratios[rIdx] as number)}{rIdx === pivotRowForSelect ? ' ← min' : ''}
+                    <span className={!hideSelectionHints && rIdx === pivotRowForSelect ? 'font-bold text-amber-700' : ''}>
+                      {fmt(ratios[rIdx] as number)}{!hideSelectionHints && rIdx === pivotRowForSelect ? ' ← min' : ''}
                     </span>
                   ) : <span className="text-gray-400">—</span>}
                 </td>
@@ -153,10 +160,13 @@ export default function TableauWorkspace({
 
   const renderStandardTable = () => {
     const isInitial = !stepType || stepType === 'initial';
+    // In MC mode (hideSelectionHints) treat select_pivot visually like initial
+    // so we don't reveal which column to enter or which row to leave.
+    const showHints = !isInitial && !hideSelectionHints;
     return renderTable({
       rows: tableau.rows,
       basis: tableau.basisVariables,
-      showRatios: showRatioTest && !isInitial,
+      showRatios: showRatioTest && showHints,
       ratios: computedRatios,
       getCellClass: (rIdx, cIdx, isZRow) => {
         const cell = tableau.rows[rIdx][cIdx];
@@ -164,13 +174,20 @@ export default function TableauWorkspace({
         const isSelected = selectedCell?.row === rIdx && selectedCell?.col === cIdx;
         let cls = 'px-3 py-2 text-center border transition-all text-xs ';
         if (isSelected) cls += 'ring-2 ring-purple-500 bg-purple-50 border-gray-200';
-        else if (isPivotCell) cls += 'bg-amber-400 font-bold text-white border-amber-500';
-        else if (!isInitial && rIdx === pivotRow) cls += 'bg-amber-100 border-gray-200';
-        else if (!isInitial && cIdx === pivotCol && !isZRow) cls += 'bg-blue-100 border-gray-200';
-        else if (isZRow && !isInitial) {
+        else if (isPivotCell && showHints) cls += 'bg-amber-400 font-bold text-white border-amber-500';
+        else if (showHints && rIdx === pivotRow) cls += 'bg-amber-100 border-gray-200';
+        else if (showHints && cIdx === pivotCol && !isZRow) cls += 'bg-blue-100 border-gray-200';
+        else if (isZRow && showHints) {
           if (cIdx === rhsColIdx) cls += 'bg-blue-100 font-semibold border-gray-300';
           else if (cIdx === optEnteringCol) cls += 'bg-blue-400 text-white font-bold border-blue-500';
           else if (candidateCols.some(c => c.idx === cIdx)) cls += 'bg-blue-200 font-semibold border-gray-200';
+          else if (cell.value > 1e-9) cls += 'bg-green-50 text-green-700 border-gray-200';
+          else cls += 'bg-blue-50 border-gray-200';
+        } else if (isZRow) {
+          // hideSelectionHints: still colour Z-row cells by sign so student
+          // can read the values, but don't call out the winner.
+          if (cIdx === rhsColIdx) cls += 'bg-blue-50 font-semibold border-gray-300';
+          else if (cell.value < -1e-9) cls += 'bg-red-50 text-red-700 border-gray-200';
           else if (cell.value > 1e-9) cls += 'bg-green-50 text-green-700 border-gray-200';
           else cls += 'bg-blue-50 border-gray-200';
         } else cls += 'border-gray-200';
