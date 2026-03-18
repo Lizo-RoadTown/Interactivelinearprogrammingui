@@ -1209,7 +1209,6 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
   const allVars  = tableau.allVariables ?? [];
   const zRow     = tableau.rows[tableau.rows.length - 1];
   const basis    = tableau.basisVariables ?? [];
-  const ratios   = tableau.ratios ?? [];
 
   // If the backend didn't supply enteringVar, fall back to most-negative Z-row col
   const cols = allVars.slice(0, -1).map((name, idx) => ({
@@ -1221,13 +1220,25 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
   // normVar from shared util — backend "X2" matches tableau "x2"
   const correctEntering  = normVar(step.enteringVar || fallbackEntering);
 
+  // Ratios: use server-provided values when available; otherwise compute from raw tableau.
+  // The initial step doesn't carry ratios, but we can derive them from the entering column.
+  const enteringColIdx = cols.findIndex(c => normVar(c.name) === correctEntering);
+  const serverRatios = tableau.ratios ?? [];
+  const computedRatios: (number | null)[] = serverRatios.length > 0
+    ? serverRatios.map(r => (r !== null && r !== undefined ? Number(r) : null))
+    : basis.map((_, r) => {
+        const entry = tableau.rows[r]?.[enteringColIdx]?.value ?? 0;
+        const rhs   = tableau.rows[r]?.[allVars.length - 1]?.value ?? 0;
+        return entry > 1e-9 ? rhs / entry : null; // null = not a valid pivot row
+      });
+
   // Similarly for leaving var
   const validRows = basis
-    .map((name, idx) => ({ name, ratio: ratios[idx] ?? null }))
+    .map((name, idx) => ({ name, ratio: computedRatios[idx] ?? null }))
     .filter(r => r.ratio !== null && (r.ratio as number) >= 0);
   const fallbackLeaving = validRows.reduce<string>((best, r) => {
     const bIdx = basis.indexOf(best);
-    const bRatio = bIdx >= 0 ? (ratios[bIdx] as number ?? Infinity) : Infinity;
+    const bRatio = bIdx >= 0 ? (computedRatios[bIdx] as number ?? Infinity) : Infinity;
     return (r.ratio as number) < bRatio ? r.name : best;
   }, validRows[0]?.name ?? '');
   const correctLeaving = normVar(step.leavingVar || fallbackLeaving);
@@ -1443,16 +1454,21 @@ function SolvingScreen({
   const stepType  = currentStep?.stepType;
   const isAtPivot = stepType === 'select_pivot';
 
-  // At initial-type steps (before any pivot), show pivot MC using the *next* step's data.
-  // The next step is always select_pivot and carries enteringVar / leavingVar / ratios.
-  // When the student completes the MC we jump past select_pivot directly to after_pivot.
+  // At initial-type steps the student must choose the first pivot before advancing.
+  // We show PivotMCPanel immediately — no "select_pivot" step needs to follow.
   const isAtInitialPivot =
     (stepType === 'initial' || stepType === 'phase1_initial' || stepType === 'phase2_initial') &&
-    currentStepIndex + 1 < steps.length &&
-    steps[currentStepIndex + 1]?.stepType === 'select_pivot';
-  const showPivotMC  = isAtPivot || isAtInitialPivot;
-  // Data source for PivotMCPanel: borrow the next step when at initial pivot
-  const pivotDataStep = (isAtInitialPivot && steps[currentStepIndex + 1]) ?? currentStep;
+    currentStepIndex < steps.length - 1; // still more steps ahead (not already optimal)
+  const showPivotMC = isAtPivot || isAtInitialPivot;
+
+  // When at an initial-pivot step, try to borrow the next step's data if it has
+  // better info (entering/leaving var already known, ratios populated).
+  // PivotMCPanel now computes ratios from the raw tableau itself as a fallback.
+  const nextStep = steps[currentStepIndex + 1];
+  const pivotDataStep =
+    isAtInitialPivot && nextStep?.enteringVar != null
+      ? nextStep  // next step has the answer pre-computed
+      : currentStep; // fall back — PivotMCPanel will compute its own ratios
 
   // Hints from word problem or generic
   function getHint(): string {
@@ -1626,21 +1642,17 @@ function SolvingScreen({
                 onPivotApplied={
                   isAtInitialPivot
                     ? () => {
-                        // Skip over the select_pivot step to the after_pivot step
-                        const target = steps.findIndex(
-                          (s, i) => i > currentStepIndex && s.stepType !== 'select_pivot',
-                        );
-                        jumpToStep(target >= 0 ? target : currentStepIndex + 2);
+                        // If the very next step is select_pivot (answer-reveal), skip it
+                        const skip = nextStep?.stepType === 'select_pivot';
+                        jumpToStep(currentStepIndex + (skip ? 2 : 1));
                       }
                     : stepForward
                 }
                 onShowMe={
                   isAtInitialPivot
                     ? () => {
-                        const target = steps.findIndex(
-                          (s, i) => i > currentStepIndex && s.stepType !== 'select_pivot',
-                        );
-                        jumpToStep(target >= 0 ? target : currentStepIndex + 2);
+                        const skip = nextStep?.stepType === 'select_pivot';
+                        jumpToStep(currentStepIndex + (skip ? 2 : 1));
                       }
                     : stepForward
                 }
