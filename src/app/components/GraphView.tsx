@@ -38,11 +38,13 @@ export default function GraphView({
   // Compute viewport from instructional geometry only:
   // corner points, simplex path, current BFS.
   // Fall back to constraint intercepts only if none of those exist yet.
+  // feasibleRegionPolygon intentionally excluded — it may contain Sutherland-Hodgman
+  // clipping boundary points far outside the LP's interesting region.
+  // cornerPoints are the actual LP vertices and are sufficient for bounds.
   const instructionalPoints: { x: number; y: number }[] = [
     ...cornerPoints,
     ...simplexPath,
     ...(currentPoint ? [currentPoint] : []),
-    ...feasibleRegionPolygon,
   ];
 
   let maxX: number;
