@@ -11,10 +11,12 @@
  *   - Always-visible hints and feedback — student never feels alone
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import GraphView from '../components/GraphView';
 import TableauWorkspace from '../components/TableauWorkspace';
+import GraphBuildPhase from '../components/GraphBuildPhase';
+import TableauSetupPhase from '../components/TableauSetupPhase';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { useLPSolver } from '../hooks/useLPSolver';
@@ -24,7 +26,7 @@ import {
   WPDifficulty,
   WPCategory,
 } from '../data/wordProblems';
-import { Constraint, LPProblem, StepType } from '../types';
+import { Constraint, LPProblem, SimplexStep, StepType } from '../types';
 import {
   ArrowLeft, BookOpen, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, Lightbulb, AlertTriangle,
@@ -1182,6 +1184,207 @@ function MethodSelector({
   );
 }
 
+// ── Pivot MC Panel ────────────────────────────────────────────────────────────
+// Shown inside SolvingScreen at every select_pivot step. Replaces click-on-cell.
+
+function fmtNum(n: number): string {
+  const r = Math.round(n * 100) / 100;
+  return Number.isInteger(r) ? r.toString() : r.toFixed(2);
+}
+
+interface PivotMCPanelProps {
+  step:           SimplexStep;
+  onPivotApplied: () => void; // caller should call stepForward()
+  onShowMe:       () => void; // skip — just advance
+}
+
+function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
+  type MCPhase = 'entering' | 'leaving' | 'done';
+  const [mcPhase,  setMcPhase]  = useState<MCPhase>('entering');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ correct: boolean; msg: string } | null>(null);
+
+  const tableau  = step.tableau;
+  const allVars  = tableau.allVariables ?? [];
+  const zRow     = tableau.rows[tableau.rows.length - 1];
+  const basis    = tableau.basisVariables ?? [];
+  const ratios   = tableau.ratios ?? [];
+
+  // Entering options: all non-RHS columns, coloured by sign. Cap at 5.
+  const enteringOptions = useMemo(() => {
+    const cols = allVars.slice(0, -1).map((name, idx) => ({
+      name,
+      zVal: zRow[idx]?.value ?? 0,
+    }));
+    const neg = cols.filter(c => c.zVal < -1e-9).sort((a, b) => a.zVal - b.zVal);
+    const pos = cols.filter(c => c.zVal >= -1e-9);
+    // Show all negatives + up to (4 - neg.length) positives as distractors
+    const combined = [...neg, ...pos.slice(0, Math.max(0, 4 - neg.length))];
+    const shuffled: typeof combined = [];
+    const src = [...combined];
+    while (src.length) {
+      const j = Math.floor(Math.random() * src.length);
+      shuffled.push(src.splice(j, 1)[0]);
+    }
+    return shuffled.map(c => ({
+      label:     `${c.name}   (Z-row = ${fmtNum(c.zVal)})`,
+      value:     c.name,
+      isCorrect: c.name === step.enteringVar,
+    }));
+  }, [step.iteration]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Leaving options: rows with non-negative ratios
+  const leavingOptions = useMemo(() => {
+    const rows = basis
+      .map((name, idx) => ({ name, ratio: ratios[idx] ?? null }))
+      .filter(r => r.ratio !== null && (r.ratio as number) >= 0);
+    const shuffled: typeof rows = [];
+    const src = [...rows];
+    while (src.length) {
+      const j = Math.floor(Math.random() * src.length);
+      shuffled.push(src.splice(j, 1)[0]);
+    }
+    return shuffled.map(r => ({
+      label:     `${r.name}   (ratio = ${fmtNum(r.ratio as number)})`,
+      value:     r.name,
+      isCorrect: r.name === step.leavingVar,
+    }));
+  }, [step.iteration, mcPhase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleSelect(v: string) {
+    if (selected !== null) return;
+    setSelected(v);
+    if (mcPhase === 'entering') {
+      const correct = v === step.enteringVar;
+      const zIdx = allVars.indexOf(step.enteringVar ?? '');
+      const zVal = zIdx >= 0 ? (zRow[zIdx]?.value ?? 0) : 0;
+      setFeedback({
+        correct,
+        msg: correct
+          ? `Correct! ${step.enteringVar} has the most negative Z-row coefficient (${fmtNum(zVal)}). It will enter the basis.`
+          : `Not the optimal choice. The most-negative rule says pick the variable with the smallest (most negative) Z-row entry. That's ${step.enteringVar}.`,
+      });
+    } else {
+      const correct = v === step.leavingVar;
+      const correctIdx = basis.indexOf(step.leavingVar ?? '');
+      const correctRatio = correctIdx >= 0 ? (ratios[correctIdx] ?? 0) : 0;
+      setFeedback({
+        correct,
+        msg: correct
+          ? `Correct! ${step.leavingVar} has the minimum non-negative ratio (${fmtNum(correctRatio as number)}). It leaves the basis.`
+          : `Not the minimum ratio. ${step.leavingVar} leaves because it has the smallest valid ratio (${fmtNum(correctRatio as number)}). This keeps the RHS non-negative after the pivot.`,
+      });
+    }
+  }
+
+  function advance() {
+    if (mcPhase === 'entering') {
+      setMcPhase('leaving');
+      setSelected(null);
+      setFeedback(null);
+    } else {
+      setMcPhase('done');
+      onPivotApplied();
+    }
+  }
+
+  if (mcPhase === 'done') {
+    return (
+      <div className="bg-green-50 border border-green-300 rounded-lg p-3">
+        <p className="text-xs font-bold text-green-800 flex items-center gap-1.5">
+          <CheckCircle className="w-4 h-4" />
+          Pivot identified! Row operations are computing automatically…
+        </p>
+      </div>
+    );
+  }
+
+  const options = mcPhase === 'entering' ? enteringOptions : leavingOptions;
+
+  return (
+    <div className="space-y-2">
+      {/* Step banner */}
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+        <p className="text-xs font-bold text-purple-800">
+          {mcPhase === 'entering'
+            ? 'Pivot — Step 1: Choose the Entering Variable'
+            : 'Pivot — Step 2: Choose the Leaving Variable'}
+        </p>
+        <p className="text-xs text-purple-700 mt-0.5">
+          {mcPhase === 'entering'
+            ? 'Use the most-negative coefficient rule: pick the column with the smallest Z-row value.'
+            : 'Use the minimum ratio test: pick the row with the smallest non-negative RHS ÷ column entry.'}
+        </p>
+      </div>
+
+      {/* Options */}
+      <div className="space-y-1.5">
+        {options.map((opt, i) => {
+          let cls = 'w-full text-left border-2 rounded-lg px-3 py-2 text-xs font-mono transition-all ';
+          if (selected === null) {
+            cls += 'border-gray-200 bg-white hover:border-purple-400 hover:bg-purple-50 cursor-pointer';
+          } else if (opt.isCorrect) {
+            cls += 'border-green-400 bg-green-50 text-green-800';
+          } else if (opt.value === selected) {
+            cls += 'border-red-400 bg-red-50 text-red-800';
+          } else {
+            cls += 'border-gray-100 bg-white opacity-40 cursor-default';
+          }
+          return (
+            <button
+              key={i}
+              onClick={() => handleSelect(opt.value)}
+              disabled={selected !== null}
+              className={cls}
+            >
+              {opt.label}
+              {selected !== null && opt.isCorrect && (
+                <CheckCircle className="inline w-3.5 h-3.5 ml-2 text-green-600" />
+              )}
+              {selected !== null && opt.value === selected && !opt.isCorrect && (
+                <XCircle className="inline w-3.5 h-3.5 ml-2 text-red-500" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Feedback */}
+      {feedback && (
+        <div className={`rounded-lg p-3 text-xs leading-relaxed ${
+          feedback.correct
+            ? 'bg-green-50 border border-green-300 text-green-800'
+            : 'bg-amber-50 border border-amber-300 text-amber-800'
+        }`}>
+          {feedback.correct
+            ? <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-green-600" />
+            : <AlertTriangle className="inline w-3.5 h-3.5 mr-1 text-amber-600" />}
+          {feedback.msg}
+        </div>
+      )}
+
+      {/* Advance / Show Me */}
+      <div className="flex gap-2">
+        {selected !== null && (
+          <Button onClick={advance} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
+            {mcPhase === 'entering'
+              ? 'OK — now find the leaving variable →'
+              : feedback?.correct
+              ? <><Zap className="w-3 h-3 mr-1" />Apply pivot! Row ops autofill →</>
+              : 'Apply the correct pivot →'}
+          </Button>
+        )}
+        {selected === null && (
+          <Button onClick={onShowMe} size="sm" variant="outline" className="text-xs">
+            <Eye className="w-3 h-3 mr-1" />
+            Show Me
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Solving Screen ─────────────────────────────────────────────────────────────
 
 function SolvingScreen({
@@ -1197,13 +1400,14 @@ function SolvingScreen({
     steps, currentStep, currentStepIndex,
     canStepBack, canStepForward, isLoading, error,
     currentSimplexPath, currentPoint, solverResponse,
-    interactiveState, cellExplanation,
     solve, stepForward, stepBack, jumpToStep,
-    enterInteractiveMode, exitInteractiveMode,
-    handleInteractiveClick, setCellExplanation,
   } = useLPSolver();
 
   const prevStep = currentStepIndex > 0 ? steps[currentStepIndex - 1] : null;
+
+  // Sub-phase state: loading → graph_build (2-var) or tableau_setup → pivoting
+  type SolvingSubPhase = 'loading' | 'graph_build' | 'tableau_setup' | 'pivoting';
+  const [solvingSubPhase, setSolvingSubPhase] = useState<SolvingSubPhase>('loading');
 
   // Auto-solve on mount
   const solvedRef = useRef(false);
@@ -1214,10 +1418,15 @@ function SolvingScreen({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When we reach a select_pivot step, offer interactive mode automatically
-  const stepType = currentStep?.stepType;
+  // Transition out of loading once solver completes
+  useEffect(() => {
+    if (!isLoading && !error && solverResponse && solvingSubPhase === 'loading') {
+      setSolvingSubPhase(problem.variables.length === 2 ? 'graph_build' : 'tableau_setup');
+    }
+  }, [isLoading, error, solverResponse, solvingSubPhase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const stepType  = currentStep?.stepType;
   const isAtPivot = stepType === 'select_pivot';
-  const inInteractive = !!interactiveState;
 
   // Hints from word problem or generic
   function getHint(): string {
@@ -1242,49 +1451,71 @@ function SolvingScreen({
 
   const hint = getHint();
 
+  // ── Sub-phase: loading ───────────────────────────────────────────────────────
+  if (isLoading || solvingSubPhase === 'loading') {
+    return (
+      <div className="flex-1 flex items-center justify-center text-gray-500">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        {isLoading ? 'Solving your LP…' : 'Preparing…'}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md text-center">
+          <p className="text-red-700 font-medium">Solver Error</p>
+          <p className="text-sm text-red-600 mt-1">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Sub-phase: graph_build ────────────────────────────────────────────────────
+  if (solvingSubPhase === 'graph_build' && solverResponse) {
+    const optZ = solverResponse.optimalValue
+      ?? Math.max(...solverResponse.cornerPoints.map(p => p.z ?? 0), 0);
+    return (
+      <GraphBuildPhase
+        constraints={problem.constraints}
+        objectiveCoefficients={problem.objectiveCoefficients}
+        objectiveType={problem.objectiveType}
+        feasibleRegionPolygon={solverResponse.feasibleRegionPolygon}
+        cornerPoints={solverResponse.cornerPoints}
+        optimalZ={optZ}
+        onDone={() => setSolvingSubPhase('tableau_setup')}
+      />
+    );
+  }
+
+  // ── Sub-phase: tableau_setup ──────────────────────────────────────────────────
+  if (solvingSubPhase === 'tableau_setup' && steps.length > 0) {
+    return (
+      <TableauSetupPhase
+        problem={problem}
+        method={method}
+        initialStep={steps[0]}
+        onDone={() => setSolvingSubPhase('pivoting')}
+      />
+    );
+  }
+
+  // ── Sub-phase: pivoting ───────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
 
       {/* TOP HALF: Tableau */}
       <div className="h-1/2 border-b border-gray-300 bg-white overflow-auto">
-        {isLoading && (
-          <div className="h-full flex items-center justify-center text-gray-500">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" />
-            Solving…
-          </div>
-        )}
-        {!isLoading && error && (
-          <div className="h-full flex items-center justify-center">
-            <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md text-center">
-              <p className="text-red-700 font-medium">Solver Error</p>
-              <p className="text-sm text-red-600 mt-1">{error}</p>
-            </div>
-          </div>
-        )}
-        {!isLoading && !error && currentStep && (
+        {currentStep ? (
           <TableauWorkspace
-            tableau={
-              inInteractive
-                ? {
-                    ...currentStep.tableau,
-                    rows: currentStep.tableau.rows,
-                    basisVariables: currentStep.tableau.basisVariables,
-                    rawMatrix: interactiveState!.liveMatrix,
-                    rawBasis: interactiveState!.liveBasis,
-                  }
-                : currentStep.tableau
-            }
-            previousTableau={!inInteractive ? prevStep?.tableau : undefined}
+            tableau={currentStep.tableau}
+            previousTableau={prevStep?.tableau}
             currentStep={currentStep}
-            showRatioTest={true}
-            isInteractive={inInteractive || isAtPivot}
-            onCellClick={inInteractive
-              ? (row, col) => handleInteractiveClick(row, col, problem.objectiveType)
-              : undefined
-            }
+            showRatioTest={isAtPivot}
+            isInteractive={false}
           />
-        )}
-        {!isLoading && !error && !currentStep && (
+        ) : (
           <div className="h-full flex items-center justify-center text-gray-400 text-sm">
             Loading…
           </div>
@@ -1294,7 +1525,7 @@ function SolvingScreen({
       {/* BOTTOM HALF */}
       <div className="h-1/2 flex overflow-hidden">
 
-        {/* Bottom-left: Guidance + interactivity */}
+        {/* Bottom-left: Guidance */}
         <div className="w-1/2 border-r border-gray-300 overflow-hidden flex flex-col">
 
           {/* Step header */}
@@ -1350,7 +1581,7 @@ function SolvingScreen({
             )}
 
             {/* Hint */}
-            {hint && (
+            {hint && !isAtPivot && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Lightbulb className="w-3.5 h-3.5 text-blue-600" />
@@ -1360,81 +1591,18 @@ function SolvingScreen({
               </div>
             )}
 
-            {/* Interactive mode prompt at select_pivot */}
-            {isAtPivot && !inInteractive && (
-              <div className="bg-purple-50 border border-purple-300 rounded-lg p-3 space-y-2">
-                <p className="text-xs font-bold text-purple-800 flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5" />
-                  Your turn! Try the pivot yourself.
-                </p>
-                <p className="text-xs text-purple-700 leading-relaxed">
-                  Click a cell in the <strong>Z-row</strong> of the tableau to choose the entering
-                  variable, then click a row cell to choose the leaving variable.
-                  Wrong choices are allowed — you'll see exactly what happens.
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={enterInteractiveMode}
-                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs"
-                  >
-                    <Zap className="w-3 h-3 mr-1" />
-                    Try It
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={stepForward}
-                    className="text-xs"
-                  >
-                    <Eye className="w-3 h-3 mr-1" />
-                    Show Me
-                  </Button>
-                </div>
-              </div>
+            {/* Pivot MC at select_pivot steps */}
+            {isAtPivot && currentStep && (
+              <PivotMCPanel
+                key={currentStepIndex}
+                step={currentStep}
+                onPivotApplied={stepForward}
+                onShowMe={stepForward}
+              />
             )}
 
-            {/* Interactive mode active feedback */}
-            {inInteractive && (
-              <div className="bg-purple-50 border border-purple-300 rounded-lg p-3 space-y-2">
-                <p className="text-xs font-bold text-purple-800">
-                  Interactive mode — {interactiveState!.phase === 'choose_entering'
-                    ? 'Click a Z-row cell (negative coefficient) to choose the entering variable'
-                    : interactiveState!.phase === 'choose_leaving'
-                    ? 'Now click a row in the highlighted column to choose the leaving variable'
-                    : 'Optimal reached!'}
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    exitInteractiveMode();
-                    setCellExplanation('');
-                    stepForward();
-                  }}
-                  className="text-xs"
-                >
-                  <Eye className="w-3 h-3 mr-1" />
-                  Exit & Show Next Step
-                </Button>
-              </div>
-            )}
-
-            {/* Feedback from interactive clicks */}
-            {cellExplanation && (
-              <div className={`rounded-lg p-3 text-xs leading-relaxed ${
-                cellExplanation.startsWith('⚠') || cellExplanation.startsWith('Note:')
-                  ? 'bg-amber-50 border border-amber-200 text-amber-800'
-                  : cellExplanation.startsWith('Good') || cellExplanation.startsWith('Correct')
-                  ? 'bg-green-50 border border-green-200 text-green-800'
-                  : 'bg-gray-50 border border-gray-200 text-gray-700'
-              } whitespace-pre-line font-mono`}>
-                {cellExplanation}
-              </div>
-            )}
-
-            {/* Solver explanation */}
-            {currentStep?.explanation && !inInteractive && (
+            {/* Solver explanation (non-pivot steps) */}
+            {currentStep?.explanation && !isAtPivot && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <p className="text-xs font-bold text-gray-500 mb-1">Solver</p>
                 <p className="text-xs text-gray-700 font-mono leading-relaxed whitespace-pre-wrap">
@@ -1480,7 +1648,7 @@ function SolvingScreen({
             size="sm"
             variant="outline"
             onClick={stepBack}
-            disabled={!canStepBack || inInteractive}
+            disabled={!canStepBack}
             className="text-xs"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
@@ -1490,8 +1658,7 @@ function SolvingScreen({
             {steps.map((s, i) => (
               <button
                 key={i}
-                onClick={() => !inInteractive && jumpToStep(i)}
-                disabled={inInteractive}
+                onClick={() => jumpToStep(i)}
                 className={`flex-shrink-0 w-2.5 h-2.5 rounded-full transition-colors ${
                   i === currentStepIndex
                     ? 'bg-indigo-600 scale-125'
@@ -1507,7 +1674,7 @@ function SolvingScreen({
             size="sm"
             variant="outline"
             onClick={stepForward}
-            disabled={!canStepForward || inInteractive}
+            disabled={!canStepForward || isAtPivot}
             className="text-xs"
           >
             Next

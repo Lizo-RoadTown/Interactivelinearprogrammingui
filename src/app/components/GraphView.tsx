@@ -10,6 +10,10 @@ interface GraphViewProps {
   objectiveCoefficients: number[];
   showObjectiveLine: boolean;
   currentPoint?: Point;
+  /** Show only the first N constraints (undefined = all). Used during graph building. */
+  visibleConstraintCount?: number;
+  /** Draw objective line at this z value regardless of currentPoint.z. */
+  zOverride?: number;
 }
 
 export default function GraphView({
@@ -20,6 +24,8 @@ export default function GraphView({
   objectiveCoefficients,
   showObjectiveLine,
   currentPoint,
+  visibleConstraintCount,
+  zOverride,
 }: GraphViewProps) {
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
   const [hoveredConstraint, setHoveredConstraint] = useState<string | null>(null);
@@ -87,21 +93,13 @@ export default function GraphView({
     .map((p: Point) => `${scaleX(p.x)},${scaleY(p.y)}`)
     .join(' ');
 
-  // Objective line (isoprofit line through current point)
+  // Objective line: drawn at zOverride if set, otherwise at currentPoint.z
   const getObjectiveLine = () => {
-    if (!currentPoint || !showObjectiveLine) return null;
-    
+    if (!showObjectiveLine) return null;
+    const z = zOverride !== undefined ? zOverride : (currentPoint?.z ?? null);
+    if (z === null) return null;
     const [c1, c2] = objectiveCoefficients;
-    // c1*x + c2*y = z
-    // y = (z - c1*x) / c2
-    
-    const z = currentPoint.z || 0;
-    const x1 = 0;
-    const y1 = z / c2;
-    const x2 = z / c1;
-    const y2 = 0;
-    
-    return { x1, y1, x2, y2 };
+    return { x1: 0, y1: z / c2, x2: z / c1, y2: 0 };
   };
 
   const objectiveLine = getObjectiveLine();
@@ -180,8 +178,8 @@ export default function GraphView({
             stroke="none"
           />
 
-          {/* Constraint lines */}
-          {constraints.map((c, idx) => {
+          {/* Constraint lines — respects visibleConstraintCount */}
+          {(visibleConstraintCount !== undefined ? constraints.slice(0, visibleConstraintCount) : constraints).map((c, idx) => {
             const line = getConstraintLine(c);
             const colors = ['#ef4444', '#10b981', '#f59e0b'];
             const color = colors[idx % colors.length];
