@@ -14,17 +14,20 @@ Endpoints:
   GET  /api/health         Liveness check
 """
 
+import os
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
-from models import (
+from .models import (
     LPProblemIn, PivotRequest, CellExplainRequest,
     SolverResponse, PivotResponse, CellExplainResponse,
     SimplexStepOut, TableauOut, TableauCellOut, PointOut,
 )
-from solver_core import (
-    SimplexSolver, compute_graphical_data,
+from .solver_core import (
+    SimplexSolver, TwoPhaseSolver, compute_graphical_data,
     _bfs_from_tab, _cell_explanation, _optimal_pivot_info, _apply_pivot_to_T,
     _fmt_cell, BIG_M,
 )
@@ -33,10 +36,26 @@ app = FastAPI(title="LP Simulator API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"],   # tightened per-host in production via env var if needed
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve React frontend in production (when dist/ exists next to backend/)
+_DIST = os.path.join(os.path.dirname(__file__), '..', 'dist')
+if os.path.isdir(_DIST):
+    app.mount('/assets', StaticFiles(directory=os.path.join(_DIST, 'assets')), name='assets')
+
+    @app.get('/', include_in_schema=False)
+    def _root():
+        return FileResponse(os.path.join(_DIST, 'index.html'))
+
+    @app.get('/{full_path:path}', include_in_schema=False)
+    def _spa(full_path: str):
+        candidate = os.path.join(_DIST, full_path)
+        if os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(_DIST, 'index.html'))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -127,10 +146,16 @@ def _tab_to_step(tab: dict, iteration: int, prev_tab: dict | None,
     # Classify step type
     if iteration == 0:
         step_type = 'initial'
-    elif msg.startswith('SELECT PIVOT'):
+    elif msg.startswith('PHASE I COMPLETE'):
+        step_type = 'phase1_complete'
+    elif msg.startswith('PHASE I SELECT PIVOT') or msg.startswith('PHASE II SELECT PIVOT') or msg.startswith('SELECT PIVOT'):
         step_type = 'select_pivot'
-    elif msg.startswith('AFTER PIVOT'):
+    elif msg.startswith('PHASE I AFTER PIVOT') or msg.startswith('PHASE II AFTER PIVOT') or msg.startswith('AFTER PIVOT'):
         step_type = 'after_pivot'
+    elif msg.startswith('PHASE II:'):
+        step_type = 'phase2_initial'
+    elif msg.startswith('PHASE I:'):
+        step_type = 'phase1_initial'
     elif msg.startswith('OPTIMAL'):
         step_type = 'optimal'
     elif msg.startswith('INFEASIBLE'):
@@ -139,6 +164,9 @@ def _tab_to_step(tab: dict, iteration: int, prev_tab: dict | None,
         step_type = 'unbounded'
     else:
         step_type = 'after_pivot'
+
+    has_alt = 'ALTERNATIVE' in msg
+    is_degen = 'DEGENERATE' in msg
 
     T = tab['matrix']
     m = len(tab['basis'])
@@ -156,10 +184,13 @@ def _tab_to_step(tab: dict, iteration: int, prev_tab: dict | None,
         leavingVar=tab.get('leaving'),
         rowOperations=tab.get('row_ops'),
         objectiveValue=round(obj_val, 8),
+        hasAlternative=has_alt if has_alt else None,
+        isDegenerate=is_degen if is_degen else None,
+        specialCase='alternative' if has_alt else ('degenerate' if is_degen else None),
     )
 
 
-def _build_simplex_path(solver: SimplexSolver) -> list[PointOut]:
+def _build_simplex_path(solver) -> list[PointOut]:
     """Extract the sequence of BFS points from solver tableau history."""
     var_names = solver.var_names
     if len(var_names) != 2:
@@ -229,7 +260,10 @@ def solve(problem: LPProblemIn):
         raise HTTPException(status_code=422, detail=f"Problem parsing error: {e}")
 
     try:
-        solver = SimplexSolver(sense, obj, constraints, var_names)
+        if problem.method == 'two-phase':
+            solver = TwoPhaseSolver(sense, obj, constraints, var_names)
+        else:
+            solver = SimplexSolver(sense, obj, constraints, var_names)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Solver error: {e}")
 

@@ -10,7 +10,6 @@ interface GraphViewProps {
   objectiveCoefficients: number[];
   showObjectiveLine: boolean;
   currentPoint?: Point;
-  axisBounds?: { maxX: number; maxY: number };
 }
 
 export default function GraphView({
@@ -21,7 +20,6 @@ export default function GraphView({
   objectiveCoefficients,
   showObjectiveLine,
   currentPoint,
-  axisBounds,
 }: GraphViewProps) {
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
   const [hoveredConstraint, setHoveredConstraint] = useState<string | null>(null);
@@ -30,8 +28,45 @@ export default function GraphView({
   const width = 500;
   const height = 500;
   const padding = 60;
-  const maxX = axisBounds?.maxX ?? 20;
-  const maxY = axisBounds?.maxY ?? 20;
+
+  // Compute viewport from instructional geometry only:
+  // corner points, simplex path, current BFS.
+  // Fall back to constraint intercepts only if none of those exist yet.
+  const instructionalPoints: { x: number; y: number }[] = [
+    ...cornerPoints,
+    ...simplexPath,
+    ...(currentPoint ? [currentPoint] : []),
+    ...feasibleRegionPolygon,
+  ];
+
+  let maxX: number;
+  let maxY: number;
+
+  if (instructionalPoints.length > 0) {
+    const rawMaxX = Math.max(...instructionalPoints.map(p => p.x), 0);
+    const rawMaxY = Math.max(...instructionalPoints.map(p => p.y), 0);
+    const padX = Math.max(1, 0.15 * rawMaxX);
+    const padY = Math.max(1, 0.15 * rawMaxY);
+    maxX = Math.ceil(rawMaxX + padX);
+    maxY = Math.ceil(rawMaxY + padY);
+    // Ensure a sensible minimum so the graph isn't microscopic
+    maxX = Math.max(maxX, 5);
+    maxY = Math.max(maxY, 5);
+  } else {
+    // Pre-solve: use constraint intercepts but cap at reasonable instructional range
+    const interceptsX = constraints
+      .map(c => c.coefficients[0] > 0 ? c.rhs / c.coefficients[0] : 0)
+      .filter(v => isFinite(v) && v > 0);
+    const interceptsY = constraints
+      .map(c => c.coefficients[1] > 0 ? c.rhs / c.coefficients[1] : 0)
+      .filter(v => isFinite(v) && v > 0);
+    const rawMaxX = interceptsX.length > 0 ? Math.max(...interceptsX) : 10;
+    const rawMaxY = interceptsY.length > 0 ? Math.max(...interceptsY) : 10;
+    const padX = Math.max(1, 0.15 * rawMaxX);
+    const padY = Math.max(1, 0.15 * rawMaxY);
+    maxX = Math.max(Math.ceil(rawMaxX + padX), 5);
+    maxY = Math.max(Math.ceil(rawMaxY + padY), 5);
+  }
 
   const scaleX = (x: number) => padding + (x / maxX) * (width - 2 * padding);
   const scaleY = (y: number) => height - padding - (y / maxY) * (height - 2 * padding);
@@ -72,35 +107,27 @@ export default function GraphView({
   const objectiveLine = getObjectiveLine();
 
   return (
-    <div className="h-full bg-white border-r border-gray-200 p-4 flex flex-col">
-      <div className="mb-3">
-        <h3 className="font-semibold">Graphical View</h3>
-        <p className="text-xs text-gray-600">Feasible region and optimal solution</p>
-      </div>
-      
+    <div className="h-full bg-white flex flex-col overflow-hidden">
       <TooltipProvider>
-        <svg width={width} height={height} className="border border-gray-200 rounded">
-          {/* Grid lines */}
-          {[...Array(21)].map((_, i) => (
-            <g key={`grid-${i}`}>
-              <line
-                x1={scaleX(i)}
-                y1={scaleY(0)}
-                x2={scaleX(i)}
-                y2={scaleY(maxY)}
-                stroke="#f0f0f0"
-                strokeWidth="1"
-              />
-              <line
-                x1={scaleX(0)}
-                y1={scaleY(i)}
-                x2={scaleX(maxX)}
-                y2={scaleY(i)}
-                stroke="#f0f0f0"
-                strokeWidth="1"
-              />
-            </g>
-          ))}
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          width="100%"
+          height="100%"
+          preserveAspectRatio="xMidYMid meet"
+          className="flex-1 min-h-0"
+        >
+          {/* Grid lines — dynamic */}
+          {(() => {
+            const step = maxX <= 15 ? 2 : maxX <= 30 ? 5 : 10;
+            const xLines = Array.from({ length: Math.floor(maxX / step) + 1 }, (_, i) => i * step);
+            const yLines = Array.from({ length: Math.floor(maxY / step) + 1 }, (_, i) => i * step);
+            return (
+              <>
+                {xLines.map(i => <line key={`gx-${i}`} x1={scaleX(i)} y1={scaleY(0)} x2={scaleX(i)} y2={scaleY(maxY)} stroke="#f0f0f0" strokeWidth="1" />)}
+                {yLines.map(i => <line key={`gy-${i}`} x1={scaleX(0)} y1={scaleY(i)} x2={scaleX(maxX)} y2={scaleY(i)} stroke="#f0f0f0" strokeWidth="1" />)}
+              </>
+            );
+          })()}
 
           {/* Axes */}
           <line
@@ -128,17 +155,22 @@ export default function GraphView({
             x₂
           </text>
 
-          {/* Tick marks and labels */}
-          {[0, 5, 10, 15, 20].map(i => (
-            <g key={`tick-${i}`}>
-              <text x={scaleX(i)} y={scaleY(0) + 20} className="text-xs" textAnchor="middle">
-                {i}
-              </text>
-              <text x={scaleX(0) - 20} y={scaleY(i) + 5} className="text-xs" textAnchor="middle">
-                {i}
-              </text>
-            </g>
-          ))}
+          {/* Tick marks and labels — dynamic based on axis bounds */}
+          {(() => {
+            const step = maxX <= 15 ? 2 : maxX <= 30 ? 5 : 10;
+            const xTicks = Array.from({ length: Math.floor(maxX / step) + 1 }, (_, i) => i * step);
+            const yTicks = Array.from({ length: Math.floor(maxY / step) + 1 }, (_, i) => i * step);
+            return (
+              <>
+                {xTicks.map(i => (
+                  <text key={`xt-${i}`} x={scaleX(i)} y={scaleY(0) + 20} fontSize="14" textAnchor="middle" fill="#666">{i}</text>
+                ))}
+                {yTicks.map(i => (
+                  <text key={`yt-${i}`} x={scaleX(0) - 20} y={scaleY(i) + 5} fontSize="14" textAnchor="middle" fill="#666">{i}</text>
+                ))}
+              </>
+            );
+          })()}
 
           {/* Feasible region */}
           <polygon
@@ -290,26 +322,12 @@ export default function GraphView({
         </svg>
       </TooltipProvider>
 
-      {/* Legend */}
-      <div className="mt-4 space-y-2 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-blue-500 opacity-15 border border-blue-500"></div>
-          <span>Feasible Region</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-1 bg-purple-500"></div>
-          <span>Simplex Path</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-purple-600"></div>
-          <span>Current Solution</span>
-        </div>
-        {showObjectiveLine && (
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-1 bg-purple-500" style={{ backgroundImage: 'repeating-linear-gradient(to right, #8b5cf6 0, #8b5cf6 8px, transparent 8px, transparent 12px)' }}></div>
-            <span>Objective Line</span>
-          </div>
-        )}
+      {/* Compact legend */}
+      <div className="flex items-center gap-4 px-3 py-1 border-t border-gray-100 text-xs text-gray-500 shrink-0 flex-wrap">
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-blue-500 opacity-30 border border-blue-400" />Feasible</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-purple-500" />Simplex path</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-purple-600" />Current</span>
+        {showObjectiveLine && <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-purple-400 border-dashed" />Objective</span>}
       </div>
     </div>
   );

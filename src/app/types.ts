@@ -1,6 +1,6 @@
 export type ObjectiveType = 'max' | 'min';
 
-export type Method = 'graphical' | 'simplex' | 'big-m';
+export type Method = 'graphical' | 'simplex' | 'big-m' | 'two-phase';
 
 export type StepType =
   | 'initial'
@@ -8,7 +8,12 @@ export type StepType =
   | 'after_pivot'
   | 'optimal'
   | 'infeasible'
-  | 'unbounded';
+  | 'unbounded'
+  | 'phase1_initial'
+  | 'phase1_complete'
+  | 'phase2_initial'
+  | 'degenerate'
+  | 'alternative';
 
 export interface Constraint {
   id: string;
@@ -18,11 +23,14 @@ export interface Constraint {
   label?: string;
 }
 
+export type VariableSign = 'nonneg' | 'nonpos' | 'urs';
+
 export interface LPProblem {
   objectiveType: ObjectiveType;
   objectiveCoefficients: number[];
   constraints: Constraint[];
   variables: string[];
+  variableSigns?: VariableSign[];  // one per variable; defaults to 'nonneg'
 }
 
 // ── Tableau types (API-driven) ────────────────────────────────────────────────
@@ -58,6 +66,9 @@ export interface SimplexStep {
   leavingVar?: string;
   rowOperations?: string[];
   objectiveValue: number;
+  hasAlternative?: boolean;
+  isDegenerate?: boolean;
+  specialCase?: string;
 }
 
 // ── Graph types ───────────────────────────────────────────────────────────────

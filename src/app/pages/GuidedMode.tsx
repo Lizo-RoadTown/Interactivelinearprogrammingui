@@ -73,6 +73,9 @@ export default function GuidedMode() {
       <TopControlBar
         objectiveType={objectiveType}
         onObjectiveTypeChange={setObjectiveType}
+        objectiveCoefficients={sampleProblem.objectiveCoefficients}
+        onObjectiveCoefficientsChange={() => {}}
+        variables={sampleProblem.variables}
         method={method}
         onMethodChange={setMethod}
         onSolve={handleSolve}
@@ -83,8 +86,6 @@ export default function GuidedMode() {
         onInteractiveModeToggle={() => setIsInteractive(!isInteractive)}
         showRatioTest={showRatioTest}
         onShowRatioTestToggle={() => setShowRatioTest(!showRatioTest)}
-        showRowOperations={showRowOperations}
-        onShowRowOperationsToggle={() => setShowRowOperations(!showRowOperations)}
         showObjectiveLine={showObjectiveLine}
         onShowObjectiveLineToggle={() => setShowObjectiveLine(!showObjectiveLine)}
         canStepBack={currentStepIndex > 0}

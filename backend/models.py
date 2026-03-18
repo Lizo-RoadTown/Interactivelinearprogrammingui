@@ -24,8 +24,9 @@ class LPProblemIn(BaseModel):
     objectiveType: str             # "max" | "min"
     objectiveCoefficients: list[float]
     variables: list[str]           # e.g. ["x1", "x2"]
+    variableSigns: Optional[list[str]] = None  # "nonneg" | "nonpos" | "urs" per variable
     constraints: list[ConstraintIn]
-    method: str = "simplex"        # "simplex" | "big-m" (big-m is always used internally)
+    method: str = "simplex"        # "simplex" | "big-m" | "two-phase"
 
 
 class PivotRequest(BaseModel):
@@ -75,7 +76,9 @@ class TableauOut(BaseModel):
 
 class SimplexStepOut(BaseModel):
     iteration: int
-    stepType: str                  # "initial" | "select_pivot" | "after_pivot" | "optimal" | "infeasible" | "unbounded"
+    # "initial"|"select_pivot"|"after_pivot"|"optimal"|"infeasible"
+    # "unbounded"|"phase1_initial"|"phase1_complete"|"phase2_initial"
+    stepType: str
     tableau: TableauOut
     explanation: str
     pivotRow: Optional[int] = None
@@ -84,6 +87,9 @@ class SimplexStepOut(BaseModel):
     leavingVar: Optional[str] = None
     rowOperations: Optional[list[str]] = None
     objectiveValue: float
+    hasAlternative: Optional[bool] = None
+    isDegenerate: Optional[bool] = None
+    specialCase: Optional[str] = None   # "alternative" | "degenerate" | "cycling_risk"
 
 
 class PointOut(BaseModel):

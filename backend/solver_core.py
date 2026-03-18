@@ -368,7 +368,7 @@ class SimplexSolver:
                 break
 
             ratios = []
-            pivot_row = -1
+            tied = []
             min_ratio = float('inf')
             for i in range(m):
                 elem = T[i, pivot_col]
@@ -377,12 +377,13 @@ class SimplexSolver:
                     ratios.append(round(r, 6))
                     if r < min_ratio - 1e-10:
                         min_ratio = r
-                        pivot_row = i
-                    elif abs(r - min_ratio) < 1e-10 and pivot_row == -1:
-                        min_ratio = r
-                        pivot_row = i
+                        tied = [i]
+                    elif abs(r - min_ratio) < 1e-10:
+                        tied.append(i)
                 else:
                     ratios.append(None)
+            # Bland's rule: break ties by lowest basis index
+            pivot_row = min(tied, key=lambda i: basis[i]) if tied else -1
 
             if pivot_row == -1:
                 self._save(T, basis, all_vars, col_types,
@@ -443,7 +444,6 @@ class SimplexSolver:
         else:
             W = T[m, -1]
             z_star = W if self.sense == 'max' else -W
-            msg = f"OPTIMAL  z* = {z_star:.6g}"
             self.status = 'optimal'
             self.z_optimal = z_star
             for j, v in enumerate(self.var_names):
@@ -452,6 +452,16 @@ class SimplexSolver:
                 bv = basis[i]
                 if bv < n:
                     self.solution[self.var_names[bv]] = round(T[i, -1], 8)
+            # Special case detection
+            nonbasic = set(range(n_total)) - set(basis)
+            has_alt = any(abs(T[m, j]) < 1e-8 and col_types[j] == 'decision'
+                          for j in nonbasic)
+            is_degen = any(abs(T[i, -1]) < 1e-8 for i in range(m))
+            msg = f"OPTIMAL  z* = {_fmt_cell(z_star)}"
+            if has_alt:
+                msg += "  [ALTERNATIVE SOLUTIONS EXIST: a nonbasic variable has z-row = 0]"
+            if is_degen:
+                msg += "  [DEGENERATE: a basic variable = 0 at optimum]"
 
         self._save(T, basis, all_vars, col_types,
                    pivot_col=None, pivot_row=None, ratios=None,
@@ -478,6 +488,330 @@ class SimplexSolver:
         sense_word = "Minimize" if self.sense == 'min' else "Maximize"
         obj_str = _fmt_expr(self.obj, self.var_names)
         lines.append("ORIGINAL PROBLEM")
+        lines.append(f"  {sense_word}  z = {obj_str}")
+        lines.append("  Subject to:")
+        for i, (coeffs, rel, rhs) in enumerate(self.constraints):
+            lines.append(f"    C{i+1}:  {_fmt_expr(coeffs, self.var_names)} {rel} {rhs:g}")
+        lines.append(f"    {', '.join(v.lower() for v in self.var_names)} >= 0")
+        return "\n".join(lines)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  TWO-PHASE SIMPLEX SOLVER
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TwoPhaseSolver:
+    """Two-phase simplex solver.  Same public interface as SimplexSolver."""
+
+    MAX_ITERS = 60
+
+    def __init__(self, sense, obj, constraints, var_names):
+        self.sense = sense
+        self.obj = obj
+        self.constraints = constraints
+        self.var_names = list(var_names)
+        self.tableaus = []
+        self.status = 'running'
+        self.z_optimal = None
+        self.solution = {}
+        self._solve()
+
+    # ── build augmented matrix ────────────────────────────────────────────────
+
+    def _build_augmented(self):
+        n = len(self.var_names)
+        m = len(self.constraints)
+        all_vars = list(self.var_names)
+        col_types = ['decision'] * n
+        row_aux = {i: [] for i in range(m)}
+        art_cols = []
+        s_cnt = e_cnt = a_cnt = 0
+
+        for i, (_, rel, _) in enumerate(self.constraints):
+            if rel in ('<=', '<'):
+                s_cnt += 1
+                row_aux[i].append((len(all_vars), 'slack'))
+                all_vars.append(f's{s_cnt}')
+                col_types.append('slack')
+            elif rel in ('>=', '>'):
+                e_cnt += 1
+                row_aux[i].append((len(all_vars), 'surplus'))
+                all_vars.append(f'e{e_cnt}')
+                col_types.append('surplus')
+                a_cnt += 1
+                row_aux[i].append((len(all_vars), 'artificial'))
+                art_cols.append(len(all_vars))
+                all_vars.append(f'a{a_cnt}')
+                col_types.append('artificial')
+            elif rel == '=':
+                a_cnt += 1
+                row_aux[i].append((len(all_vars), 'artificial'))
+                art_cols.append(len(all_vars))
+                all_vars.append(f'a{a_cnt}')
+                col_types.append('artificial')
+
+        n_total = len(all_vars)
+        T = np.zeros((m + 1, n_total + 1))
+        basis = [-1] * m
+
+        for i, (coeffs, rel, rhs) in enumerate(self.constraints):
+            for j, v in enumerate(self.var_names):
+                T[i, j] = coeffs.get(v, 0.0)
+            for col_idx, vtype in row_aux[i]:
+                if vtype == 'slack':        T[i, col_idx] =  1.0
+                elif vtype == 'surplus':    T[i, col_idx] = -1.0
+                elif vtype == 'artificial': T[i, col_idx] =  1.0
+            T[i, -1] = rhs
+            for col_idx, vtype in row_aux[i]:
+                if vtype in ('slack', 'artificial'):
+                    basis[i] = col_idx
+
+        return T, basis, all_vars, col_types, art_cols
+
+    # ── pivot loop ────────────────────────────────────────────────────────────
+
+    def _pivot_loop(self, T, basis, all_vars, col_types, label, allowed=None):
+        """Run simplex pivots. Returns (T, basis, terminated_early)."""
+        m = len(basis)
+        for it in range(self.MAX_ITERS):
+            z_row = T[m, :-1]
+            cols = allowed if allowed is not None else range(len(z_row))
+            neg = [j for j in cols if z_row[j] < -1e-8]
+            if not neg:
+                break
+
+            pivot_col = min(neg, key=lambda j: z_row[j])  # most negative
+
+            # Min-ratio test with Bland's tie-breaking
+            ratios, tied, min_r = [], [], float('inf')
+            for i in range(m):
+                e = T[i, pivot_col]
+                if e > 1e-8:
+                    r = T[i, -1] / e
+                    ratios.append(round(r, 6))
+                    if r < min_r - 1e-10:
+                        min_r, tied = r, [i]
+                    elif abs(r - min_r) < 1e-10:
+                        tied.append(i)
+                else:
+                    ratios.append(None)
+
+            if not tied:
+                entering = all_vars[pivot_col]
+                self._save(T, basis, all_vars, col_types,
+                           pivot_col=pivot_col, pivot_row=None, ratios=ratios,
+                           entering=entering, leaving=None, row_ops=None,
+                           message=f"UNBOUNDED: no positive entry in {entering} column.")
+                self.status = 'unbounded'
+                return T, basis, True
+
+            # Bland's rule on ties: lowest basis index
+            pivot_row = min(tied, key=lambda i: basis[i])
+            entering = all_vars[pivot_col]
+            leaving = all_vars[basis[pivot_row]]
+            degen = abs(T[pivot_row, -1]) < 1e-8
+            degen_note = "  [DEGENERATE: ratio = 0]" if degen else ""
+
+            self._save(T, basis, all_vars, col_types,
+                       pivot_col=pivot_col, pivot_row=pivot_row, ratios=ratios,
+                       entering=entering, leaving=leaving, row_ops=None,
+                       message=(f"{label} SELECT PIVOT  |  Entering: {entering.lower()}  |  "
+                                f"Leaving: {leaving.lower()}  |  "
+                                f"Pivot = {_fmt_cell(T[pivot_row, pivot_col])}{degen_note}"))
+
+            pe = T[pivot_row, pivot_col]
+            ops = []
+            ops.append(f"R{pivot_row+1} / {_fmt_cell(pe)}  ->  new R{pivot_row+1}"
+                       if abs(pe - 1) > 1e-9 else
+                       f"R{pivot_row+1} stays (pivot = 1)")
+            for i in range(m + 1):
+                if i == pivot_row: continue
+                c = T[i, pivot_col]
+                if abs(c) < 1e-9: continue
+                rl = "Rz" if i == m else f"R{i+1}"
+                ops.append(f"{rl} <- {rl} - ({_fmt_cell(c)}) x R{pivot_row+1}"
+                           if c > 0 else
+                           f"{rl} <- {rl} + ({_fmt_cell(abs(c))}) x R{pivot_row+1}")
+
+            T[pivot_row] /= pe
+            for i in range(m + 1):
+                if i != pivot_row:
+                    T[i] -= T[i, pivot_col] * T[pivot_row]
+            basis[pivot_row] = pivot_col
+
+            self._save(T, basis, all_vars, col_types,
+                       pivot_col=pivot_col, pivot_row=pivot_row, ratios=None,
+                       entering=entering, leaving=leaving, row_ops=ops,
+                       message=(f"{label} AFTER PIVOT {it+1}  |  "
+                                f"{entering.lower()} entered, {leaving.lower()} left  |  "
+                                f"z = {_fmt_cell(T[m, -1])}"))
+        return T, basis, False
+
+    # ── main solve ────────────────────────────────────────────────────────────
+
+    def _solve(self):
+        T, basis, all_vars, col_types, art_cols = self._build_augmented()
+        m = len(basis)
+
+        # ── If no artificials: just run standard simplex ──────────────────
+        if not art_cols:
+            T[m, :] = 0.0
+            for j, v in enumerate(all_vars):
+                if col_types[j] == 'decision':
+                    c = self.obj.get(v, 0.0)
+                    T[m, j] = -c if self.sense == 'max' else c
+            for i, bv in enumerate(basis):
+                if bv >= 0 and abs(T[m, bv]) > 1e-9:
+                    T[m] -= T[m, bv] * T[i]
+            self._save(T, basis, all_vars, col_types,
+                       None, None, None, None, None, None,
+                       "Initial tableau (no artificial variables needed).")
+            T, basis, early = self._pivot_loop(T, basis, all_vars, col_types, "")
+            if not early:
+                self._finalize(T, basis, all_vars, col_types)
+            return
+
+        # ── PHASE I setup ────────────────────────────────────────────────
+        T[m, :] = 0.0
+        for j, ct in enumerate(col_types):
+            if ct == 'artificial':
+                T[m, j] = 1.0          # MIN z1 = sum(artificials); internal MAX → +c_j
+        for i, bv in enumerate(basis):
+            if bv >= 0 and col_types[bv] == 'artificial':
+                T[m] -= T[m, bv] * T[i]
+
+        self._save(T, basis, all_vars, col_types,
+                   None, None, None, None, None, None,
+                   "PHASE I: Minimize sum of artificial variables. "
+                   "All artificials must reach zero to find a basic feasible solution.")
+
+        T, basis, early = self._pivot_loop(T, basis, all_vars, col_types, "PHASE I")
+        if early:
+            return   # unbounded (rare in Phase I)
+
+        # Phase I value (internally minimizing, so z1* = -T[m,-1])
+        z1_star = -T[m, -1]
+
+        if z1_star > 1e-6:
+            self._save(T, basis, all_vars, col_types,
+                       None, None, None, None, None, None,
+                       f"INFEASIBLE: Phase I optimal z₁* = {_fmt_cell(z1_star)} > 0. "
+                       "Cannot drive all artificials to zero — problem has no feasible solution.")
+            self.status = 'infeasible'
+            return
+
+        # Identify basic artificials (degenerate if RHS ≈ 0)
+        degen_art_rows = [i for i in range(m)
+                          if col_types[basis[i]] == 'artificial' and abs(T[i, -1]) < 1e-8]
+        pos_art_rows   = [i for i in range(m)
+                          if col_types[basis[i]] == 'artificial' and T[i, -1] > 1e-8]
+        if pos_art_rows:
+            self.status = 'infeasible'
+            return
+
+        note = ""
+        if degen_art_rows:
+            note = (f"  {len(degen_art_rows)} artificial(s) remain basic at zero "
+                    "(degenerate) — their rows will be removed before Phase II.")
+
+        self._save(T, basis, all_vars, col_types,
+                   None, None, None, None, None, None,
+                   f"PHASE I COMPLETE: z₁* = 0. Basic feasible solution found.{note}")
+
+        # ── PHASE II setup ───────────────────────────────────────────────
+        # Remove degenerate artificial rows
+        keep_rows = [i for i in range(m) if i not in degen_art_rows]
+        z_row_idx = m
+        T2 = T[np.ix_(keep_rows + [z_row_idx],
+                       list(range(T.shape[1])))]
+        basis2 = [basis[i] for i in keep_rows]
+        m2 = len(basis2)
+
+        # Remove all artificial columns
+        art_set = {j for j, ct in enumerate(col_types) if ct == 'artificial'}
+        keep_cols = [j for j in range(len(all_vars)) if j not in art_set] + [len(all_vars)]
+        old_to_new = {old: new for new, old in enumerate(keep_cols)}
+
+        T2 = T2[:, keep_cols]
+        all_vars2 = [v for j, v in enumerate(all_vars) if j not in art_set]
+        col_types2 = [ct for j, ct in enumerate(col_types) if j not in art_set]
+        basis2 = [old_to_new[b] for b in basis2]
+
+        # Restore original z-row
+        T2[m2, :] = 0.0
+        for j, v in enumerate(all_vars2):
+            if col_types2[j] == 'decision':
+                c = self.obj.get(v, 0.0)
+                T2[m2, j] = -c if self.sense == 'max' else c
+        for i, bv in enumerate(basis2):
+            if bv >= 0 and abs(T2[m2, bv]) > 1e-9:
+                T2[m2] -= T2[m2, bv] * T2[i]
+
+        self._save(T2, basis2, all_vars2, col_types2,
+                   None, None, None, None, None, None,
+                   "PHASE II: Artificial columns removed. Original objective restored. "
+                   "Continue simplex to find the optimal solution.")
+
+        T2, basis2, early = self._pivot_loop(T2, basis2, all_vars2, col_types2, "PHASE II")
+        if not early:
+            self._finalize(T2, basis2, all_vars2, col_types2)
+
+    # ── finalize optimal ──────────────────────────────────────────────────────
+
+    def _finalize(self, T, basis, all_vars, col_types):
+        m = len(basis)
+        W = T[m, -1]
+        z_star = W if self.sense == 'max' else -W
+        self.status = 'optimal'
+        self.z_optimal = z_star
+
+        for v in self.var_names:
+            self.solution[v] = 0.0
+        for i, bv in enumerate(basis):
+            if 0 <= bv < len(all_vars) and col_types[bv] == 'decision':
+                vn = all_vars[bv]
+                if vn in self.solution:
+                    self.solution[vn] = round(float(T[i, -1]), 8)
+
+        # Alternative solution check
+        nonbasic_set = set(range(len(all_vars))) - set(basis)
+        has_alt = any(abs(T[m, j]) < 1e-8 and col_types[j] == 'decision'
+                      for j in nonbasic_set)
+        # Degeneracy check
+        is_degen = any(abs(T[i, -1]) < 1e-8 for i in range(m))
+
+        msg = f"OPTIMAL  z* = {_fmt_cell(z_star)}"
+        if has_alt:
+            msg += "  [ALTERNATIVE SOLUTIONS EXIST: a nonbasic variable has z-row = 0]"
+        if is_degen:
+            msg += "  [DEGENERATE: a basic variable = 0 at optimum]"
+
+        self._save(T, basis, all_vars, col_types,
+                   None, None, None, None, None, None, msg)
+
+    # ── save ─────────────────────────────────────────────────────────────────
+
+    def _save(self, T, basis, all_vars, col_types,
+              pivot_col, pivot_row, ratios, entering, leaving, row_ops, message):
+        self.tableaus.append({
+            'matrix':    T.copy(),
+            'basis':     list(basis),
+            'all_vars':  list(all_vars),
+            'col_types': list(col_types),
+            'pivot_col': pivot_col,
+            'pivot_row': pivot_row,
+            'ratios':    list(ratios) if ratios is not None else None,
+            'entering':  entering,
+            'leaving':   leaving,
+            'row_ops':   list(row_ops) if row_ops is not None else None,
+            'message':   message,
+        })
+
+    def standard_form_text(self):
+        lines = []
+        sense_word = "Minimize" if self.sense == 'min' else "Maximize"
+        obj_str = _fmt_expr(self.obj, self.var_names)
+        lines.append("ORIGINAL PROBLEM  [Two-Phase Method]")
         lines.append(f"  {sense_word}  z = {obj_str}")
         lines.append("  Subject to:")
         for i, (coeffs, rel, rhs) in enumerate(self.constraints):

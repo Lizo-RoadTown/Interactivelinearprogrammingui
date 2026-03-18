@@ -125,6 +125,9 @@ export default function InteractiveMode() {
       <TopControlBar
         objectiveType={objectiveType}
         onObjectiveTypeChange={setObjectiveType}
+        objectiveCoefficients={sampleProblem.objectiveCoefficients}
+        onObjectiveCoefficientsChange={() => {}}
+        variables={sampleProblem.variables}
         method={method}
         onMethodChange={setMethod}
         onSolve={handleSolve}
@@ -135,8 +138,6 @@ export default function InteractiveMode() {
         onInteractiveModeToggle={() => setIsInteractive(!isInteractive)}
         showRatioTest={showRatioTest}
         onShowRatioTestToggle={() => setShowRatioTest(!showRatioTest)}
-        showRowOperations={showRowOperations}
-        onShowRowOperationsToggle={() => setShowRowOperations(!showRowOperations)}
         showObjectiveLine={showObjectiveLine}
         onShowObjectiveLineToggle={() => setShowObjectiveLine(!showObjectiveLine)}
         canStepBack={currentStepIndex > 0}

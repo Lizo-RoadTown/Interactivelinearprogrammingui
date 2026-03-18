@@ -11,7 +11,9 @@ import {
   PivotRecord, Point, SimplexStep,
 } from '../types';
 
-const API_BASE = 'http://localhost:8000/api';
+// In dev, Vite proxies /api → localhost:8000.  In production, same origin.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const API_BASE = (import.meta as any).env?.DEV ? 'http://localhost:8000/api' : '/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -66,6 +68,7 @@ export function useLPSolver() {
         objectiveType: problem.objectiveType,
         objectiveCoefficients: problem.objectiveCoefficients,
         variables: problem.variables,
+        variableSigns: problem.variableSigns ?? problem.variables.map(() => 'nonneg'),
         constraints: problem.constraints,
         method,
       });

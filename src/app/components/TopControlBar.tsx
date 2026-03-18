@@ -1,14 +1,16 @@
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
-import { Label } from './ui/label';
 import { Input } from './ui/input';
-import { ChevronLeft, ChevronRight, Play, RotateCcw, Plus, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, RotateCcw, Maximize2, Minimize2 } from 'lucide-react';
 import { ObjectiveType, Method } from '../types';
 
 interface TopControlBarProps {
   objectiveType: ObjectiveType;
   onObjectiveTypeChange: (type: ObjectiveType) => void;
+  objectiveCoefficients: number[];
+  onObjectiveCoefficientsChange: (coeffs: number[]) => void;
+  variables: string[];
   method: Method;
   onMethodChange: (method: Method) => void;
   onSolve: () => void;
@@ -19,8 +21,6 @@ interface TopControlBarProps {
   onInteractiveModeToggle: () => void;
   showRatioTest: boolean;
   onShowRatioTestToggle: () => void;
-  showRowOperations: boolean;
-  onShowRowOperationsToggle: () => void;
   showObjectiveLine: boolean;
   onShowObjectiveLineToggle: () => void;
   canStepBack: boolean;
@@ -30,6 +30,9 @@ interface TopControlBarProps {
 export default function TopControlBar({
   objectiveType,
   onObjectiveTypeChange,
+  objectiveCoefficients,
+  onObjectiveCoefficientsChange,
+  variables,
   method,
   onMethodChange,
   onSolve,
@@ -40,105 +43,90 @@ export default function TopControlBar({
   onInteractiveModeToggle,
   showRatioTest,
   onShowRatioTestToggle,
-  showRowOperations,
-  onShowRowOperationsToggle,
   showObjectiveLine,
   onShowObjectiveLineToggle,
   canStepBack,
-  canStepForward
+  canStepForward,
 }: TopControlBarProps) {
+  const handleCoeff = (i: number, raw: string) => {
+    const val = parseFloat(raw);
+    if (isNaN(val)) return;
+    const next = [...objectiveCoefficients];
+    next[i] = val;
+    onObjectiveCoefficientsChange(next);
+  };
+
   return (
-    <div className="bg-white border-b border-gray-200 p-4">
-      <div className="grid grid-cols-3 gap-6">
-        {/* Left section - Objective Function */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Label className="text-sm font-medium">Objective:</Label>
-            <div className="flex gap-2">
-              <Button
-                variant={objectiveType === 'max' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => onObjectiveTypeChange('max')}
-                className="w-16"
-              >
-                <Maximize2 className="w-4 h-4 mr-1" />
-                Max
-              </Button>
-              <Button
-                variant={objectiveType === 'min' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => onObjectiveTypeChange('min')}
-                className="w-16"
-              >
-                <Minimize2 className="w-4 h-4 mr-1" />
-                Min
-              </Button>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm">z = </span>
-            <Input className="w-12 h-8 text-center" defaultValue="3" />
-            <span className="text-sm">x₁ +</span>
-            <Input className="w-12 h-8 text-center" defaultValue="2" />
-            <span className="text-sm">x₂</span>
-          </div>
-          <Button variant="outline" size="sm" className="w-full">
-            <Plus className="w-4 h-4 mr-1" />
-            Add Constraint
+    <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-6">
+      {/* Objective */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="flex gap-1">
+          <Button variant={objectiveType === 'max' ? 'default' : 'outline'} size="sm"
+            onClick={() => onObjectiveTypeChange('max')} className="h-7 w-14 text-xs">
+            <Maximize2 className="w-3 h-3 mr-1" />Max
+          </Button>
+          <Button variant={objectiveType === 'min' ? 'default' : 'outline'} size="sm"
+            onClick={() => onObjectiveTypeChange('min')} className="h-7 w-14 text-xs">
+            <Minimize2 className="w-3 h-3 mr-1" />Min
           </Button>
         </div>
+        <span className="text-sm font-medium">z =</span>
+        {objectiveCoefficients.map((coeff, i) => (
+          <span key={i} className="flex items-center gap-1">
+            <Input className="w-12 h-7 text-center text-sm" value={coeff}
+              onChange={e => handleCoeff(i, e.target.value)} />
+            <span className="text-sm text-gray-600">
+              {variables[i] ?? `x${i + 1}`}{i < objectiveCoefficients.length - 1 ? ' +' : ''}
+            </span>
+          </span>
+        ))}
+      </div>
 
-        {/* Center section - Method & Controls */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Label className="text-sm font-medium">Method:</Label>
-            <Select value={method} onValueChange={onMethodChange}>
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="graphical">Graphical</SelectItem>
-                <SelectItem value="simplex">Simplex</SelectItem>
-                <SelectItem value="big-m">Big-M</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-2 justify-center">
-            <Button variant="outline" size="sm" onClick={onStepBack} disabled={!canStepBack}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button variant="default" size="sm" onClick={onSolve}>
-              <Play className="w-4 h-4 mr-1" />
-              Solve
-            </Button>
-            <Button variant="outline" size="sm" onClick={onStepForward} disabled={!canStepForward}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={onReset}>
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
+      <div className="w-px h-8 bg-gray-200 shrink-0" />
 
-        {/* Right section - Toggles */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Interactive Mode</Label>
-            <Switch checked={isInteractive} onCheckedChange={onInteractiveModeToggle} />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Show Ratio Test</Label>
-            <Switch checked={showRatioTest} onCheckedChange={onShowRatioTestToggle} />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Show Row Operations</Label>
-            <Switch checked={showRowOperations} onCheckedChange={onShowRowOperationsToggle} />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">Show Objective Line</Label>
-            <Switch checked={showObjectiveLine} onCheckedChange={onShowObjectiveLineToggle} />
-          </div>
-        </div>
+      {/* Method + controls */}
+      <div className="flex items-center gap-2 shrink-0">
+        <Select value={method} onValueChange={onMethodChange}>
+          <SelectTrigger className="w-32 h-7 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="graphical">Graphical</SelectItem>
+            <SelectItem value="simplex">Simplex</SelectItem>
+            <SelectItem value="big-m">Big-M</SelectItem>
+            <SelectItem value="two-phase">Two-Phase</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={onStepBack} disabled={!canStepBack}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <Button variant="default" size="sm" className="h-7 px-3 text-xs" onClick={onSolve}>
+          <Play className="w-3 h-3 mr-1" />Solve
+        </Button>
+        <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={onStepForward} disabled={!canStepForward}>
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+        <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={onReset}>
+          <RotateCcw className="w-3 h-3" />
+        </Button>
+      </div>
+
+      <div className="w-px h-8 bg-gray-200 shrink-0" />
+
+      {/* Toggles */}
+      <div className="flex items-center gap-4 text-xs">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <Switch checked={isInteractive} onCheckedChange={onInteractiveModeToggle} />
+          <span>Interactive</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <Switch checked={showRatioTest} onCheckedChange={onShowRatioTestToggle} />
+          <span>Ratio Test</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <Switch checked={showObjectiveLine} onCheckedChange={onShowObjectiveLineToggle} />
+          <span>Objective Line</span>
+        </label>
       </div>
     </div>
   );
