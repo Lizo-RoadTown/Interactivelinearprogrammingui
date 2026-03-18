@@ -566,14 +566,23 @@ export default function GraphBuildPhase({
                     last touches the feasible region. This is always a vertex — this is why the
                     Simplex Method moves from corner to corner!
                   </p>
-                  <Button
-                    onClick={() => setPhase('wrap_up')}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    Excellent — let's set up the tableau <ArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
                 </div>
               )}
+
+              {/* Always-visible continue button — student is never stuck */}
+              <Button
+                onClick={() => setPhase('wrap_up')}
+                className={`w-full text-white ${
+                  zStatus === 'optimal'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
+              >
+                {zStatus === 'optimal'
+                  ? <>Excellent — set up the tableau <ArrowRight className="w-4 h-4 ml-1" /></>
+                  : <>Continue to Tableau Setup <ArrowRight className="w-4 h-4 ml-1" /></>
+                }
+              </Button>
             </div>
           )}
 
@@ -593,11 +602,15 @@ export default function GraphBuildPhase({
                   where we can't graph.
                 </p>
               </div>
+
+              <p className="text-xs text-center text-gray-400">Step 2 of 3 — next up: Tableau Setup</p>
+
               <Button
                 onClick={onDone}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                size="lg"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3"
               >
-                Build the Tableau →
+                Build the Simplex Tableau →
               </Button>
             </div>
           )}
