@@ -1,7 +1,6 @@
 import { createBrowserRouter } from "react-router";
 import MainWorkspace from "./pages/MainWorkspace";
-import GuidedMode from "./pages/GuidedMode";
-import InteractiveMode from "./pages/InteractiveMode";
+import PracticeMode from "./pages/PracticeMode";
 
 export const router = createBrowserRouter([
   {
@@ -9,11 +8,7 @@ export const router = createBrowserRouter([
     Component: MainWorkspace,
   },
   {
-    path: "/guided",
-    Component: GuidedMode,
-  },
-  {
-    path: "/interactive",
-    Component: InteractiveMode,
+    path: "/practice",
+    Component: PracticeMode,
   },
 ]);

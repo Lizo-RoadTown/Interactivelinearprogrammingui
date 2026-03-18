@@ -292,11 +292,8 @@ export default function MainWorkspace() {
           <p className="text-sm text-purple-200 mt-0.5">Interactive Simplex Method Learning Tool</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="secondary" size="sm" className="px-4" onClick={() => navigate('/guided')}>
-            <BookOpen className="w-4 h-4 mr-2" />Guided
-          </Button>
-          <Button variant="secondary" size="sm" className="px-4" onClick={() => navigate('/interactive')}>
-            <Zap className="w-4 h-4 mr-2" />Interactive
+          <Button variant="secondary" size="sm" className="px-4" onClick={() => navigate('/practice')}>
+            <BookOpen className="w-4 h-4 mr-2" />Practice Mode
           </Button>
         </div>
       </div>
