@@ -1210,16 +1210,33 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
   const basis    = tableau.basisVariables ?? [];
   const ratios   = tableau.ratios ?? [];
 
-  // Entering options: all non-RHS columns, coloured by sign. Cap at 5.
+  // Normalise variable names for comparison — backend uses "X2", tableau uses "x2"
+  const norm = (s: string | undefined) => (s ?? '').toLowerCase().trim();
+
+  // If the backend didn't supply enteringVar, fall back to most-negative Z-row col
+  const cols = allVars.slice(0, -1).map((name, idx) => ({
+    name,
+    zVal: zRow[idx]?.value ?? 0,
+  }));
+  const negCols = cols.filter(c => c.zVal < -1e-9).sort((a, b) => a.zVal - b.zVal);
+  const fallbackEntering = negCols[0]?.name ?? '';
+  const correctEntering  = step.enteringVar ? norm(step.enteringVar) : norm(fallbackEntering);
+
+  // Similarly for leaving var
+  const validRows = basis
+    .map((name, idx) => ({ name, ratio: ratios[idx] ?? null }))
+    .filter(r => r.ratio !== null && (r.ratio as number) >= 0);
+  const fallbackLeaving = validRows.reduce<string>((best, r) => {
+    const bIdx = basis.indexOf(best);
+    const bRatio = bIdx >= 0 ? (ratios[bIdx] as number ?? Infinity) : Infinity;
+    return (r.ratio as number) < bRatio ? r.name : best;
+  }, validRows[0]?.name ?? '');
+  const correctLeaving = step.leavingVar ? norm(step.leavingVar) : norm(fallbackLeaving);
+
+  // Entering options: all non-RHS columns
   const enteringOptions = useMemo(() => {
-    const cols = allVars.slice(0, -1).map((name, idx) => ({
-      name,
-      zVal: zRow[idx]?.value ?? 0,
-    }));
-    const neg = cols.filter(c => c.zVal < -1e-9).sort((a, b) => a.zVal - b.zVal);
     const pos = cols.filter(c => c.zVal >= -1e-9);
-    // Show all negatives + up to (4 - neg.length) positives as distractors
-    const combined = [...neg, ...pos.slice(0, Math.max(0, 4 - neg.length))];
+    const combined = [...negCols, ...pos.slice(0, Math.max(0, 4 - negCols.length))];
     const shuffled: typeof combined = [];
     const src = [...combined];
     while (src.length) {
@@ -1229,17 +1246,14 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
     return shuffled.map(c => ({
       label:     `${c.name}   (Z-row = ${fmtNum(c.zVal)})`,
       value:     c.name,
-      isCorrect: c.name === step.enteringVar,
+      isCorrect: norm(c.name) === correctEntering,
     }));
   }, [step.iteration]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Leaving options: rows with non-negative ratios
   const leavingOptions = useMemo(() => {
-    const rows = basis
-      .map((name, idx) => ({ name, ratio: ratios[idx] ?? null }))
-      .filter(r => r.ratio !== null && (r.ratio as number) >= 0);
-    const shuffled: typeof rows = [];
-    const src = [...rows];
+    const shuffled: typeof validRows = [];
+    const src = [...validRows];
     while (src.length) {
       const j = Math.floor(Math.random() * src.length);
       shuffled.push(src.splice(j, 1)[0]);
@@ -1247,7 +1261,7 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
     return shuffled.map(r => ({
       label:     `${r.name}   (ratio = ${fmtNum(r.ratio as number)})`,
       value:     r.name,
-      isCorrect: r.name === step.leavingVar,
+      isCorrect: norm(r.name) === correctLeaving,
     }));
   }, [step.iteration, mcPhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1255,24 +1269,26 @@ function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
     if (selected !== null) return;
     setSelected(v);
     if (mcPhase === 'entering') {
-      const correct = v === step.enteringVar;
-      const zIdx = allVars.indexOf(step.enteringVar ?? '');
-      const zVal = zIdx >= 0 ? (zRow[zIdx]?.value ?? 0) : 0;
+      const correct = norm(v) === correctEntering;
+      // Find the display name of the correct entering variable from the tableau
+      const correctDisplayName = cols.find(c => norm(c.name) === correctEntering)?.name ?? correctEntering;
+      const zIdx = cols.findIndex(c => norm(c.name) === correctEntering);
+      const zVal = zIdx >= 0 ? cols[zIdx].zVal : 0;
       setFeedback({
         correct,
         msg: correct
-          ? `Correct! ${step.enteringVar} has the most negative Z-row coefficient (${fmtNum(zVal)}). It will enter the basis.`
-          : `Not the optimal choice. The most-negative rule says pick the variable with the smallest (most negative) Z-row entry. That's ${step.enteringVar}.`,
+          ? `Correct! ${correctDisplayName} has the most negative Z-row coefficient (${fmtNum(zVal)}). It will enter the basis.`
+          : `Not the optimal choice. The most-negative rule says pick the variable with the smallest (most negative) Z-row entry. That's ${correctDisplayName} (${fmtNum(zVal)}).`,
       });
     } else {
-      const correct = v === step.leavingVar;
-      const correctIdx = basis.indexOf(step.leavingVar ?? '');
-      const correctRatio = correctIdx >= 0 ? (ratios[correctIdx] ?? 0) : 0;
+      const correct = norm(v) === correctLeaving;
+      const correctDisplayName = validRows.find(r => norm(r.name) === correctLeaving)?.name ?? correctLeaving;
+      const correctRatio = validRows.find(r => norm(r.name) === correctLeaving)?.ratio ?? 0;
       setFeedback({
         correct,
         msg: correct
-          ? `Correct! ${step.leavingVar} has the minimum non-negative ratio (${fmtNum(correctRatio as number)}). It leaves the basis.`
-          : `Not the minimum ratio. ${step.leavingVar} leaves because it has the smallest valid ratio (${fmtNum(correctRatio as number)}). This keeps the RHS non-negative after the pivot.`,
+          ? `Correct! ${correctDisplayName} has the minimum non-negative ratio (${fmtNum(correctRatio as number)}). It leaves the basis.`
+          : `Not the minimum ratio. ${correctDisplayName} leaves because it has the smallest valid ratio (${fmtNum(correctRatio as number)}). This keeps the RHS non-negative after the pivot.`,
       });
     }
   }
@@ -1655,20 +1671,25 @@ function SolvingScreen({
             Back
           </Button>
           <div className="flex-1 flex items-center gap-1 overflow-x-auto">
-            {steps.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => jumpToStep(i)}
-                className={`flex-shrink-0 w-2.5 h-2.5 rounded-full transition-colors ${
-                  i === currentStepIndex
-                    ? 'bg-indigo-600 scale-125'
-                    : i < currentStepIndex
-                    ? 'bg-indigo-300'
-                    : 'bg-gray-200 hover:bg-gray-300'
-                }`}
-                title={`Step ${i + 1}: ${STEP_LABEL[s.stepType] ?? s.stepType}`}
-              />
-            ))}
+            {steps.map((s, i) => {
+              // At pivot steps, only allow jumping to already-visited steps
+              const canJump = isAtPivot ? i < currentStepIndex : true;
+              return (
+                <button
+                  key={i}
+                  onClick={() => canJump && jumpToStep(i)}
+                  disabled={!canJump}
+                  className={`flex-shrink-0 w-2.5 h-2.5 rounded-full transition-colors ${
+                    i === currentStepIndex
+                      ? 'bg-indigo-600 scale-125'
+                      : i < currentStepIndex
+                      ? 'bg-indigo-300 hover:bg-indigo-400'
+                      : 'bg-gray-200'
+                  } disabled:cursor-default`}
+                  title={canJump ? `Step ${i + 1}: ${STEP_LABEL[s.stepType] ?? s.stepType}` : 'Complete the pivot to unlock'}
+                />
+              );
+            })}
           </div>
           <Button
             size="sm"
