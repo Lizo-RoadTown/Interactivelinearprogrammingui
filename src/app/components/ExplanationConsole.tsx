@@ -1,4 +1,4 @@
-import { SimplexStep } from '../types';
+import { SimplexStep, InteractivePhase } from '../types';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { AlertCircle, CheckCircle, Info, TrendingUp } from 'lucide-react';
@@ -7,12 +7,20 @@ interface ExplanationConsoleProps {
   currentStep: SimplexStep;
   showRowOperations: boolean;
   stepHistory?: SimplexStep[];
+  cellExplanation?: string;
+  isInteractive?: boolean;
+  interactivePhase?: InteractivePhase;
+  pivotCount?: number;
 }
 
 export default function ExplanationConsole({
   currentStep,
   showRowOperations,
-  stepHistory = []
+  stepHistory = [],
+  cellExplanation,
+  isInteractive = false,
+  interactivePhase,
+  pivotCount = 0,
 }: ExplanationConsoleProps) {
   const isOptimal = currentStep.explanation.includes('OPTIMAL');
   const isInitial = currentStep.iteration === 0;
@@ -30,6 +38,19 @@ export default function ExplanationConsole({
 
         <ScrollArea className="h-48">
           <div className="space-y-3">
+            {/* Cell interrogation result (shown when a cell has been clicked) */}
+            {cellExplanation && (
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded">
+                <div className="flex items-center gap-2 mb-1">
+                  <Info className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-indigo-700">
+                    {isInteractive ? 'Interactive' : 'Cell Explanation'}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed text-indigo-900 whitespace-pre-line">{cellExplanation}</p>
+              </div>
+            )}
+
             {/* Current step explanation */}
             <div className="flex gap-3">
               <div className="mt-1">
@@ -43,10 +64,11 @@ export default function ExplanationConsole({
               </div>
               <div className="flex-1">
                 <p className="text-sm leading-relaxed">{currentStep.explanation}</p>
-                
+
                 {currentStep.pivotRow !== undefined && currentStep.pivotCol !== undefined && (
                   <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
-                    <strong>Pivot Operation:</strong> Row {currentStep.pivotRow + 1}, Column {currentStep.pivotCol + 1}
+                    <strong>Pivot:</strong> {currentStep.enteringVar ?? `Col ${currentStep.pivotCol + 1}`} enters,{' '}
+                    {currentStep.leavingVar ?? `Row ${currentStep.pivotRow + 1}`} leaves
                   </div>
                 )}
               </div>

@@ -5,19 +5,23 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/t
 interface GraphViewProps {
   constraints: Constraint[];
   cornerPoints: Point[];
+  feasibleRegionPolygon?: Point[];
   simplexPath?: Point[];
   objectiveCoefficients: number[];
   showObjectiveLine: boolean;
   currentPoint?: Point;
+  axisBounds?: { maxX: number; maxY: number };
 }
 
 export default function GraphView({
   constraints,
   cornerPoints,
+  feasibleRegionPolygon = [],
   simplexPath = [],
   objectiveCoefficients,
   showObjectiveLine,
-  currentPoint
+  currentPoint,
+  axisBounds,
 }: GraphViewProps) {
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
   const [hoveredConstraint, setHoveredConstraint] = useState<string | null>(null);
@@ -26,9 +30,9 @@ export default function GraphView({
   const width = 500;
   const height = 500;
   const padding = 60;
-  const maxX = 20;
-  const maxY = 20;
-  
+  const maxX = axisBounds?.maxX ?? 20;
+  const maxY = axisBounds?.maxY ?? 20;
+
   const scaleX = (x: number) => padding + (x / maxX) * (width - 2 * padding);
   const scaleY = (y: number) => height - padding - (y / maxY) * (height - 2 * padding);
 
@@ -36,37 +40,16 @@ export default function GraphView({
   const getConstraintLine = (c: Constraint) => {
     const [a, b] = c.coefficients;
     const rhs = c.rhs;
-    
-    // For ax + by <= rhs, line is ax + by = rhs
-    // Points: (0, rhs/b) and (rhs/a, 0)
     if (b !== 0) {
-      return {
-        x1: 0,
-        y1: rhs / b,
-        x2: rhs / a,
-        y2: 0
-      };
+      return { x1: 0, y1: rhs / b, x2: rhs / a, y2: 0 };
     } else {
-      return {
-        x1: rhs / a,
-        y1: 0,
-        x2: rhs / a,
-        y2: maxY
-      };
+      return { x1: rhs / a, y1: 0, x2: rhs / a, y2: maxY };
     }
   };
 
-  // Feasible region polygon (simplified for this example)
-  const feasibleRegion = [
-    { x: 0, y: 0 },
-    { x: 8, y: 0 },
-    { x: 6, y: 6 },
-    { x: 3, y: 12 },
-    { x: 0, y: 14 }
-  ];
-
-  const feasiblePath = feasibleRegion
-    .map(p => `${scaleX(p.x)},${scaleY(p.y)}`)
+  // Use real feasible region polygon from API, or fall back to empty
+  const feasiblePath = feasibleRegionPolygon
+    .map((p: Point) => `${scaleX(p.x)},${scaleY(p.y)}`)
     .join(' ');
 
   // Objective line (isoprofit line through current point)
