@@ -1365,21 +1365,16 @@ function SolvingScreen({
             </div>
           )}
 
-          {/* A4: Reveal — column highlighted, transition to B */}
+          {/* A4: Reveal — column highlighted, auto-transitions to B */}
           {phase === 'a4_reveal' && (
             <div className="space-y-3">
               {feedback && renderFeedback(feedback)}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-xs text-blue-800 leading-relaxed">
-                  The entering column is now highlighted in blue. Next: determine which constraint limits how far this variable can increase.
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+                <p className="text-xs text-blue-800">
+                  Column highlighted. Moving to leaving variable selection…
                 </p>
               </div>
-              <Button
-                onClick={guided.advanceToB}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
-              >
-                Find the Leaving Variable
-              </Button>
             </div>
           )}
         </div>
@@ -1428,16 +1423,16 @@ function SolvingScreen({
             </div>
           )}
 
-          {/* B4: Reveal — ratios shown, graph updated */}
+          {/* B4: Reveal — ratios shown, auto-transitions to Apply */}
           {phase === 'b4_reveal' && (
             <div className="space-y-3">
               {feedback && renderFeedback(feedback)}
-              <Button
-                onClick={guided.advanceToApply}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
-              >
-                Continue
-              </Button>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+                <p className="text-xs text-blue-800">
+                  Ratios confirmed. Preparing pivot…
+                </p>
+              </div>
             </div>
           )}
 
@@ -1649,22 +1644,13 @@ function SolvingScreen({
                   </div>
                 )}
 
-                {/* After-pivot: prominent Continue button to next pivot */}
-                {stepType === 'after_pivot' && canStepForward && (
-                  <div className="space-y-2">
-                    <div className="bg-green-50 border border-green-300 rounded-lg p-3">
-                      <p className="text-xs text-green-800">
-                        <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-green-600" />
-                        Pivot complete. Step through the row operations above, then continue.
-                      </p>
-                    </div>
-                    <Button
-                      onClick={stepForward}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      Continue to Next Pivot
-                      <ChevronRight className="w-4 h-4 ml-1" />
-                    </Button>
+                {/* After-pivot: guidance (student navigated back here) */}
+                {stepType === 'after_pivot' && (
+                  <div className="bg-green-50 border border-green-300 rounded-lg p-3">
+                    <p className="text-xs text-green-800">
+                      <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-green-600" />
+                      Pivot complete. Use the row operation stepper above to review what happened.
+                    </p>
                   </div>
                 )}
 
@@ -1693,21 +1679,12 @@ function SolvingScreen({
                 )}
 
                 {/* Phase I complete: transition message */}
-                {stepType === 'phase1_complete' && canStepForward && (
-                  <div className="space-y-2">
-                    <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                      <p className="text-xs text-indigo-800">
-                        Phase I is complete. All artificial variables have been driven to zero.
-                        The original objective will now be restored for Phase II.
-                      </p>
-                    </div>
-                    <Button
-                      onClick={stepForward}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      Begin Phase II
-                      <ChevronRight className="w-4 h-4 ml-1" />
-                    </Button>
+                {stepType === 'phase1_complete' && (
+                  <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                    <p className="text-xs text-indigo-800">
+                      Phase I is complete. All artificial variables have been driven to zero.
+                      The original objective will now be restored for Phase II.
+                    </p>
                   </div>
                 )}
               </>

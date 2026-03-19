@@ -451,6 +451,22 @@ export function useGuidedSimplex({
     }
   }, [currentStepIndex, needsInteraction]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-transition: A4 (entering correct) → B1 (leaving attention)
+  useEffect(() => {
+    if (state.phase === 'a4_reveal') {
+      const timer = setTimeout(() => dispatch({ type: 'ADVANCE_TO_B' }), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [state.phase]);
+
+  // Auto-transition: B4 (leaving correct) → B5 (apply)
+  useEffect(() => {
+    if (state.phase === 'b4_reveal') {
+      const timer = setTimeout(() => dispatch({ type: 'ADVANCE_TO_APPLY' }), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [state.phase]);
+
   // ── Compute correct answers from tableau ──────────────────────────────────
   const analysis = useMemo(() => {
     if (!currentStep) return null;
@@ -630,15 +646,24 @@ export function useGuidedSimplex({
     if (state.phase !== 'b5_apply') return;
     dispatch({ type: 'APPLY_PIVOT' });
 
-    // Navigate forward
-    const nextStep = steps[currentStepIndex + 1];
-    if (isInitialPivotStep) {
-      const skip = nextStep?.stepType === 'select_pivot';
-      jumpToStep(currentStepIndex + (skip ? 2 : 1));
-    } else {
-      stepForward();
+    // Skip past non-interactive steps (after_pivot, select_pivot at initial)
+    // and land on the next step that needs interaction or is terminal.
+    let target = currentStepIndex + 1;
+    while (target < steps.length) {
+      const st = steps[target].stepType;
+      // Stop at: next interactive step, optimal, infeasible, unbounded, phase transitions
+      if (st === 'select_pivot' || st === 'initial' ||
+          st === 'phase1_initial' || st === 'phase2_initial' ||
+          st === 'optimal' || st === 'infeasible' || st === 'unbounded' ||
+          st === 'phase1_complete') {
+        break;
+      }
+      target++;
     }
-  }, [state.phase, steps, currentStepIndex, isInitialPivotStep, jumpToStep, stepForward]);
+    // Clamp to last step
+    target = Math.min(target, steps.length - 1);
+    jumpToStep(target);
+  }, [state.phase, steps, currentStepIndex, jumpToStep]);
 
   const showAnswer = useCallback(() => {
     if (!analysis || !currentStep) return;
