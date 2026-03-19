@@ -1454,14 +1454,27 @@ function SolvingScreen({
     currentStepIndex < steps.length - 1; // still more steps ahead (not already optimal)
   const showPivotMC = isAtPivot || isAtInitialPivot;
 
-  // When at an initial-pivot step, try to borrow the next step's data if it has
-  // better info (entering/leaving var already known, ratios populated).
-  // PivotMCPanel now computes ratios from the raw tableau itself as a fallback.
   const nextStep = steps[currentStepIndex + 1];
-  const pivotDataStep =
-    isAtInitialPivot && nextStep?.enteringVar != null
-      ? nextStep  // next step has the answer pre-computed
-      : currentStep; // fall back — PivotMCPanel will compute its own ratios
+
+  // ── Tableau click interaction state ─────────────────────────────────────────
+  // Instead of MC buttons, the student clicks directly on tableau cells.
+  type PivotClickPhase = 'entering' | 'leaving' | 'done';
+  const [pivotClickPhase, setPivotClickPhase] = useState<PivotClickPhase>('entering');
+  const [confirmedEnteringCol, setConfirmedEnteringCol] = useState<number | null>(null);
+  const [wrongEnteringCol, setWrongEnteringCol]         = useState<number | null>(null);
+  const [confirmedLeavingRow, setConfirmedLeavingRow]   = useState<number | null>(null);
+  const [wrongLeavingRow, setWrongLeavingRow]           = useState<number | null>(null);
+  const [pivotFeedback, setPivotFeedback] = useState<{ correct: boolean; msg: string } | null>(null);
+
+  // Reset whenever the displayed step changes
+  useEffect(() => {
+    setPivotClickPhase('entering');
+    setConfirmedEnteringCol(null);
+    setWrongEnteringCol(null);
+    setConfirmedLeavingRow(null);
+    setWrongLeavingRow(null);
+    setPivotFeedback(null);
+  }, [currentStepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hints from word problem or generic
   function getHint(): string {
@@ -1485,6 +1498,104 @@ function SolvingScreen({
   }
 
   const hint = getHint();
+
+  // ── Tableau click handler ────────────────────────────────────────────────────
+  function handleCellClick(rowIdx: number, colIdx: number) {
+    if (!showPivotMC || !currentStep || pivotClickPhase === 'done') return;
+
+    const tableau   = currentStep.tableau;
+    const allVars   = tableau.allVariables ?? [];
+    const rhsColIdx = allVars.length - 1;
+    const zRowIdx   = tableau.rows.length - 1;
+    const zRow      = tableau.rows[zRowIdx];
+    const basis     = tableau.basisVariables ?? [];
+
+    // Correct entering variable — use backend hint, fall back to most-negative z-row
+    const cols = allVars.slice(0, -1).map((name, idx) => ({
+      name, zVal: zRow[idx]?.value ?? 0,
+    }));
+    const negCols = cols.filter(c => c.zVal < -1e-9).sort((a, b) => a.zVal - b.zVal);
+    const correctEntering     = normVar(currentStep.enteringVar || negCols[0]?.name || '');
+    const correctEnteringCol  = cols.findIndex(c => normVar(c.name) === correctEntering);
+
+    // Correct leaving variable — use confirmed entering col for ratio computation
+    const pivotCol = confirmedEnteringCol ?? correctEnteringCol;
+    const serverRatios = tableau.ratios ?? [];
+    const computedRatios: (number | null)[] = serverRatios.length > 0
+      ? serverRatios.map(r => (r !== null && r !== undefined ? Number(r) : null))
+      : basis.map((_, r) => {
+          const entry = tableau.rows[r]?.[pivotCol]?.value ?? 0;
+          const rhs   = tableau.rows[r]?.[rhsColIdx]?.value ?? 0;
+          return entry > 1e-9 ? rhs / entry : null;
+        });
+    const validRows = basis
+      .map((name, idx) => ({ name, ratio: computedRatios[idx] ?? null }))
+      .filter(r => r.ratio !== null && (r.ratio as number) >= 0);
+    const fallbackLeaving = validRows.reduce<string>((best, r) => {
+      const bIdx  = basis.indexOf(best);
+      const bRatio = bIdx >= 0 ? (computedRatios[bIdx] as number ?? Infinity) : Infinity;
+      return (r.ratio as number) < bRatio ? r.name : best;
+    }, validRows[0]?.name ?? '');
+    const correctLeaving    = normVar(currentStep.leavingVar || fallbackLeaving);
+    const correctLeavingRow = basis.findIndex(v => normVar(v) === correctLeaving);
+
+    if (pivotClickPhase === 'entering') {
+      if (rowIdx !== zRowIdx) return;       // must be the Z-row
+      if (colIdx === rhsColIdx) return;     // RHS column not valid
+      const zVal = zRow[colIdx]?.value ?? 0;
+      if (zVal >= -1e-9) return;            // must be negative
+      const colName = allVars[colIdx] ?? `col ${colIdx}`;
+      if (colIdx === correctEnteringCol) {
+        setConfirmedEnteringCol(colIdx);
+        setWrongEnteringCol(null);
+        setPivotFeedback({
+          correct: true,
+          msg: `Correct! ${colName} (Z = ${fmtNum(zVal)}) is the most negative. Now click a row in the ${colName} column to choose the leaving variable.`,
+        });
+        setPivotClickPhase('leaving');
+      } else {
+        const correctColName = allVars[correctEnteringCol] ?? correctEntering;
+        setWrongEnteringCol(colIdx);
+        setPivotFeedback({
+          correct: false,
+          msg: `${colName} is negative, but not the most negative. ${correctColName} (${fmtNum(cols[correctEnteringCol]?.zVal ?? 0)}) is smaller — use the most-negative rule.`,
+        });
+      }
+
+    } else if (pivotClickPhase === 'leaving') {
+      if (rowIdx === zRowIdx) return;                                // not z-row
+      if (colIdx !== confirmedEnteringCol) return;                   // must be entering col
+      const entry = tableau.rows[rowIdx]?.[confirmedEnteringCol!]?.value ?? 0;
+      if (entry <= 1e-9) return;                                     // non-positive entry
+      const rowName = basis[rowIdx] ?? `row ${rowIdx}`;
+      const ratio   = computedRatios[rowIdx];
+      if (rowIdx === correctLeavingRow) {
+        setConfirmedLeavingRow(rowIdx);
+        setWrongLeavingRow(null);
+        setPivotFeedback({
+          correct: true,
+          msg: `Correct! ${rowName} leaves the basis (ratio = ${ratio !== null ? fmtNum(ratio) : '?'}). Applying pivot…`,
+        });
+        setPivotClickPhase('done');
+        setTimeout(() => {
+          if (isAtInitialPivot) {
+            const skip = nextStep?.stepType === 'select_pivot';
+            jumpToStep(currentStepIndex + (skip ? 2 : 1));
+          } else {
+            stepForward();
+          }
+        }, 1400);
+      } else {
+        const correctRowName  = basis[correctLeavingRow] ?? correctLeaving;
+        const correctRatio    = computedRatios[correctLeavingRow];
+        setWrongLeavingRow(rowIdx);
+        setPivotFeedback({
+          correct: false,
+          msg: `Not the minimum ratio. ${correctRowName} has the smallest valid ratio (${correctRatio !== null ? fmtNum(correctRatio) : '?'}). Try that row instead.`,
+        });
+      }
+    }
+  }
 
   // ── Sub-phase: loading ───────────────────────────────────────────────────────
   if (isLoading || solvingSubPhase === 'loading') {
@@ -1550,6 +1661,14 @@ function SolvingScreen({
             showRatioTest={false}
             isInteractive={false}
             hideSelectionHints={showPivotMC}
+            onCellClick={showPivotMC && pivotClickPhase !== 'done' ? handleCellClick : undefined}
+            pivotHighlight={showPivotMC ? {
+              phase: pivotClickPhase === 'leaving' || pivotClickPhase === 'done' ? 'leaving' : 'entering',
+              confirmedEnteringCol,
+              wrongEnteringCol,
+              confirmedLeavingRow,
+              wrongLeavingRow,
+            } : undefined}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -1627,29 +1746,59 @@ function SolvingScreen({
               </div>
             )}
 
-            {/* Pivot MC — shown at select_pivot steps AND at initial-type steps */}
-            {showPivotMC && pivotDataStep && (
-              <PivotMCPanel
-                key={currentStepIndex}
-                step={pivotDataStep}
-                onPivotApplied={
-                  isAtInitialPivot
-                    ? () => {
-                        // If the very next step is select_pivot (answer-reveal), skip it
+            {/* Tableau click interaction — shown whenever student must choose a pivot */}
+            {showPivotMC && (
+              <div className="space-y-2">
+                {/* Instruction banner */}
+                {pivotClickPhase !== 'done' && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                    <p className="text-xs font-bold text-purple-800">
+                      {pivotClickPhase === 'entering'
+                        ? 'Pivot — Step 1: Choose the Entering Variable'
+                        : 'Pivot — Step 2: Choose the Leaving Variable'}
+                    </p>
+                    <p className="text-xs text-purple-700 mt-0.5">
+                      {pivotClickPhase === 'entering'
+                        ? 'Click the most negative value in the Z-row (bottom row of the tableau above).'
+                        : 'Click a positive cell in the highlighted column using the minimum ratio test.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Feedback */}
+                {pivotFeedback && (
+                  <div className={`rounded-lg p-3 text-xs leading-relaxed ${
+                    pivotFeedback.correct
+                      ? 'bg-green-50 border border-green-300 text-green-800'
+                      : 'bg-amber-50 border border-amber-300 text-amber-800'
+                  }`}>
+                    {pivotFeedback.correct
+                      ? <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-green-600" />
+                      : <AlertTriangle className="inline w-3.5 h-3.5 mr-1 text-amber-600" />}
+                    {pivotFeedback.msg}
+                  </div>
+                )}
+
+                {/* Skip */}
+                {pivotClickPhase !== 'done' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => {
+                      if (isAtInitialPivot) {
                         const skip = nextStep?.stepType === 'select_pivot';
                         jumpToStep(currentStepIndex + (skip ? 2 : 1));
+                      } else {
+                        stepForward();
                       }
-                    : stepForward
-                }
-                onShowMe={
-                  isAtInitialPivot
-                    ? () => {
-                        const skip = nextStep?.stepType === 'select_pivot';
-                        jumpToStep(currentStepIndex + (skip ? 2 : 1));
-                      }
-                    : stepForward
-                }
-              />
+                    }}
+                  >
+                    <Eye className="w-3 h-3 mr-1" />
+                    Skip (show me)
+                  </Button>
+                )}
+              </div>
             )}
 
             {/* Solver explanation (non-pivot steps) */}
@@ -1708,7 +1857,7 @@ function SolvingScreen({
           <div className="flex-1 flex items-center gap-1 overflow-x-auto">
             {steps.map((s, i) => {
               // At pivot / initial-pivot steps, only allow jumping to already-visited steps
-              const canJump = showPivotMC ? i < currentStepIndex : true;
+              const canJump = showPivotMC && pivotClickPhase !== 'done' ? i < currentStepIndex : true;
               return (
                 <button
                   key={i}
@@ -1730,7 +1879,7 @@ function SolvingScreen({
             size="sm"
             variant="outline"
             onClick={stepForward}
-            disabled={!canStepForward || showPivotMC}
+            disabled={!canStepForward || (showPivotMC && pivotClickPhase !== 'done')}
             className="text-xs"
           >
             Next
