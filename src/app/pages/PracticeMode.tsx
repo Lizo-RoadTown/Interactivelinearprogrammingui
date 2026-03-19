@@ -188,100 +188,74 @@ function HomeScreen({
 
 // ── Problem Browser ────────────────────────────────────────────────────────────
 
+const DIFFICULTY_TIERS: { level: WPDifficulty; desc: string; icon: string; border: string; bg: string; hover: string }[] = [
+  {
+    level: 'Beginner',
+    desc: 'Standard Simplex with all ≤ constraints. 2 variables, clear structure.',
+    icon: '1',
+    border: 'border-green-300 hover:border-green-500',
+    bg: 'bg-green-50',
+    hover: 'hover:shadow-lg hover:shadow-green-100',
+  },
+  {
+    level: 'Intermediate',
+    desc: 'Big-M method, mixed constraints (≤ and ≥), 2–3 variables.',
+    icon: '2',
+    border: 'border-amber-300 hover:border-amber-500',
+    bg: 'bg-amber-50',
+    hover: 'hover:shadow-lg hover:shadow-amber-100',
+  },
+  {
+    level: 'Advanced',
+    desc: 'Two-Phase, equality constraints, special cases (infeasible, unbounded, alternative optima).',
+    icon: '3',
+    border: 'border-red-300 hover:border-red-500',
+    bg: 'bg-red-50',
+    hover: 'hover:shadow-lg hover:shadow-red-100',
+  },
+];
+
 function ProblemBrowser({ onSelect }: { onSelect: (p: WordProblem) => void }) {
-  const [filter, setFilter] = useState<WPDifficulty | 'All'>('All');
-
-  const visible = filter === 'All'
-    ? WORD_PROBLEMS
-    : WORD_PROBLEMS.filter(p => p.difficulty === filter);
-
-  const random = () => {
-    const pool = filter === 'All' ? WORD_PROBLEMS : visible;
+  const pickRandom = (level: WPDifficulty) => {
+    const pool = WORD_PROBLEMS.filter(p => p.difficulty === level);
     onSelect(pool[Math.floor(Math.random() * pool.length)]);
   };
 
+  const counts: Record<WPDifficulty, number> = {
+    Beginner: WORD_PROBLEMS.filter(p => p.difficulty === 'Beginner').length,
+    Intermediate: WORD_PROBLEMS.filter(p => p.difficulty === 'Intermediate').length,
+    Advanced: WORD_PROBLEMS.filter(p => p.difficulty === 'Advanced').length,
+  };
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Filter bar */}
-      <div className="flex-shrink-0 px-6 py-3 bg-white border-b border-gray-200 flex items-center gap-3 flex-wrap">
-        <span className="text-sm font-medium text-gray-600">Filter:</span>
-        {(['All', 'Beginner', 'Intermediate', 'Advanced'] as const).map(d => (
+    <div className="flex-1 flex flex-col items-center justify-center p-8">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose a Difficulty</h2>
+        <p className="text-gray-500 text-sm max-w-md">
+          You'll get a random word problem at the level you choose.
+          Formulate the LP, pick the method, and solve it step by step.
+        </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-5 w-full max-w-3xl">
+        {DIFFICULTY_TIERS.map(tier => (
           <button
-            key={d}
-            onClick={() => setFilter(d)}
-            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-              filter === d
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'
-            }`}
+            key={tier.level}
+            onClick={() => pickRandom(tier.level)}
+            className={`flex-1 ${tier.bg} border-2 ${tier.border} ${tier.hover}
+                       rounded-2xl p-6 text-left transition-all cursor-pointer`}
           >
-            {d}
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-lg font-bold
+                            ${tier.level === 'Beginner' ? 'bg-green-200 text-green-800' :
+                              tier.level === 'Intermediate' ? 'bg-amber-200 text-amber-800' :
+                              'bg-red-200 text-red-800'}`}>
+              {tier.icon}
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">{tier.level}</h3>
+            <p className="text-sm text-gray-600 leading-relaxed">{tier.desc}</p>
+            <p className="text-xs text-gray-400 mt-3">{counts[tier.level]} problems</p>
           </button>
         ))}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={random}
-          className="ml-auto text-xs"
-        >
-          <Shuffle className="w-3.5 h-3.5 mr-1.5" />
-          Surprise me
-        </Button>
-      </div>
-
-      {/* Grid */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-w-6xl mx-auto">
-          {visible.map(problem => (
-            <ProblemCard key={problem.id} problem={problem} onSelect={onSelect} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ProblemCard({
-  problem,
-  onSelect,
-}: {
-  problem: WordProblem;
-  onSelect: (p: WordProblem) => void;
-}) {
-  const catColor = CATEGORY_COLOR[problem.category] ?? 'bg-gray-600';
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm
-                    hover:shadow-md hover:border-indigo-300 transition-all flex flex-col">
-      <div className={`${catColor} text-white px-4 py-2.5 flex items-center justify-between`}>
-        <span className="text-xs font-semibold uppercase tracking-wide">{problem.category}</span>
-        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${DIFFICULTY_BADGE[problem.difficulty]}`}>
-          {problem.difficulty}
-        </span>
-      </div>
-      <div className="p-4 flex flex-col gap-2 flex-1">
-        <h3 className="text-sm font-bold text-gray-900">{problem.title}</h3>
-        <p className="text-xs text-gray-500 leading-snug line-clamp-3 flex-1">
-          {problem.scenario.replace(/⚠.*$/s, '').slice(0, 120)}…
-        </p>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className="text-xs text-gray-400">{problem.numVars} variables</span>
-          <span className="text-xs text-gray-300">·</span>
-          <span className="text-xs text-gray-400">{problem.objectiveType.toUpperCase()}</span>
-          <span className="text-xs text-gray-300">·</span>
-          <span className="text-xs text-gray-400">{METHOD_LABEL[problem.method]}</span>
-        </div>
-        {problem.specialCaseNote && (
-          <div className="text-xs text-rose-600 font-medium flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" /> Special case
-          </div>
-        )}
-        <Button
-          size="sm"
-          onClick={() => onSelect(problem)}
-          className={`w-full mt-2 ${catColor} hover:opacity-90 text-white text-xs`}
-        >
-          Start this problem →
-        </Button>
       </div>
     </div>
   );
