@@ -20,6 +20,7 @@ import TableauSetupPhase from '../components/TableauSetupPhase';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { useLPSolver } from '../hooks/useLPSolver';
+import { useGuidedSimplex } from '../hooks/useGuidedSimplex';
 import {
   WORD_PROBLEMS,
   WordProblem,
@@ -31,7 +32,7 @@ import { normVar, sameVar, indexOfVar } from '../utils/varName';
 import {
   ArrowLeft, BookOpen, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, Lightbulb, AlertTriangle,
-  Loader2, Info, Shuffle, PenLine, Eye, Zap,
+  Loader2, Info, Shuffle, PenLine, Eye, Zap, Play,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -1185,230 +1186,11 @@ function MethodSelector({
   );
 }
 
-// ── Pivot MC Panel ────────────────────────────────────────────────────────────
-// Shown inside SolvingScreen at every select_pivot step. Replaces click-on-cell.
+// ── Helper ──────────────────────────────────────────────────────────────────
 
 function fmtNum(n: number): string {
   const r = Math.round(n * 100) / 100;
   return Number.isInteger(r) ? r.toString() : r.toFixed(2);
-}
-
-interface PivotMCPanelProps {
-  step:           SimplexStep;
-  onPivotApplied: () => void; // caller should call stepForward()
-  onShowMe:       () => void; // skip — just advance
-}
-
-function PivotMCPanel({ step, onPivotApplied, onShowMe }: PivotMCPanelProps) {
-  type MCPhase = 'entering' | 'leaving' | 'done';
-  const [mcPhase,  setMcPhase]  = useState<MCPhase>('entering');
-  const [selected, setSelected] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ correct: boolean; msg: string } | null>(null);
-
-  const tableau  = step.tableau;
-  const allVars  = tableau.allVariables ?? [];
-  const zRow     = tableau.rows[tableau.rows.length - 1];
-  const basis    = tableau.basisVariables ?? [];
-
-  // If the backend didn't supply enteringVar, fall back to most-negative Z-row col
-  const cols = allVars.slice(0, -1).map((name, idx) => ({
-    name,
-    zVal: zRow[idx]?.value ?? 0,
-  }));
-  const negCols = cols.filter(c => c.zVal < -1e-9).sort((a, b) => a.zVal - b.zVal);
-  const fallbackEntering = negCols[0]?.name ?? '';
-  // normVar from shared util — backend "X2" matches tableau "x2"
-  const correctEntering  = normVar(step.enteringVar || fallbackEntering);
-
-  // Ratios: use server-provided values when available; otherwise compute from raw tableau.
-  // The initial step doesn't carry ratios, but we can derive them from the entering column.
-  const enteringColIdx = cols.findIndex(c => normVar(c.name) === correctEntering);
-  const serverRatios = tableau.ratios ?? [];
-  const computedRatios: (number | null)[] = serverRatios.length > 0
-    ? serverRatios.map(r => (r !== null && r !== undefined ? Number(r) : null))
-    : basis.map((_, r) => {
-        const entry = tableau.rows[r]?.[enteringColIdx]?.value ?? 0;
-        const rhs   = tableau.rows[r]?.[allVars.length - 1]?.value ?? 0;
-        return entry > 1e-9 ? rhs / entry : null; // null = not a valid pivot row
-      });
-
-  // Similarly for leaving var
-  const validRows = basis
-    .map((name, idx) => ({ name, ratio: computedRatios[idx] ?? null }))
-    .filter(r => r.ratio !== null && (r.ratio as number) >= 0);
-  const fallbackLeaving = validRows.reduce<string>((best, r) => {
-    const bIdx = basis.indexOf(best);
-    const bRatio = bIdx >= 0 ? (computedRatios[bIdx] as number ?? Infinity) : Infinity;
-    return (r.ratio as number) < bRatio ? r.name : best;
-  }, validRows[0]?.name ?? '');
-  const correctLeaving = normVar(step.leavingVar || fallbackLeaving);
-
-  // Entering options: all non-RHS columns
-  const enteringOptions = useMemo(() => {
-    const pos = cols.filter(c => c.zVal >= -1e-9);
-    const combined = [...negCols, ...pos.slice(0, Math.max(0, 4 - negCols.length))];
-    const shuffled: typeof combined = [];
-    const src = [...combined];
-    while (src.length) {
-      const j = Math.floor(Math.random() * src.length);
-      shuffled.push(src.splice(j, 1)[0]);
-    }
-    return shuffled.map(c => ({
-      label:     `${c.name}   (Z-row = ${fmtNum(c.zVal)})`,
-      value:     c.name,
-      isCorrect: normVar(c.name) === correctEntering,
-    }));
-  }, [step.iteration]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Leaving options: rows with non-negative ratios
-  const leavingOptions = useMemo(() => {
-    const shuffled: typeof validRows = [];
-    const src = [...validRows];
-    while (src.length) {
-      const j = Math.floor(Math.random() * src.length);
-      shuffled.push(src.splice(j, 1)[0]);
-    }
-    return shuffled.map(r => ({
-      label:     `${r.name}   (ratio = ${fmtNum(r.ratio as number)})`,
-      value:     r.name,
-      isCorrect: normVar(r.name) === correctLeaving,
-    }));
-  }, [step.iteration, mcPhase]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handleSelect(v: string) {
-    if (selected !== null) return;
-    setSelected(v);
-    if (mcPhase === 'entering') {
-      const correct = normVar(v) === correctEntering;
-      // Use the display name from the tableau (not the backend's capitalized version)
-      const correctDisplayName = cols.find(c => normVar(c.name) === correctEntering)?.name ?? correctEntering;
-      const zIdx = indexOfVar(cols.map(c => c.name), correctEntering);
-      const zVal = zIdx >= 0 ? cols[zIdx].zVal : 0;
-      setFeedback({
-        correct,
-        msg: correct
-          ? `Correct! ${correctDisplayName} has the most negative Z-row coefficient (${fmtNum(zVal)}). It will enter the basis.`
-          : `Not the optimal choice. The most-negative rule says pick the variable with the smallest (most negative) Z-row entry. That's ${correctDisplayName} (${fmtNum(zVal)}).`,
-      });
-    } else {
-      const correct = normVar(v) === correctLeaving;
-      const correctDisplayName = validRows.find(r => normVar(r.name) === correctLeaving)?.name ?? correctLeaving;
-      const correctRatio = validRows.find(r => normVar(r.name) === correctLeaving)?.ratio ?? 0;
-      setFeedback({
-        correct,
-        msg: correct
-          ? `Correct! ${correctDisplayName} has the minimum non-negative ratio (${fmtNum(correctRatio as number)}). It leaves the basis.`
-          : `Not the minimum ratio. ${correctDisplayName} leaves because it has the smallest valid ratio (${fmtNum(correctRatio as number)}). This keeps the RHS non-negative after the pivot.`,
-      });
-    }
-  }
-
-  function advance() {
-    if (mcPhase === 'entering') {
-      setMcPhase('leaving');
-      setSelected(null);
-      setFeedback(null);
-    } else {
-      setMcPhase('done');
-      onPivotApplied();
-    }
-  }
-
-  if (mcPhase === 'done') {
-    return (
-      <div className="bg-green-50 border border-green-300 rounded-lg p-3">
-        <p className="text-xs font-bold text-green-800 flex items-center gap-1.5">
-          <CheckCircle className="w-4 h-4" />
-          Pivot identified! Row operations are computing automatically…
-        </p>
-      </div>
-    );
-  }
-
-  const options = mcPhase === 'entering' ? enteringOptions : leavingOptions;
-
-  return (
-    <div className="space-y-2">
-      {/* Step banner */}
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-        <p className="text-xs font-bold text-purple-800">
-          {mcPhase === 'entering'
-            ? 'Pivot — Step 1: Choose the Entering Variable'
-            : 'Pivot — Step 2: Choose the Leaving Variable'}
-        </p>
-        <p className="text-xs text-purple-700 mt-0.5">
-          {mcPhase === 'entering'
-            ? 'Use the most-negative coefficient rule: pick the column with the smallest Z-row value.'
-            : 'Use the minimum ratio test: pick the row with the smallest non-negative RHS ÷ column entry.'}
-        </p>
-      </div>
-
-      {/* Options */}
-      <div className="space-y-1.5">
-        {options.map((opt, i) => {
-          let cls = 'w-full text-left border-2 rounded-lg px-3 py-2 text-xs font-mono transition-all ';
-          if (selected === null) {
-            cls += 'border-gray-200 bg-white hover:border-purple-400 hover:bg-purple-50 cursor-pointer';
-          } else if (opt.isCorrect) {
-            cls += 'border-green-400 bg-green-50 text-green-800';
-          } else if (opt.value === selected) {
-            cls += 'border-red-400 bg-red-50 text-red-800';
-          } else {
-            cls += 'border-gray-100 bg-white opacity-40 cursor-default';
-          }
-          return (
-            <button
-              key={i}
-              onClick={() => handleSelect(opt.value)}
-              disabled={selected !== null}
-              className={cls}
-            >
-              {opt.label}
-              {selected !== null && opt.isCorrect && (
-                <CheckCircle className="inline w-3.5 h-3.5 ml-2 text-green-600" />
-              )}
-              {selected !== null && opt.value === selected && !opt.isCorrect && (
-                <XCircle className="inline w-3.5 h-3.5 ml-2 text-red-500" />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Feedback */}
-      {feedback && (
-        <div className={`rounded-lg p-3 text-xs leading-relaxed ${
-          feedback.correct
-            ? 'bg-green-50 border border-green-300 text-green-800'
-            : 'bg-amber-50 border border-amber-300 text-amber-800'
-        }`}>
-          {feedback.correct
-            ? <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-green-600" />
-            : <AlertTriangle className="inline w-3.5 h-3.5 mr-1 text-amber-600" />}
-          {feedback.msg}
-        </div>
-      )}
-
-      {/* Advance / Show Me */}
-      <div className="flex gap-2">
-        {selected !== null && (
-          <Button onClick={advance} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
-            {mcPhase === 'entering'
-              ? 'OK — now find the leaving variable →'
-              : feedback?.correct
-              ? <><Zap className="w-3 h-3 mr-1" />Apply pivot! Row ops autofill →</>
-              : 'Apply the correct pivot →'}
-          </Button>
-        )}
-        {selected === null && (
-          <Button onClick={onShowMe} size="sm" variant="outline" className="text-xs">
-            <Eye className="w-3 h-3 mr-1" />
-            Show Me
-          </Button>
-        )}
-      </div>
-    </div>
-  );
 }
 
 // ── Solving Screen ─────────────────────────────────────────────────────────────
@@ -1444,39 +1226,21 @@ function SolvingScreen({
     }
   }, [isLoading, error, solverResponse, solvingSubPhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stepType  = currentStep?.stepType;
-  const isAtPivot = stepType === 'select_pivot';
+  // ── Guided Simplex interaction hook ──────────────────────────────────────────
+  const guided = useGuidedSimplex({
+    currentStep,
+    steps,
+    currentStepIndex,
+    method,
+    objectiveType: problem.objectiveType,
+    stepForward,
+    jumpToStep,
+  });
 
-  // At initial-type steps the student must choose the first pivot before advancing.
-  // We show PivotMCPanel immediately — no "select_pivot" step needs to follow.
-  const isAtInitialPivot =
-    (stepType === 'initial' || stepType === 'phase1_initial' || stepType === 'phase2_initial') &&
-    currentStepIndex < steps.length - 1; // still more steps ahead (not already optimal)
-  const showPivotMC = isAtPivot || isAtInitialPivot;
-
-  const nextStep = steps[currentStepIndex + 1];
-
-  // ── Tableau click interaction state ─────────────────────────────────────────
-  // Instead of MC buttons, the student clicks directly on tableau cells.
-  type PivotClickPhase = 'entering' | 'leaving' | 'done';
-  const [pivotClickPhase, setPivotClickPhase] = useState<PivotClickPhase>('entering');
-  const [confirmedEnteringCol, setConfirmedEnteringCol] = useState<number | null>(null);
-  const [wrongEnteringCol, setWrongEnteringCol]         = useState<number | null>(null);
-  const [confirmedLeavingRow, setConfirmedLeavingRow]   = useState<number | null>(null);
-  const [wrongLeavingRow, setWrongLeavingRow]           = useState<number | null>(null);
-  const [pivotFeedback, setPivotFeedback] = useState<{ correct: boolean; msg: string } | null>(null);
-
-  // Reset whenever the displayed step changes
-  useEffect(() => {
-    setPivotClickPhase('entering');
-    setConfirmedEnteringCol(null);
-    setWrongEnteringCol(null);
-    setConfirmedLeavingRow(null);
-    setWrongLeavingRow(null);
-    setPivotFeedback(null);
-  }, [currentStepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { state: gs, needsInteraction, tableauProps, graphProps } = guided;
 
   // Hints from word problem or generic
+  const stepType = currentStep?.stepType;
   function getHint(): string {
     if (!stepType) return '';
     if (wordProblem?.solvingHints) {
@@ -1496,105 +1260,234 @@ function SolvingScreen({
     };
     return generic[stepType] ?? '';
   }
-
   const hint = getHint();
 
-  // ── Tableau click handler ────────────────────────────────────────────────────
+  // ── Tableau click handler (delegates to guided hook) ──────────────────────────
   function handleCellClick(rowIdx: number, colIdx: number) {
-    if (!showPivotMC || !currentStep || pivotClickPhase === 'done') return;
+    if (!needsInteraction) return;
 
-    const tableau   = currentStep.tableau;
-    const allVars   = tableau.allVariables ?? [];
-    const rhsColIdx = allVars.length - 1;
-    const zRowIdx   = tableau.rows.length - 1;
-    const zRow      = tableau.rows[zRowIdx];
-    const basis     = tableau.basisVariables ?? [];
+    const { episode, phase } = gs;
 
-    // Correct entering variable — use backend hint, fall back to most-negative z-row
-    const cols = allVars.slice(0, -1).map((name, idx) => ({
-      name, zVal: zRow[idx]?.value ?? 0,
-    }));
-    const negCols = cols.filter(c => c.zVal < -1e-9).sort((a, b) => a.zVal - b.zVal);
-    const correctEntering     = normVar(currentStep.enteringVar || negCols[0]?.name || '');
-    const correctEnteringCol  = cols.findIndex(c => normVar(c.name) === correctEntering);
-
-    // Correct leaving variable — use confirmed entering col for ratio computation
-    const pivotCol = confirmedEnteringCol ?? correctEnteringCol;
-    const serverRatios = tableau.ratios ?? [];
-    const computedRatios: (number | null)[] = serverRatios.length > 0
-      ? serverRatios.map(r => (r !== null && r !== undefined ? Number(r) : null))
-      : basis.map((_, r) => {
-          const entry = tableau.rows[r]?.[pivotCol]?.value ?? 0;
-          const rhs   = tableau.rows[r]?.[rhsColIdx]?.value ?? 0;
-          return entry > 1e-9 ? rhs / entry : null;
-        });
-    const validRows = basis
-      .map((name, idx) => ({ name, ratio: computedRatios[idx] ?? null }))
-      .filter(r => r.ratio !== null && (r.ratio as number) >= 0);
-    const fallbackLeaving = validRows.reduce<string>((best, r) => {
-      const bIdx  = basis.indexOf(best);
-      const bRatio = bIdx >= 0 ? (computedRatios[bIdx] as number ?? Infinity) : Infinity;
-      return (r.ratio as number) < bRatio ? r.name : best;
-    }, validRows[0]?.name ?? '');
-    const correctLeaving    = normVar(currentStep.leavingVar || fallbackLeaving);
-    const correctLeavingRow = basis.findIndex(v => normVar(v) === correctLeaving);
-
-    if (pivotClickPhase === 'entering') {
-      if (rowIdx !== zRowIdx) return;       // must be the Z-row
-      if (colIdx === rhsColIdx) return;     // RHS column not valid
-      const zVal = zRow[colIdx]?.value ?? 0;
-      if (zVal >= -1e-9) return;            // must be negative
-      const colName = allVars[colIdx] ?? `col ${colIdx}`;
-      if (colIdx === correctEnteringCol) {
-        setConfirmedEnteringCol(colIdx);
-        setWrongEnteringCol(null);
-        setPivotFeedback({
-          correct: true,
-          msg: `Correct! ${colName} (Z = ${fmtNum(zVal)}) is the most negative. Now click a row in the ${colName} column to choose the leaving variable.`,
-        });
-        setPivotClickPhase('leaving');
-      } else {
-        const correctColName = allVars[correctEnteringCol] ?? correctEntering;
-        setWrongEnteringCol(colIdx);
-        setPivotFeedback({
-          correct: false,
-          msg: `${colName} is negative, but not the most negative. ${correctColName} (${fmtNum(cols[correctEnteringCol]?.zVal ?? 0)}) is smaller — use the most-negative rule.`,
-        });
-      }
-
-    } else if (pivotClickPhase === 'leaving') {
-      if (rowIdx === zRowIdx) return;                                // not z-row
-      if (colIdx !== confirmedEnteringCol) return;                   // must be entering col
-      const entry = tableau.rows[rowIdx]?.[confirmedEnteringCol!]?.value ?? 0;
-      if (entry <= 1e-9) return;                                     // non-positive entry
-      const rowName = basis[rowIdx] ?? `row ${rowIdx}`;
-      const ratio   = computedRatios[rowIdx];
-      if (rowIdx === correctLeavingRow) {
-        setConfirmedLeavingRow(rowIdx);
-        setWrongLeavingRow(null);
-        setPivotFeedback({
-          correct: true,
-          msg: `Correct! ${rowName} leaves the basis (ratio = ${ratio !== null ? fmtNum(ratio) : '?'}). Applying pivot…`,
-        });
-        setPivotClickPhase('done');
-        setTimeout(() => {
-          if (isAtInitialPivot) {
-            const skip = nextStep?.stepType === 'select_pivot';
-            jumpToStep(currentStepIndex + (skip ? 2 : 1));
-          } else {
-            stepForward();
-          }
-        }, 1400);
-      } else {
-        const correctRowName  = basis[correctLeavingRow] ?? correctLeaving;
-        const correctRatio    = computedRatios[correctLeavingRow];
-        setWrongLeavingRow(rowIdx);
-        setPivotFeedback({
-          correct: false,
-          msg: `Not the minimum ratio. ${correctRowName} has the smallest valid ratio (${correctRatio !== null ? fmtNum(correctRatio) : '?'}). Try that row instead.`,
-        });
-      }
+    // Episode A: Z-row cells only
+    if (episode === 'episodeA' && (phase === 'a2_attention' || phase === 'a3_commitment')) {
+      guided.clickZRowCell(colIdx);
+      return;
     }
+
+    // Episode B: pivot column cells only
+    if (episode === 'episodeB' && (phase === 'b1_attention' || phase === 'b3_commitment')) {
+      guided.clickPivotColumnCell(rowIdx);
+      return;
+    }
+  }
+
+  // ── Guided interaction panel content ────────────────────────────────────────
+  function renderGuidedPanel() {
+    const { episode, phase, feedback, attemptCount } = gs;
+
+    // Episode A — Entering Variable
+    if (episode === 'episodeA') {
+      return (
+        <div className="space-y-3">
+          {/* A1: Arrive — "Choose Entering Variable" button */}
+          {phase === 'a1_arrive' && (
+            <div className="space-y-3">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="text-xs text-gray-700 leading-relaxed">
+                  The tableau is ready. Your task: identify which variable should enter the basis to improve the objective.
+                </p>
+              </div>
+              <Button
+                onClick={guided.clickChooseEntering}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                Choose Entering Variable
+              </Button>
+            </div>
+          )}
+
+          {/* A2/A3: Attention + Commitment — instruction, waiting for click */}
+          {(phase === 'a2_attention' || phase === 'a3_commitment') && (
+            <div className="space-y-3">
+              <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                <p className="text-xs font-bold text-indigo-800 mb-1">
+                  Episode A: Choose the Entering Variable
+                </p>
+                <p className="text-xs text-indigo-700 leading-relaxed">
+                  The Z-row shows how each variable affects the objective.
+                  {problem.objectiveType === 'max'
+                    ? ' For MAX: negative values indicate improvement. Which variable should enter the basis?'
+                    : ' For MIN: positive values indicate improvement. Which variable should enter the basis?'}
+                </p>
+                <p className="text-xs text-indigo-600 mt-2 font-medium">
+                  Click a cell in the Z-row above.
+                </p>
+              </div>
+
+              {/* Feedback from wrong attempts */}
+              {feedback && renderFeedback(feedback)}
+
+              {/* Show reasoning after 4+ attempts */}
+              {attemptCount >= 4 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-blue-800 mb-1">Step-by-step reasoning:</p>
+                  <p className="text-xs text-blue-700 leading-relaxed">
+                    {problem.objectiveType === 'max'
+                      ? '1. Scan the Z-row for all values.\n2. Negative values mean increasing that variable improves z.\n3. The MOST negative value gives the fastest improvement.\n4. Click that cell.'
+                      : '1. Scan the Z-row for all values.\n2. Positive values mean increasing that variable improves z.\n3. The MOST positive value gives the fastest improvement.\n4. Click that cell.'}
+                  </p>
+                </div>
+              )}
+
+              <Button onClick={guided.showAnswer} size="sm" variant="outline" className="text-xs">
+                <Eye className="w-3 h-3 mr-1" />
+                Show Answer
+              </Button>
+            </div>
+          )}
+
+          {/* A3b: Suboptimal — dual buttons */}
+          {phase === 'a3b_suboptimal' && (
+            <div className="space-y-3">
+              {feedback && renderFeedback(feedback)}
+              <div className="flex gap-2">
+                <Button
+                  onClick={guided.acceptSuboptimalChoice}
+                  size="sm"
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                >
+                  Use this variable anyway
+                </Button>
+                <Button onClick={guided.retryEntering} size="sm" variant="outline" className="text-xs">
+                  Choose again
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* A4: Reveal — column highlighted, transition to B */}
+          {phase === 'a4_reveal' && (
+            <div className="space-y-3">
+              {feedback && renderFeedback(feedback)}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800 leading-relaxed">
+                  The entering column is now highlighted in blue. Next: determine which constraint limits how far this variable can increase.
+                </p>
+              </div>
+              <Button
+                onClick={guided.advanceToB}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+              >
+                Find the Leaving Variable
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Episode B — Leaving Variable
+    if (episode === 'episodeB') {
+      return (
+        <div className="space-y-3">
+          {/* B1/B3: Attention + Commitment */}
+          {(phase === 'b1_attention' || phase === 'b3_commitment') && (
+            <div className="space-y-3">
+              <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                <p className="text-xs font-bold text-indigo-800 mb-1">
+                  Episode B: Choose the Leaving Variable
+                </p>
+                <p className="text-xs text-indigo-700 leading-relaxed">
+                  Divide RHS by the pivot column entry (only where the entry is positive).
+                  The smallest ratio determines the leaving variable — it&apos;s the first constraint that would be violated.
+                </p>
+                <p className="text-xs text-indigo-600 mt-2 font-medium">
+                  Click a row in the highlighted blue column above.
+                </p>
+              </div>
+
+              {feedback && renderFeedback(feedback)}
+
+              {attemptCount >= 4 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs font-bold text-blue-800 mb-1">Step-by-step reasoning:</p>
+                  <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">
+                    1. Look at each row in the pivot column.{'\n'}
+                    2. Skip rows with zero or negative entries.{'\n'}
+                    3. For positive entries: compute RHS / entry.{'\n'}
+                    4. The row with the smallest ratio leaves the basis.{'\n'}
+                    5. Click that row.
+                  </p>
+                </div>
+              )}
+
+              <Button onClick={guided.showAnswer} size="sm" variant="outline" className="text-xs">
+                <Eye className="w-3 h-3 mr-1" />
+                Show Answer
+              </Button>
+            </div>
+          )}
+
+          {/* B4: Reveal — ratios shown, graph updated */}
+          {phase === 'b4_reveal' && (
+            <div className="space-y-3">
+              {feedback && renderFeedback(feedback)}
+              <Button
+                onClick={guided.advanceToApply}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+              >
+                Continue
+              </Button>
+            </div>
+          )}
+
+          {/* B5: Apply — explicit button, no auto-advance */}
+          {phase === 'b5_apply' && (
+            <div className="space-y-3">
+              {feedback && renderFeedback(feedback)}
+              <div className="bg-green-50 border border-green-300 rounded-lg p-3">
+                <p className="text-xs text-green-800 leading-relaxed">
+                  Pivot selected. Click below to apply the row operations and advance to the next tableau.
+                </p>
+              </div>
+              <Button
+                onClick={guided.applyPivot}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Play className="w-3.5 h-3.5 mr-1.5" />
+                Apply Pivot
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return null;
+  }
+
+  /** Render a feedback message with appropriate styling. */
+  function renderFeedback(fb: NonNullable<typeof gs.feedback>) {
+    const bgMap = {
+      invalid: 'bg-red-50 border-red-300 text-red-800',
+      suboptimal: 'bg-amber-50 border-amber-300 text-amber-800',
+      correct: 'bg-green-50 border-green-300 text-green-800',
+      hint: 'bg-blue-50 border-blue-300 text-blue-800',
+      reasoning: 'bg-blue-50 border-blue-300 text-blue-800',
+    };
+    const iconMap = {
+      invalid: <XCircle className="inline w-3.5 h-3.5 mr-1.5 text-red-500 flex-shrink-0" />,
+      suboptimal: <AlertTriangle className="inline w-3.5 h-3.5 mr-1.5 text-amber-600 flex-shrink-0" />,
+      correct: <CheckCircle className="inline w-3.5 h-3.5 mr-1.5 text-green-600 flex-shrink-0" />,
+      hint: <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-blue-600 flex-shrink-0" />,
+      reasoning: <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-blue-600 flex-shrink-0" />,
+    };
+    return (
+      <div className={`rounded-lg p-3 text-xs leading-relaxed border whitespace-pre-line ${bgMap[fb.type]}`}>
+        {iconMap[fb.type]}
+        {fb.text}
+      </div>
+    );
   }
 
   // ── Sub-phase: loading ───────────────────────────────────────────────────────
@@ -1660,15 +1553,9 @@ function SolvingScreen({
             currentStep={currentStep}
             showRatioTest={false}
             isInteractive={false}
-            hideSelectionHints={showPivotMC}
-            onCellClick={showPivotMC && pivotClickPhase !== 'done' ? handleCellClick : undefined}
-            pivotHighlight={showPivotMC ? {
-              phase: pivotClickPhase === 'leaving' || pivotClickPhase === 'done' ? 'leaving' : 'entering',
-              confirmedEnteringCol,
-              wrongEnteringCol,
-              confirmedLeavingRow,
-              wrongLeavingRow,
-            } : undefined}
+            hideSelectionHints={needsInteraction}
+            onCellClick={needsInteraction ? handleCellClick : undefined}
+            guidedPhase={needsInteraction ? tableauProps : undefined}
           />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -1735,8 +1622,11 @@ function SolvingScreen({
               </div>
             )}
 
-            {/* Hint */}
-            {hint && !showPivotMC && (
+            {/* Guided interaction panel */}
+            {needsInteraction && renderGuidedPanel()}
+
+            {/* Hint (non-interactive steps only) */}
+            {hint && !needsInteraction && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Lightbulb className="w-3.5 h-3.5 text-blue-600" />
@@ -1746,63 +1636,8 @@ function SolvingScreen({
               </div>
             )}
 
-            {/* Tableau click interaction — shown whenever student must choose a pivot */}
-            {showPivotMC && (
-              <div className="space-y-2">
-                {/* Instruction banner */}
-                {pivotClickPhase !== 'done' && (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                    <p className="text-xs font-bold text-purple-800">
-                      {pivotClickPhase === 'entering'
-                        ? 'Pivot — Step 1: Choose the Entering Variable'
-                        : 'Pivot — Step 2: Choose the Leaving Variable'}
-                    </p>
-                    <p className="text-xs text-purple-700 mt-0.5">
-                      {pivotClickPhase === 'entering'
-                        ? 'Click the most negative value in the Z-row (bottom row of the tableau above).'
-                        : 'Click a positive cell in the highlighted column using the minimum ratio test.'}
-                    </p>
-                  </div>
-                )}
-
-                {/* Feedback */}
-                {pivotFeedback && (
-                  <div className={`rounded-lg p-3 text-xs leading-relaxed ${
-                    pivotFeedback.correct
-                      ? 'bg-green-50 border border-green-300 text-green-800'
-                      : 'bg-amber-50 border border-amber-300 text-amber-800'
-                  }`}>
-                    {pivotFeedback.correct
-                      ? <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-green-600" />
-                      : <AlertTriangle className="inline w-3.5 h-3.5 mr-1 text-amber-600" />}
-                    {pivotFeedback.msg}
-                  </div>
-                )}
-
-                {/* Skip */}
-                {pivotClickPhase !== 'done' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs"
-                    onClick={() => {
-                      if (isAtInitialPivot) {
-                        const skip = nextStep?.stepType === 'select_pivot';
-                        jumpToStep(currentStepIndex + (skip ? 2 : 1));
-                      } else {
-                        stepForward();
-                      }
-                    }}
-                  >
-                    <Eye className="w-3 h-3 mr-1" />
-                    Skip (show me)
-                  </Button>
-                )}
-              </div>
-            )}
-
             {/* Solver explanation (non-pivot steps) */}
-            {currentStep?.explanation && !showPivotMC && (
+            {currentStep?.explanation && !needsInteraction && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <p className="text-xs font-bold text-gray-500 mb-1">Solver</p>
                 <p className="text-xs text-gray-700 font-mono leading-relaxed whitespace-pre-wrap">
@@ -1825,6 +1660,7 @@ function SolvingScreen({
               objectiveCoefficients={problem.objectiveCoefficients}
               showObjectiveLine={true}
               currentPoint={currentPoint ?? undefined}
+              guidedGraph={needsInteraction ? graphProps : undefined}
             />
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center">
@@ -1856,8 +1692,9 @@ function SolvingScreen({
           </Button>
           <div className="flex-1 flex items-center gap-1 overflow-x-auto">
             {steps.map((s, i) => {
-              // At pivot / initial-pivot steps, only allow jumping to already-visited steps
-              const canJump = showPivotMC && pivotClickPhase !== 'done' ? i < currentStepIndex : true;
+              const canJump = needsInteraction && !gs.canJumpTimeline
+                ? i < currentStepIndex
+                : true;
               return (
                 <button
                   key={i}
@@ -1879,7 +1716,7 @@ function SolvingScreen({
             size="sm"
             variant="outline"
             onClick={stepForward}
-            disabled={!canStepForward || (showPivotMC && pivotClickPhase !== 'done')}
+            disabled={!canStepForward || (needsInteraction && !gs.canAdvance)}
             className="text-xs"
           >
             Next

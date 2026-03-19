@@ -3,6 +3,7 @@ import { Tableau, SimplexStep, InteractivePhase } from '../types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { ChevronLeft, ChevronRight, SkipBack, SkipForward } from 'lucide-react';
 import { Button } from './ui/button';
+import { GuidedTableauProps } from '../hooks/useGuidedSimplex';
 
 interface TableauWorkspaceProps {
   tableau: Tableau;
@@ -15,25 +16,14 @@ interface TableauWorkspaceProps {
   interactivePhase?: InteractivePhase;
   /**
    * When true, suppress all pivot-selection highlighting (optimal entering
-   * column, candidate columns, min-ratio annotation). Used in Practice Mode
-   * so the tableau doesn't reveal the answer before the student picks.
+   * column, candidate columns, min-ratio annotation).
    */
   hideSelectionHints?: boolean;
   /**
-   * When set, makes specific tableau cells interactive for pivot selection.
-   * Used in Practice Mode so the student clicks the tableau directly.
+   * Guided simplex interaction state — drives Z-row emphasis, column highlight,
+   * dimmed rows, cell coloring, click gating, and ratio display.
    */
-  pivotHighlight?: {
-    phase: 'entering' | 'leaving';
-    /** Column the student has confirmed as entering variable (green). */
-    confirmedEnteringCol: number | null;
-    /** Column they attempted but was wrong (red). */
-    wrongEnteringCol: number | null;
-    /** Row the student has confirmed as leaving variable (green). */
-    confirmedLeavingRow: number | null;
-    /** Row they attempted but was wrong (red). */
-    wrongLeavingRow: number | null;
-  };
+  guidedPhase?: GuidedTableauProps;
   // Controlled afterStep (lifted to parent so narrative can use it)
   afterStep?: number;
   onAfterStepChange?: (step: number) => void;
@@ -49,13 +39,14 @@ export default function TableauWorkspace({
   isInteractive = false,
   interactivePhase,
   hideSelectionHints = false,
-  pivotHighlight = undefined,
+  guidedPhase,
   afterStep: afterStepProp,
   onAfterStepChange,
 }: TableauWorkspaceProps) {
   const headers = tableau.allVariables ?? [];
   const totalRows = tableau.rows.length;
   const rhsColIdx = headers.length - 1;
+  const zRowIdx = totalRows - 1;
 
   // Controlled or uncontrolled afterStep
   const [localAfterStep, setLocalAfterStep] = useState(0);
@@ -102,10 +93,38 @@ export default function TableauWorkspace({
   const pivotRow = currentStep?.pivotRow ?? -1;
   const pivotCol = currentStep?.pivotCol ?? -1;
 
+  // ── Guided phase helpers ──────────────────────────────────────────────────────
+
+  const gp = guidedPhase;
+
+  /** Get cell state from guided phase */
+  const getGuidedCellState = (rIdx: number, cIdx: number): string | undefined => {
+    if (!gp) return undefined;
+    return gp.cellStates[`${rIdx},${cIdx}`];
+  };
+
+  /** Check if a cell is clickable in guided mode */
+  const isGuidedClickable = (rIdx: number, cIdx: number, isZRow: boolean): boolean => {
+    if (!gp) return false;
+    if (gp.clickableRegion === 'zrow') {
+      return isZRow && cIdx !== rhsColIdx;
+    }
+    if (gp.clickableRegion === 'pivotcol') {
+      return !isZRow && cIdx === gp.highlightedCol && !gp.dimmedRows.includes(rIdx);
+    }
+    return false;
+  };
+
+  /** Check if a row is dimmed in guided mode */
+  const isGuidedDimmed = (rIdx: number): boolean => {
+    if (!gp) return false;
+    return gp.dimmedRows.includes(rIdx);
+  };
+
   // ── Shared table renderer ────────────────────────────────────────────────────
 
   const renderTable = ({
-    rows, basis, getCellClass, getTooltip, showRatios, ratios,
+    rows, basis, getCellClass, getTooltip, showRatios, ratios, ratioMinRow,
   }: {
     rows: Tableau['rows'];
     basis: string[];
@@ -113,55 +132,81 @@ export default function TableauWorkspace({
     getTooltip?: (rIdx: number, cIdx: number) => string;
     showRatios?: boolean;
     ratios?: (number | null)[];
+    ratioMinRow?: number;
   }) => (
     <TooltipProvider>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
             <th className="px-3 py-2 bg-gray-100 border border-gray-300 font-semibold text-xs">Basis</th>
-            {headers.map((h, i) => (
-              <th key={i} className={`px-3 py-2 border border-gray-300 font-semibold text-xs ${
-                i === pivotColForRatio && showRatios ? 'bg-blue-100' : 'bg-gray-100'
-              }`}>{h}</th>
-            ))}
+            {headers.map((h, i) => {
+              let thCls = 'px-3 py-2 border border-gray-300 font-semibold text-xs ';
+              if (gp?.highlightedCol === i) thCls += 'bg-blue-200 text-blue-900 ';
+              else if (gp?.rhsEmphasis && i === rhsColIdx) thCls += 'bg-purple-100 ';
+              else if (i === pivotColForRatio && showRatios && !gp) thCls += 'bg-blue-100 ';
+              else thCls += 'bg-gray-100 ';
+              return <th key={i} className={thCls}>{h}</th>;
+            })}
             {showRatios && <th className="px-3 py-2 bg-purple-100 border border-gray-300 font-semibold text-xs">Ratio</th>}
           </tr>
         </thead>
         <tbody>
-          {rows.slice(0, -1).map((row, rIdx) => (
-            <tr key={rIdx}>
-              <td className="px-3 py-2 bg-gray-50 border border-gray-300 font-medium text-center text-xs">
-                {basis[rIdx]}
-              </td>
-              {row.map((cell, cIdx) => (
-                <Tooltip key={cIdx}>
-                  <TooltipTrigger asChild>
-                    <td className={getCellClass(rIdx, cIdx, false)} onClick={() => onCellClick?.(rIdx, cIdx)}>
-                      {fmt(cell.value)}
-                    </td>
-                  </TooltipTrigger>
-                  {getTooltip && (
-                    <TooltipContent><p className="max-w-xs text-xs">{getTooltip(rIdx, cIdx)}</p></TooltipContent>
-                  )}
-                </Tooltip>
-              ))}
-              {showRatios && (
-                <td className="px-3 py-2 bg-purple-50 border border-gray-300 text-center text-xs">
-                  {ratios?.[rIdx] != null ? (
-                    <span className={!hideSelectionHints && rIdx === pivotRowForSelect ? 'font-bold text-amber-700' : ''}>
-                      {fmt(ratios[rIdx] as number)}{!hideSelectionHints && rIdx === pivotRowForSelect ? ' ← min' : ''}
-                    </span>
-                  ) : <span className="text-gray-400">—</span>}
+          {rows.slice(0, -1).map((row, rIdx) => {
+            const dimmed = isGuidedDimmed(rIdx);
+            return (
+              <tr key={rIdx} className={dimmed ? 'opacity-30' : ''}>
+                <td className="px-3 py-2 bg-gray-50 border border-gray-300 font-medium text-center text-xs">
+                  {basis[rIdx]}
                 </td>
-              )}
-            </tr>
-          ))}
+                {row.map((cell, cIdx) => (
+                  <Tooltip key={cIdx}>
+                    <TooltipTrigger asChild>
+                      <td
+                        data-row={rIdx}
+                        data-col={cIdx}
+                        className={getCellClass(rIdx, cIdx, false)}
+                        onClick={() => onCellClick?.(rIdx, cIdx)}
+                      >
+                        {fmt(cell.value)}
+                      </td>
+                    </TooltipTrigger>
+                    {getTooltip && (
+                      <TooltipContent><p className="max-w-xs text-xs">{getTooltip(rIdx, cIdx)}</p></TooltipContent>
+                    )}
+                  </Tooltip>
+                ))}
+                {showRatios && (
+                  <td className="px-3 py-2 bg-purple-50 border border-gray-300 text-center text-xs">
+                    {ratios?.[rIdx] != null ? (
+                      <span className={ratioMinRow === rIdx ? 'font-bold text-green-700' : ''}>
+                        {fmt(ratios[rIdx] as number)}{ratioMinRow === rIdx ? ' ← min' : ''}
+                      </span>
+                    ) : <span className="text-gray-400">—</span>}
+                  </td>
+                )}
+              </tr>
+            );
+          })}
           {/* Z-row */}
-          <tr className="bg-blue-50">
-            <td className="px-3 py-2 border border-gray-300 font-semibold text-center text-xs">Z</td>
+          <tr className={gp?.zRowEmphasis
+            ? 'border-t-4 border-indigo-400 bg-indigo-50'
+            : 'bg-blue-50'
+          }>
+            <td className={`px-3 py-2 border border-gray-300 font-semibold text-center text-xs ${
+              gp?.zRowEmphasis ? 'bg-indigo-100 text-indigo-800' : ''
+            }`}>
+              {gp?.zRowEmphasis ? (
+                <span>Z<span className="block text-[10px] font-normal text-indigo-600 leading-tight">objective</span></span>
+              ) : 'Z'}
+            </td>
             {rows[rows.length - 1].map((cell, cIdx) => (
-              <td key={cIdx} className={getCellClass(rows.length - 1, cIdx, true)}
-                onClick={() => onCellClick?.(rows.length - 1, cIdx)}>
+              <td
+                key={cIdx}
+                data-row={zRowIdx}
+                data-col={cIdx}
+                className={getCellClass(rows.length - 1, cIdx, true)}
+                onClick={() => onCellClick?.(rows.length - 1, cIdx)}
+              >
                 {fmt(cell.value)}
               </td>
             ))}
@@ -172,18 +217,85 @@ export default function TableauWorkspace({
     </TooltipProvider>
   );
 
+  // ── GUIDED TABLE (used when guidedPhase is active) ────────────────────────────
+
+  const renderGuidedTable = () => {
+    const guidedRatios = gp!.showRatios ? gp!.ratios : undefined;
+    return renderTable({
+      rows: tableau.rows,
+      basis: tableau.basisVariables,
+      showRatios: gp!.showRatios,
+      ratios: guidedRatios,
+      ratioMinRow: gp!.minRatioRow,
+      getCellClass: (rIdx, cIdx, isZRow) => {
+        const cellState = getGuidedCellState(rIdx, cIdx);
+        const clickable = isGuidedClickable(rIdx, cIdx, isZRow);
+        const inHighlightedCol = gp!.highlightedCol !== null && cIdx === gp!.highlightedCol;
+        const isRhs = cIdx === rhsColIdx;
+        const cellVal = tableau.rows[rIdx][cIdx].value;
+
+        let cls = 'px-3 py-2 text-center border transition-all text-xs ';
+
+        // Cell state overrides (correct/invalid/suboptimal from attempts)
+        if (cellState === 'correct') {
+          cls += 'bg-green-200 ring-2 ring-green-500 font-bold text-green-900 border-green-400 ';
+          return cls;
+        }
+        if (cellState === 'invalid') {
+          cls += 'bg-red-100 text-red-400 border-red-200 ';
+          return cls;
+        }
+        if (cellState === 'suboptimal') {
+          cls += 'bg-amber-200 ring-2 ring-amber-400 font-bold text-amber-900 border-amber-300 ';
+          return cls;
+        }
+
+        // Column highlight (blue) for entering column
+        if (inHighlightedCol && !isZRow && !isRhs) {
+          cls += 'bg-blue-100 border-blue-200 ';
+          if (clickable) cls += 'cursor-pointer hover:bg-blue-200 hover:ring-2 hover:ring-blue-400 ';
+          return cls;
+        }
+
+        // RHS emphasis
+        if (gp!.rhsEmphasis && isRhs && !isZRow) {
+          cls += 'bg-purple-50 font-medium border-gray-200 ';
+          return cls;
+        }
+
+        // Z-row cells
+        if (isZRow) {
+          if (isRhs) {
+            cls += 'font-semibold border-gray-300 ';
+            cls += gp!.zRowEmphasis ? 'bg-indigo-100 text-indigo-800 ' : 'bg-blue-50 ';
+          } else if (gp!.zRowEmphasis) {
+            // In attention phase: neutral coloring, no hints about negative/positive
+            cls += 'bg-indigo-50 border-indigo-200 ';
+            if (clickable) cls += 'cursor-pointer hover:bg-indigo-100 hover:ring-2 hover:ring-indigo-400 font-medium ';
+          } else {
+            cls += 'bg-blue-50 border-gray-200 ';
+          }
+          return cls;
+        }
+
+        // Normal constraint cells
+        cls += 'border-gray-200 ';
+        return cls;
+      },
+    });
+  };
+
   // ── STANDARD TABLE (initial / select_pivot) ──────────────────────────────────
 
   const renderStandardTable = () => {
     const isInitial = !stepType || stepType === 'initial';
-    // In MC mode (hideSelectionHints) treat select_pivot visually like initial
-    // so we don't reveal which column to enter or which row to leave.
     const showHints = !isInitial && !hideSelectionHints;
     return renderTable({
       rows: tableau.rows,
       basis: tableau.basisVariables,
       showRatios: showRatioTest && showHints,
       ratios: computedRatios,
+      ratioMinRow: !hideSelectionHints ? pivotRowForSelect : -1,
       getCellClass: (rIdx, cIdx, isZRow) => {
         const cell = tableau.rows[rIdx][cIdx];
         const isPivotCell = rIdx === pivotRow && cIdx === pivotCol;
@@ -200,31 +312,9 @@ export default function TableauWorkspace({
           else if (cell.value > 1e-9) cls += 'bg-green-50 text-green-700 border-gray-200';
           else cls += 'bg-blue-50 border-gray-200';
         } else if (isZRow) {
-          // hideSelectionHints: still colour Z-row cells by sign so student
-          // can read the values, but don't call out the winner.
           if (cIdx === rhsColIdx) cls += 'bg-blue-50 font-semibold border-gray-300';
-          else if (cell.value < -1e-9) cls += 'bg-red-50 text-red-700 border-gray-200';
-          else if (cell.value > 1e-9) cls += 'bg-green-50 text-green-700 border-gray-200';
           else cls += 'bg-blue-50 border-gray-200';
         } else cls += 'border-gray-200';
-        // ── pivotHighlight: glow / click affordance for Practice Mode ──────────
-        if (pivotHighlight) {
-          if (pivotHighlight.phase === 'entering' && isZRow && cIdx !== rhsColIdx) {
-            if (cIdx === pivotHighlight.confirmedEnteringCol)
-              cls = cls.replace(/bg-\S+/g, '') + 'bg-green-100 ring-2 ring-green-500 ';
-            else if (cIdx === pivotHighlight.wrongEnteringCol)
-              cls = cls.replace(/bg-\S+/g, '') + 'bg-red-100 ring-2 ring-red-400 ';
-            else if (cell.value < -1e-9)
-              cls += 'cursor-pointer hover:ring-2 hover:ring-purple-400 hover:bg-purple-50 ';
-          } else if (pivotHighlight.phase === 'leaving' && !isZRow && cIdx === pivotHighlight.confirmedEnteringCol) {
-            if (rIdx === pivotHighlight.confirmedLeavingRow)
-              cls = cls.replace(/bg-\S+/g, '') + 'bg-green-100 ring-2 ring-green-500 ';
-            else if (rIdx === pivotHighlight.wrongLeavingRow)
-              cls = cls.replace(/bg-\S+/g, '') + 'bg-red-100 ring-2 ring-red-400 ';
-            else if (cell.value > 1e-9)
-              cls += 'cursor-pointer hover:ring-2 hover:ring-purple-400 hover:bg-purple-50 ';
-          }
-        }
         if (isInteractive && !isSelected) cls += ' cursor-pointer hover:bg-purple-50';
         return cls;
       },
@@ -377,6 +467,7 @@ export default function TableauWorkspace({
 
   const stepLabel =
     isInteractive ? `Interactive — ${interactivePhase === 'choose_entering' ? 'choose entering variable' : interactivePhase === 'choose_leaving' ? 'choose leaving variable' : 'optimal'}`
+    : guidedPhase ? 'Guided Practice'
     : stepType === 'initial' ? 'Initial Tableau'
     : stepType === 'select_pivot' ? `Iteration ${currentStep?.iteration} · Pivot Selection`
     : stepType === 'after_pivot' ? `Iteration ${currentStep?.iteration} · After Pivot`
@@ -384,7 +475,8 @@ export default function TableauWorkspace({
     : stepType === 'infeasible' ? 'Infeasible' : stepType === 'unbounded' ? 'Unbounded' : 'Tableau';
 
   const tableContent =
-    isInteractive ? renderInteractiveTable()
+    guidedPhase ? renderGuidedTable()
+    : isInteractive ? renderInteractiveTable()
     : stepType === 'after_pivot' ? renderAfterPivotTable()
     : stepType === 'optimal' ? renderOptimalTable()
     : renderStandardTable();

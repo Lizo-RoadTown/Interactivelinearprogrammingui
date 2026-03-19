@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Constraint, Point } from '../types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { GuidedGraphProps } from '../hooks/useGuidedSimplex';
 
 interface GraphViewProps {
   constraints: Constraint[];
@@ -14,6 +15,8 @@ interface GraphViewProps {
   visibleConstraintCount?: number;
   /** Draw objective line at this z value regardless of currentPoint.z. */
   zOverride?: number;
+  /** Guided simplex interaction state for per-phase graph updates. */
+  guidedGraph?: GuidedGraphProps;
 }
 
 export default function GraphView({
@@ -26,6 +29,7 @@ export default function GraphView({
   currentPoint,
   visibleConstraintCount,
   zOverride,
+  guidedGraph,
 }: GraphViewProps) {
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
   const [hoveredConstraint, setHoveredConstraint] = useState<string | null>(null);
@@ -249,7 +253,7 @@ export default function GraphView({
             />
           )}
 
-          {/* Arrow marker definition */}
+          {/* Arrow marker definitions */}
           <defs>
             <marker
               id="arrowhead"
@@ -261,7 +265,62 @@ export default function GraphView({
             >
               <polygon points="0 0, 10 3, 0 6" fill="#8b5cf6" />
             </marker>
+            <marker
+              id="direction-arrow"
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="3"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3, 0 6" fill="#059669" />
+            </marker>
           </defs>
+
+          {/* Guided: direction arrow from current vertex */}
+          {guidedGraph?.showDirectionArrow && currentPoint && guidedGraph.enteringVarName && (() => {
+            const name = guidedGraph.enteringVarName.toLowerCase();
+            // Determine direction based on variable name
+            const isX1 = name === 'x1' || name === 'x₁';
+            const isX2 = name === 'x2' || name === 'x₂';
+            const arrowLen = Math.max(maxX, maxY) * 0.15;
+            const dx = isX1 ? arrowLen : isX2 ? 0 : arrowLen * 0.7;
+            const dy = isX2 ? arrowLen : isX1 ? 0 : arrowLen * 0.7;
+            return (
+              <line
+                x1={scaleX(currentPoint.x)}
+                y1={scaleY(currentPoint.y)}
+                x2={scaleX(currentPoint.x + dx)}
+                y2={scaleY(currentPoint.y + dy)}
+                stroke="#059669"
+                strokeWidth="3"
+                strokeDasharray="6,3"
+                markerEnd="url(#direction-arrow)"
+                opacity="0.8"
+              />
+            );
+          })()}
+
+          {/* Guided: constraint highlight for leaving variable */}
+          {guidedGraph?.highlightedConstraintIdx != null && (() => {
+            const idx = guidedGraph.highlightedConstraintIdx;
+            const c = constraints[idx];
+            if (!c) return null;
+            const line = getConstraintLine(c);
+            return (
+              <line
+                x1={scaleX(line.x1)}
+                y1={scaleY(line.y1)}
+                x2={scaleX(line.x2)}
+                y2={scaleY(line.y2)}
+                stroke="#dc2626"
+                strokeWidth="5"
+                opacity="0.6"
+                strokeDasharray="none"
+                className="animate-pulse"
+              />
+            );
+          })()}
 
           {/* Corner points */}
           {cornerPoints.map((point, idx) => {
