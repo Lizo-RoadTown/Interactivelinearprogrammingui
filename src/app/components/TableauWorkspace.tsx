@@ -19,6 +19,21 @@ interface TableauWorkspaceProps {
    * so the tableau doesn't reveal the answer before the student picks.
    */
   hideSelectionHints?: boolean;
+  /**
+   * When set, makes specific tableau cells interactive for pivot selection.
+   * Used in Practice Mode so the student clicks the tableau directly.
+   */
+  pivotHighlight?: {
+    phase: 'entering' | 'leaving';
+    /** Column the student has confirmed as entering variable (green). */
+    confirmedEnteringCol: number | null;
+    /** Column they attempted but was wrong (red). */
+    wrongEnteringCol: number | null;
+    /** Row the student has confirmed as leaving variable (green). */
+    confirmedLeavingRow: number | null;
+    /** Row they attempted but was wrong (red). */
+    wrongLeavingRow: number | null;
+  };
   // Controlled afterStep (lifted to parent so narrative can use it)
   afterStep?: number;
   onAfterStepChange?: (step: number) => void;
@@ -34,6 +49,7 @@ export default function TableauWorkspace({
   isInteractive = false,
   interactivePhase,
   hideSelectionHints = false,
+  pivotHighlight = undefined,
   afterStep: afterStepProp,
   onAfterStepChange,
 }: TableauWorkspaceProps) {
@@ -191,6 +207,24 @@ export default function TableauWorkspace({
           else if (cell.value > 1e-9) cls += 'bg-green-50 text-green-700 border-gray-200';
           else cls += 'bg-blue-50 border-gray-200';
         } else cls += 'border-gray-200';
+        // ── pivotHighlight: glow / click affordance for Practice Mode ──────────
+        if (pivotHighlight) {
+          if (pivotHighlight.phase === 'entering' && isZRow && cIdx !== rhsColIdx) {
+            if (cIdx === pivotHighlight.confirmedEnteringCol)
+              cls = cls.replace(/bg-\S+/g, '') + 'bg-green-100 ring-2 ring-green-500 ';
+            else if (cIdx === pivotHighlight.wrongEnteringCol)
+              cls = cls.replace(/bg-\S+/g, '') + 'bg-red-100 ring-2 ring-red-400 ';
+            else if (cell.value < -1e-9)
+              cls += 'cursor-pointer hover:ring-2 hover:ring-purple-400 hover:bg-purple-50 ';
+          } else if (pivotHighlight.phase === 'leaving' && !isZRow && cIdx === pivotHighlight.confirmedEnteringCol) {
+            if (rIdx === pivotHighlight.confirmedLeavingRow)
+              cls = cls.replace(/bg-\S+/g, '') + 'bg-green-100 ring-2 ring-green-500 ';
+            else if (rIdx === pivotHighlight.wrongLeavingRow)
+              cls = cls.replace(/bg-\S+/g, '') + 'bg-red-100 ring-2 ring-red-400 ';
+            else if (cell.value > 1e-9)
+              cls += 'cursor-pointer hover:ring-2 hover:ring-purple-400 hover:bg-purple-50 ';
+          }
+        }
         if (isInteractive && !isSelected) cls += ' cursor-pointer hover:bg-purple-50';
         return cls;
       },
