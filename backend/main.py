@@ -143,10 +143,10 @@ def _tab_to_step(tab: dict, iteration: int, prev_tab: dict | None,
     """Convert a solver tableau dict to a SimplexStepOut."""
     msg = tab.get('message', '')
 
-    # Classify step type
+    # Classify step type — by message content, not iteration index
     if msg.startswith('Z_ROW_SETUP'):
         step_type = 'z_row_setup'
-    elif iteration == 0:
+    elif msg.startswith('Initial tableau') or (iteration == 0 and not msg.startswith('PHASE')):
         step_type = 'initial'
     elif msg.startswith('PHASE I COMPLETE'):
         step_type = 'phase1_complete'
