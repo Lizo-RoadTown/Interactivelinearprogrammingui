@@ -4,6 +4,7 @@ export type Method = 'graphical' | 'simplex' | 'big-m' | 'two-phase';
 
 export type StepType =
   | 'initial'
+  | 'z_row_setup'
   | 'select_pivot'
   | 'after_pivot'
   | 'optimal'

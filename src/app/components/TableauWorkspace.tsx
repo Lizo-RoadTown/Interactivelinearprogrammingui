@@ -112,6 +112,10 @@ export default function TableauWorkspace({
     if (gp.clickableRegion === 'pivotcol') {
       return !isZRow && cIdx === gp.highlightedCol && !gp.dimmedRows.includes(rIdx);
     }
+    if (gp.clickableRegion === 'basisrow') {
+      // Episode 0: any non-Z constraint row is clickable (student picks basis row)
+      return !isZRow;
+    }
     return false;
   };
 

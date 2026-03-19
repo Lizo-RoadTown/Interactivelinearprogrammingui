@@ -84,6 +84,7 @@ const METHOD_LABEL: Record<string, string> = {
 
 const STEP_LABEL: Record<StepType, string> = {
   initial:         'Initial Tableau',
+  z_row_setup:     'Z-Row Setup',
   select_pivot:    'Select Pivot',
   after_pivot:     'After Pivot',
   optimal:         'Optimal Solution',
@@ -1251,6 +1252,12 @@ function SolvingScreen({
 
     const { episode, phase } = gs;
 
+    // Episode 0: basis row cells
+    if (episode === 'episode0' && (phase === 'e0_attention' || phase === 'e0_commitment')) {
+      guided.e0ClickRow(rowIdx);
+      return;
+    }
+
     // Episode A: Z-row cells only
     if (episode === 'episodeA' && (phase === 'a2_attention' || phase === 'a3_commitment')) {
       guided.clickZRowCell(colIdx);
@@ -1267,6 +1274,58 @@ function SolvingScreen({
   // ── Guided interaction panel content ────────────────────────────────────────
   function renderGuidedPanel() {
     const { episode, phase, feedback, attemptCount } = gs;
+
+    // Episode 0 — Z-Row Setup
+    if (episode === 'episode0') {
+      return (
+        <div className="space-y-3">
+          {phase === 'e0_arrive' && (
+            <div className="space-y-3">
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                <p className="text-sm font-bold text-amber-800 mb-1">Z-Row Setup Required</p>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  Before selecting a pivot, the Z-row must be adjusted. Basic artificial
+                  variables have nonzero coefficients in the Z-row that must be eliminated
+                  using row operations.
+                </p>
+              </div>
+              <Button
+                onClick={guided.e0Begin}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                Begin Z-Row Setup
+              </Button>
+            </div>
+          )}
+
+          {(phase === 'e0_attention' || phase === 'e0_commitment') && (
+            <div className="space-y-3">
+              <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                <p className="text-xs font-bold text-indigo-800 mb-1">
+                  Clear Artificial {gs.currentArtificialIdx + 1} of {gs.artificialRows.length}
+                </p>
+                <p className="text-xs text-indigo-700 leading-relaxed">
+                  A basic artificial variable still has a nonzero coefficient in the Z-row.
+                  Click the row where this artificial is basic — that row will be used to
+                  eliminate the coefficient via a row operation.
+                </p>
+              </div>
+
+              {feedback && renderFeedback(feedback)}
+
+              {phase === 'e0_commitment' && feedback?.type === 'correct' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+                  <p className="text-xs text-blue-800">
+                    Applying row operation…
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
 
     // Episode A — Entering Variable
     if (episode === 'episodeA') {

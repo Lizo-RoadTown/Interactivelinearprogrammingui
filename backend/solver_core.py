@@ -350,14 +350,28 @@ class SimplexSolver:
                 if vtype == 'artificial':
                     T[m, col_idx] = M
 
+        # Save PRE-elimination tableau for Episode 0 (Z-row setup)
+        art_basis_rows = [i for i, bv in enumerate(basis)
+                          if bv >= 0 and col_types[bv] == 'artificial']
+        if art_basis_rows:
+            self._save(T, basis, all_vars, col_types,
+                       pivot_col=None, pivot_row=None, ratios=None,
+                       entering=None, leaving=None, row_ops=None,
+                       message="Z_ROW_SETUP: Z-row contains raw Big-M coefficients. "
+                               "Basic artificial variables must be eliminated from the "
+                               "Z-row before pivot selection can begin.")
+
         # Big-M elimination: clear artificials from z-row using their rows
+        ero_ops = []
         for i, bv in enumerate(basis):
             if bv >= 0 and col_types[bv] == 'artificial':
-                T[m] -= T[m, bv] * T[i]
+                coeff = T[m, bv]
+                T[m] -= coeff * T[i]
+                ero_ops.append(f"Rz <- Rz - ({_fmt_cell(coeff)}) x R{i+1}")
 
         self._save(T, basis, all_vars, col_types,
                    pivot_col=None, pivot_row=None, ratios=None,
-                   entering=None, leaving=None, row_ops=None,
+                   entering=None, leaving=None, row_ops=ero_ops if ero_ops else None,
                    message="Initial tableau — Big-M applied to z-row. "
                            "Look for the most negative value in the z-row to choose the entering variable.")
 
@@ -676,12 +690,25 @@ class TwoPhaseSolver:
         for j, ct in enumerate(col_types):
             if ct == 'artificial':
                 T[m, j] = 1.0          # MIN z1 = sum(artificials); internal MAX → +c_j
+
+        # Save PRE-elimination tableau for Episode 0
+        art_basis_rows = [i for i, bv in enumerate(basis)
+                          if bv >= 0 and col_types[bv] == 'artificial']
+        if art_basis_rows:
+            self._save(T, basis, all_vars, col_types,
+                       None, None, None, None, None, None,
+                       "Z_ROW_SETUP: Phase I Z-row has raw artificial coefficients. "
+                       "Eliminate basic artificial variables from the Z-row before pivoting.")
+
+        ero_ops_p1 = []
         for i, bv in enumerate(basis):
             if bv >= 0 and col_types[bv] == 'artificial':
-                T[m] -= T[m, bv] * T[i]
+                coeff = T[m, bv]
+                T[m] -= coeff * T[i]
+                ero_ops_p1.append(f"Rz <- Rz - ({_fmt_cell(coeff)}) x R{i+1}")
 
         self._save(T, basis, all_vars, col_types,
-                   None, None, None, None, None, None,
+                   None, None, None, None, None, ero_ops_p1 if ero_ops_p1 else None,
                    "PHASE I: Minimize sum of artificial variables. "
                    "All artificials must reach zero to find a basic feasible solution.")
 
@@ -743,12 +770,25 @@ class TwoPhaseSolver:
             if col_types2[j] == 'decision':
                 c = self.obj.get(v, 0.0)
                 T2[m2, j] = -c if self.sense == 'max' else c
+
+        # Save PRE-elimination Phase II tableau for Episode 0
+        needs_clear = [i for i, bv in enumerate(basis2)
+                       if bv >= 0 and abs(T2[m2, bv]) > 1e-9]
+        if needs_clear:
+            self._save(T2, basis2, all_vars2, col_types2,
+                       None, None, None, None, None, None,
+                       "Z_ROW_SETUP: Phase II Z-row has been restored with original "
+                       "objective coefficients. Basic variables must be cleared before pivoting.")
+
+        ero_ops_p2 = []
         for i, bv in enumerate(basis2):
             if bv >= 0 and abs(T2[m2, bv]) > 1e-9:
-                T2[m2] -= T2[m2, bv] * T2[i]
+                coeff = T2[m2, bv]
+                T2[m2] -= coeff * T2[i]
+                ero_ops_p2.append(f"Rz <- Rz - ({_fmt_cell(coeff)}) x R{i+1}")
 
         self._save(T2, basis2, all_vars2, col_types2,
-                   None, None, None, None, None, None,
+                   None, None, None, None, None, ero_ops_p2 if ero_ops_p2 else None,
                    "PHASE II: Artificial columns removed. Original objective restored. "
                    "Continue simplex to find the optimal solution.")
 

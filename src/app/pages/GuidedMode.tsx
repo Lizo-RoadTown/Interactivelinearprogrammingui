@@ -38,6 +38,7 @@ const CHAPTER_HEADER: Record<string, string> = {
 
 const STEP_LABEL: Record<StepType, string> = {
   initial:          'Initial Tableau',
+  z_row_setup:      'Z-Row Setup',
   select_pivot:     'Select Pivot',
   after_pivot:      'After Pivot',
   optimal:          'Optimal Solution',

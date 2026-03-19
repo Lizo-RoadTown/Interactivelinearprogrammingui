@@ -144,7 +144,9 @@ def _tab_to_step(tab: dict, iteration: int, prev_tab: dict | None,
     msg = tab.get('message', '')
 
     # Classify step type
-    if iteration == 0:
+    if msg.startswith('Z_ROW_SETUP'):
+        step_type = 'z_row_setup'
+    elif iteration == 0:
         step_type = 'initial'
     elif msg.startswith('PHASE I COMPLETE'):
         step_type = 'phase1_complete'

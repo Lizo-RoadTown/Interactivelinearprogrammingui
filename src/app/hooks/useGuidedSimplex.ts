@@ -17,10 +17,14 @@ import { normVar } from '../utils/varName';
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
-export type GuidedEpisode = 'idle' | 'episodeA' | 'episodeB';
+export type GuidedEpisode = 'idle' | 'episode0' | 'episodeA' | 'episodeB';
 
 export type GuidedPhase =
   | 'idle'
+  // Episode 0 — Z-row setup (Big-M / Two-Phase only)
+  | 'e0_arrive'
+  | 'e0_attention'
+  | 'e0_commitment'
   // Episode A
   | 'a1_arrive'
   | 'a2_attention'
@@ -47,7 +51,7 @@ export interface GuidedTableauProps {
   rhsEmphasis: boolean;
   dimmedRows: number[];
   cellStates: Record<string, 'correct' | 'invalid' | 'suboptimal'>;
-  clickableRegion: 'zrow' | 'pivotcol' | 'none';
+  clickableRegion: 'zrow' | 'pivotcol' | 'basisrow' | 'none';
   showRatios: boolean;
   ratios: (number | null)[];
   minRatioRow: number;
@@ -66,6 +70,10 @@ export interface GuidedGraphProps {
 interface State {
   episode: GuidedEpisode;
   phase: GuidedPhase;
+
+  // Episode 0 — Z-row setup
+  artificialRows: number[];       // row indices of basic artificials needing Z-row clearing
+  currentArtificialIdx: number;   // which one we're on
 
   // Episode A
   enteringCol: number | null;
@@ -98,6 +106,8 @@ interface State {
 const INITIAL_STATE: State = {
   episode: 'idle',
   phase: 'idle',
+  artificialRows: [],
+  currentArtificialIdx: 0,
   enteringCol: null,
   enteringAttempts: [],
   suboptimalChoice: false,
@@ -114,6 +124,10 @@ const INITIAL_STATE: State = {
 // ── Actions ──────────────────────────────────────────────────────────────────
 
 type Action =
+  | { type: 'START_EPISODE_0'; artificialRows: number[] }
+  | { type: 'E0_BEGIN' }
+  | { type: 'E0_CLICK_ROW'; row: number; correctRow: number; rowName: string; correctRowName: string }
+  | { type: 'E0_ADVANCE' }  // auto after correct, or when all cleared → advance step
   | { type: 'START_EPISODE_A' }
   | { type: 'CLICK_CHOOSE_ENTERING' }
   | {
@@ -156,6 +170,69 @@ type Action =
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
+    case 'START_EPISODE_0':
+      return {
+        ...INITIAL_STATE,
+        episode: 'episode0',
+        phase: 'e0_arrive',
+        artificialRows: action.artificialRows,
+        currentArtificialIdx: 0,
+        canAdvance: false,
+        canJumpTimeline: false,
+        suboptimalPivots: state.suboptimalPivots,
+      };
+
+    case 'E0_BEGIN':
+      return { ...state, phase: 'e0_attention' };
+
+    case 'E0_CLICK_ROW': {
+      const { row, correctRow, rowName, correctRowName } = action;
+      if (row === correctRow) {
+        return {
+          ...state,
+          phase: 'e0_commitment', // will auto-advance
+          feedback: {
+            text: `Correct. Row ${row + 1} (${rowName}) is where this artificial is basic. The row operation will clear its coefficient from the Z-row.`,
+            type: 'correct',
+            nearCell: { row, col: 0 },
+          },
+        };
+      }
+      const newCount = state.attemptCount + 1;
+      return {
+        ...state,
+        attemptCount: newCount,
+        feedback: {
+          text: `This row will not eliminate the coefficient. You need row ${correctRow + 1} (${correctRowName}) — that's where this artificial variable is basic.`,
+          type: 'invalid',
+          nearCell: { row, col: 0 },
+        },
+      };
+    }
+
+    case 'E0_ADVANCE': {
+      const nextIdx = state.currentArtificialIdx + 1;
+      if (nextIdx >= state.artificialRows.length) {
+        // All cleared — advance to next step (the post-elimination initial)
+        return {
+          ...state,
+          episode: 'idle',
+          phase: 'idle',
+          canAdvance: true,
+          canJumpTimeline: true,
+          feedback: null,
+        };
+      }
+      // More artificials to clear
+      return {
+        ...state,
+        phase: 'e0_attention',
+        currentArtificialIdx: nextIdx,
+        attemptCount: 0,
+        feedback: null,
+      };
+    }
+
     case 'START_EPISODE_A':
       return {
         ...INITIAL_STATE,
@@ -434,22 +511,70 @@ export function useGuidedSimplex({
 }: UseGuidedSimplexArgs) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
-  // ── Determine if current step needs pivot interaction ──────────────────────
+  // ── Determine if current step needs interaction ────────────────────────────
   const stepType = currentStep?.stepType;
+  const isZRowSetup = stepType === 'z_row_setup';
   const isPivotStep = stepType === 'select_pivot';
   const isInitialPivotStep =
     (stepType === 'initial' || stepType === 'phase1_initial' || stepType === 'phase2_initial') &&
     currentStepIndex < steps.length - 1;
-  const needsInteraction = isPivotStep || isInitialPivotStep;
+  const needsInteraction = isZRowSetup || isPivotStep || isInitialPivotStep;
 
-  // Auto-start Episode A when arriving at a pivot step
+  // Auto-start appropriate episode when arriving at an interactive step
   useEffect(() => {
-    if (needsInteraction && state.phase === 'idle') {
+    if (state.phase !== 'idle') {
+      if (!needsInteraction) dispatch({ type: 'RESET' });
+      return;
+    }
+    if (!needsInteraction || !currentStep) return;
+
+    if (isZRowSetup) {
+      // Find which basis rows have artificials with nonzero Z-row coefficients
+      const tableau = currentStep.tableau;
+      const basis = tableau.basisVariables ?? [];
+      const colTypes = tableau.colTypes ?? [];
+      const allVars = tableau.allVariables ?? [];
+      const zRow = tableau.rows[tableau.rows.length - 1];
+      const artRows: number[] = [];
+      for (let i = 0; i < basis.length; i++) {
+        const basisName = basis[i];
+        const colIdx = allVars.findIndex(v => normVar(v) === normVar(basisName));
+        if (colIdx >= 0 && colTypes[colIdx] === 'artificial') {
+          const zVal = zRow[colIdx]?.value ?? 0;
+          if (Math.abs(zVal) > 1e-9) artRows.push(i);
+        }
+      }
+      if (artRows.length > 0) {
+        dispatch({ type: 'START_EPISODE_0', artificialRows: artRows });
+      } else {
+        // No artificials to clear — skip this step
+        dispatch({ type: 'RESET' });
+        if (currentStepIndex < steps.length - 1) jumpToStep(currentStepIndex + 1);
+      }
+    } else {
       dispatch({ type: 'START_EPISODE_A' });
-    } else if (!needsInteraction && state.phase !== 'idle') {
-      dispatch({ type: 'RESET' });
     }
   }, [currentStepIndex, needsInteraction]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-transition: E0 correct → advance to next artificial or complete
+  useEffect(() => {
+    if (state.phase === 'e0_commitment') {
+      const timer = setTimeout(() => {
+        dispatch({ type: 'E0_ADVANCE' });
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [state.phase]);
+
+  // Auto-advance: after Episode 0 completes (idle), step forward to the post-elimination tableau
+  useEffect(() => {
+    if (state.phase === 'idle' && state.canAdvance && isZRowSetup) {
+      // Episode 0 just completed — advance past this z_row_setup step
+      if (currentStepIndex < steps.length - 1) {
+        jumpToStep(currentStepIndex + 1);
+      }
+    }
+  }, [state.phase, state.canAdvance]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-transition: A4 (entering correct) → B1 (leaving attention)
   useEffect(() => {
@@ -548,6 +673,29 @@ export function useGuidedSimplex({
   );
 
   // ── Actions ────────────────────────────────────────────────────────────────
+
+  // ── Episode 0 actions ───────────────────────────────────────────────────────
+
+  const e0Begin = useCallback(() => {
+    if (state.phase === 'e0_arrive') dispatch({ type: 'E0_BEGIN' });
+  }, [state.phase]);
+
+  const e0ClickRow = useCallback((rowIdx: number) => {
+    if (state.phase !== 'e0_attention' && state.phase !== 'e0_commitment') return;
+    if (!currentStep) return;
+    const { artificialRows, currentArtificialIdx } = state;
+    const correctRow = artificialRows[currentArtificialIdx];
+    const basis = currentStep.tableau.basisVariables ?? [];
+    dispatch({
+      type: 'E0_CLICK_ROW',
+      row: rowIdx,
+      correctRow,
+      rowName: basis[rowIdx] ?? `row ${rowIdx + 1}`,
+      correctRowName: basis[correctRow] ?? `row ${correctRow + 1}`,
+    });
+  }, [state.phase, state.artificialRows, state.currentArtificialIdx, currentStep]);
+
+  // ── Episode A actions ──────────────────────────────────────────────────────
 
   const clickChooseEntering = useCallback(() => {
     if (state.phase === 'a1_arrive') {
@@ -719,10 +867,18 @@ export function useGuidedSimplex({
     const tableau = currentStep.tableau;
     const basis = tableau.basisVariables ?? [];
 
-    // Z-row emphasis in A2+
+    const in0 = state.episode === 'episode0';
     const inA = state.episode === 'episodeA';
     const inB = state.episode === 'episodeB';
-    base.zRowEmphasis = inA && state.phase !== 'a1_arrive';
+
+    // Episode 0: Z-row + basis emphasis, clickable basis rows
+    if (in0 && state.phase !== 'e0_arrive') {
+      base.zRowEmphasis = true;
+      base.clickableRegion = 'basisrow';
+    }
+
+    // Z-row emphasis in A2+
+    if (inA && state.phase !== 'a1_arrive') base.zRowEmphasis = true;
 
     // Column highlight in A4, B*
     if ((inA && state.phase === 'a4_reveal') || inB) {
@@ -820,7 +976,10 @@ export function useGuidedSimplex({
     tableauProps,
     graphProps,
 
-    // Actions
+    // Actions — Episode 0
+    e0Begin,
+    e0ClickRow,
+    // Actions — Episode A
     clickChooseEntering,
     clickZRowCell,
     acceptSuboptimalChoice,
