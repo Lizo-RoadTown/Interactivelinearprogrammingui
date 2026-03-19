@@ -1022,4 +1022,432 @@ export const WORD_PROBLEMS: WordProblem[] = [
       ],
     },
   },
+
+  // ── 15: Water Treatment — Big-M MAX, 2 vars, Intermediate ────────────────
+  {
+    id: 'wp-water-treatment',
+    title: 'Water Treatment Plant',
+    category: 'Resource Allocation',
+    difficulty: 'Intermediate',
+    numVars: 2,
+    scenario:
+      'A water treatment plant uses two chemical processes: Process A (x1, batches/day) ' +
+      'and Process B (x2, batches/day). Each batch of Process A removes 3 units of contaminant ' +
+      'and uses 2 hours of equipment time. Each batch of Process B removes 5 units of contaminant ' +
+      'and uses 4 hours of equipment time. ' +
+      'The plant must remove at least 30 units of contaminant per day to meet safety regulations. ' +
+      'Equipment is available for at most 24 hours per day. ' +
+      'Each batch of Process A costs $4 and each batch of Process B costs $6. ' +
+      'Maximize the total contaminant removed while staying within equipment and cost limits.',
+    variables: [
+      { name: 'x1', description: 'batches of Process A per day' },
+      { name: 'x2', description: 'batches of Process B per day' },
+    ],
+    objectiveType: 'max',
+    objectiveCoefficients: [3, 5],
+    constraints: [
+      { id: 'c1', coefficients: [3, 5], operator: '>=', rhs: 30, label: 'Contaminant removal minimum' },
+      { id: 'c2', coefficients: [2, 4], operator: '<=', rhs: 24, label: 'Equipment hours' },
+    ],
+    method: 'big-m',
+    formulationHints: {
+      variables:
+        'Two processes: x1 = batches of Process A per day, x2 = batches of Process B per day.',
+      objective:
+        'Maximize contaminant removed. Process A removes 3 units per batch, Process B removes 5. ' +
+        'Objective: MAX z = 3x1 + 5x2.',
+      constraints: [
+        'Safety regulation: must remove AT LEAST 30 units. This is a ≥ constraint: 3x1 + 5x2 ≥ 30.',
+        'Equipment limit: at most 24 hours available. This is a ≤ constraint: 2x1 + 4x2 ≤ 24.',
+      ],
+      method:
+        'You have a ≥ constraint. The origin (0, 0) violates it — 0 is not ≥ 30. ' +
+        'We cannot start simplex at the origin, so we need an artificial variable. Use Big-M.',
+    },
+    methodExplanation:
+      'The ≥ constraint requires a surplus variable (−e1) and an artificial variable (+a1). ' +
+      'The ≤ constraint gets only a slack (+s2). ' +
+      'Big-M adds −M×a1 to the MAX objective, forcing the solver to drive a1 to zero.',
+    solvingHints: {
+      initial:
+        'After ERO to clear a1 from Z-row: the Z-row shows large negative entries for x1 and x2 ' +
+        '(due to −M terms). The algorithm will first drive a1 out of the basis to reach feasibility, ' +
+        'then optimize the real objective.',
+      select_pivot:
+        'Most negative Z-row entry after M-cleanup determines entering variable. ' +
+        'Priority: eliminate the artificial first.',
+      after_pivot:
+        'Once a1 leaves the basis (= 0), you are in the feasible region. ' +
+        'Continue standard simplex pivoting on the real objective.',
+      optimal:
+        'Optimal! Verify a1 = 0 (feasible). Read x1 and x2 from basis column and RHS.',
+    },
+    highlights: {
+      vars: ['Process A (x1, batches/day)', 'Process B (x2, batches/day)'],
+      objective: ['3 units of contaminant', '5 units of contaminant', 'Maximize the total contaminant removed'],
+      constraints: [
+        ['at least 30 units of contaminant per day'],
+        ['at most 24 hours per day'],
+      ],
+    },
+  },
+
+  // ── 16: Security Staffing — Big-M MIN, 2 vars, Intermediate ──────────────
+  {
+    id: 'wp-security-staffing',
+    title: 'Security Staffing',
+    category: 'Resource Allocation',
+    difficulty: 'Intermediate',
+    numVars: 2,
+    scenario:
+      'A security company assigns guards to two types of shifts: Day shifts (x1) and ' +
+      'Night shifts (x2). Each day shift guard costs $120/day. Each night shift guard costs $150/day. ' +
+      'Union rules require that at least 4 guards work day shifts. ' +
+      'Safety regulations require that the total number of guards on duty at any time is at least 10 ' +
+      '(combined day and night shifts). ' +
+      'The building has a maximum capacity of 8 guards per shift for safety reasons. ' +
+      'How many guards of each type should be scheduled to minimize daily cost?',
+    variables: [
+      { name: 'x1', description: 'day shift guards scheduled' },
+      { name: 'x2', description: 'night shift guards scheduled' },
+    ],
+    objectiveType: 'min',
+    objectiveCoefficients: [120, 150],
+    constraints: [
+      { id: 'c1', coefficients: [1, 0], operator: '>=', rhs: 4, label: 'Day shift minimum' },
+      { id: 'c2', coefficients: [1, 1], operator: '>=', rhs: 10, label: 'Total guards minimum' },
+      { id: 'c3', coefficients: [1, 0], operator: '<=', rhs: 8, label: 'Day shift capacity' },
+      { id: 'c4', coefficients: [0, 1], operator: '<=', rhs: 8, label: 'Night shift capacity' },
+    ],
+    method: 'big-m',
+    formulationHints: {
+      variables:
+        'x1 = day shift guards, x2 = night shift guards.',
+      objective:
+        'Minimize cost: $120 per day guard, $150 per night guard. MIN z = 120x1 + 150x2.',
+      constraints: [
+        'Union rule: at least 4 day guards. x1 ≥ 4.',
+        'Safety: total guards ≥ 10. x1 + x2 ≥ 10.',
+        'Capacity: at most 8 day guards. x1 ≤ 8.',
+        'Capacity: at most 8 night guards. x2 ≤ 8.',
+      ],
+      method:
+        'Two ≥ constraints → need surplus and artificial variables for each. ' +
+        'Two ≤ constraints → need slack variables. Use Big-M.',
+    },
+    methodExplanation:
+      'Constraints 1 and 2 are ≥: each gets −e and +a. Big-M adds +M×a to MIN objective. ' +
+      'Constraints 3 and 4 are ≤: each gets +s. ' +
+      'Two artificials means two ERO steps to clear Z-row before first pivot.',
+    solvingHints: {
+      initial:
+        'Two artificials in initial basis → do TWO ERO steps to clear Z-row before pivoting. ' +
+        'For MIN Big-M: artificials get +M in objective. After cleanup, most positive Z-row entry enters.',
+      select_pivot:
+        'For MIN: enter the variable with the most POSITIVE Z-row coefficient. ' +
+        'The +M terms on artificials make them extremely unattractive — solver drives them out.',
+      after_pivot:
+        'Each pivot that removes an artificial = one more constraint genuinely satisfied. ' +
+        'Continue until both artificials are nonbasic.',
+      optimal:
+        'MIN optimum reached. Both artificials = 0. Read cost from Z-row RHS.',
+    },
+    highlights: {
+      vars: ['Day shifts (x1)', 'Night shifts (x2)'],
+      objective: ['$120/day', '$150/day', 'minimize daily cost'],
+      constraints: [
+        ['at least 4 guards work day shifts'],
+        ['total number of guards on duty at any time is at least 10'],
+        ['maximum capacity of 8 guards per shift'],
+        ['maximum capacity of 8 guards per shift'],
+      ],
+    },
+  },
+
+  // ── 17: Manufacturing Contract — Big-M MAX, 3 vars, Advanced ─────────────
+  {
+    id: 'wp-manufacturing-contract',
+    title: 'Manufacturing Contract',
+    category: 'Production Planning',
+    difficulty: 'Advanced',
+    numVars: 3,
+    scenario:
+      'A manufacturer produces three products: Basic (x1), Standard (x2), and Premium (x3). ' +
+      'Profit per unit: $5 for Basic, $8 for Standard, $12 for Premium. ' +
+      'A contract requires the company to produce at least 10 units of Premium per day. ' +
+      'Total machine hours available: 60 hours per day. ' +
+      'Each unit requires: Basic = 1 hour, Standard = 2 hours, Premium = 3 hours. ' +
+      'Raw material constraint: the company has 80 kg of raw material per day. ' +
+      'Each unit requires: Basic = 2 kg, Standard = 3 kg, Premium = 4 kg. ' +
+      'Maximize daily profit.',
+    variables: [
+      { name: 'x1', description: 'Basic units produced per day' },
+      { name: 'x2', description: 'Standard units produced per day' },
+      { name: 'x3', description: 'Premium units produced per day' },
+    ],
+    objectiveType: 'max',
+    objectiveCoefficients: [5, 8, 12],
+    constraints: [
+      { id: 'c1', coefficients: [0, 0, 1], operator: '>=', rhs: 10, label: 'Premium contract minimum' },
+      { id: 'c2', coefficients: [1, 2, 3], operator: '<=', rhs: 60, label: 'Machine hours' },
+      { id: 'c3', coefficients: [2, 3, 4], operator: '<=', rhs: 80, label: 'Raw material (kg)' },
+    ],
+    method: 'big-m',
+    formulationHints: {
+      variables:
+        'Three products: x1 = Basic, x2 = Standard, x3 = Premium units per day.',
+      objective:
+        'Maximize profit: $5×x1 + $8×x2 + $12×x3.',
+      constraints: [
+        'Contract: at least 10 Premium units. x3 ≥ 10. Note: x1 and x2 have coefficient 0.',
+        'Machine hours: 1×x1 + 2×x2 + 3×x3 ≤ 60.',
+        'Raw material: 2×x1 + 3×x2 + 4×x3 ≤ 80.',
+      ],
+      method:
+        'One ≥ constraint (Premium contract) → needs surplus −e1 and artificial +a1. ' +
+        'Two ≤ constraints get slacks. Use Big-M.',
+    },
+    methodExplanation:
+      'One artificial variable a1 for the contract constraint. ' +
+      'Big-M adds −M×a1 to MAX objective. One ERO step clears Z-row. ' +
+      'Graph view not available for 3-variable problems — tableau only.',
+    solvingHints: {
+      initial:
+        'Three variables, three constraints. Initial basis: a1, s2, s3. ' +
+        'One ERO step to eliminate a1 from Z-row. Then identify most negative Z-row entry.',
+      select_pivot:
+        'With 3 decision variables, scan all three columns for most negative. ' +
+        'x3 (Premium, profit $12) may dominate despite the contract constraint.',
+      after_pivot:
+        'Watch for a1 leaving the basis — once gone, contract constraint is satisfied.',
+      optimal:
+        'Optimal. Read x1, x2, x3 values from basis column and RHS. ' +
+        'Verify x3 ≥ 10 (contract met).',
+    },
+    highlights: {
+      vars: ['Basic (x1)', 'Standard (x2)', 'Premium (x3)'],
+      objective: ['$5 for Basic', '$8 for Standard', '$12 for Premium', 'Maximize daily profit'],
+      constraints: [
+        ['at least 10 units of Premium per day'],
+        ['60 hours per day', '1 hour', '2 hours', '3 hours'],
+        ['80 kg of raw material', '2 kg', '3 kg', '4 kg'],
+      ],
+    },
+  },
+
+  // ── 18: Catering Menu — Two-Phase MIN, 2 vars, Intermediate ──────────────
+  {
+    id: 'wp-catering-menu',
+    title: 'Catering Menu Planning',
+    category: 'Diet / Nutrition',
+    difficulty: 'Intermediate',
+    numVars: 2,
+    scenario:
+      'A catering company plans a daily menu using two dishes: Dish A (x1, servings) ' +
+      'and Dish B (x2, servings). Dish A costs $8 per serving and Dish B costs $5 per serving. ' +
+      'Health regulations require EXACTLY 20 total servings per event. ' +
+      'Nutritional guidelines require at least 600 calories total ' +
+      '(Dish A provides 40 cal/serving, Dish B provides 25 cal/serving). ' +
+      'Minimize the total catering cost.',
+    variables: [
+      { name: 'x1', description: 'servings of Dish A' },
+      { name: 'x2', description: 'servings of Dish B' },
+    ],
+    objectiveType: 'min',
+    objectiveCoefficients: [8, 5],
+    constraints: [
+      { id: 'c1', coefficients: [1, 1], operator: '=', rhs: 20, label: 'Exact total servings' },
+      { id: 'c2', coefficients: [40, 25], operator: '>=', rhs: 600, label: 'Calorie minimum' },
+    ],
+    method: 'two-phase',
+    formulationHints: {
+      variables:
+        'x1 = servings of Dish A, x2 = servings of Dish B.',
+      objective:
+        'Minimize cost: $8 per serving of A, $5 per serving of B. MIN z = 8x1 + 5x2.',
+      constraints: [
+        'Health regulation: EXACTLY 20 total servings. x1 + x2 = 20. This is an equality (=) constraint.',
+        'Calorie requirement: at least 600 total calories. 40x1 + 25x2 ≥ 600.',
+      ],
+      method:
+        'Equality constraint → need artificial variable. No slack or surplus for = constraints. ' +
+        '≥ constraint → need surplus (−e) and artificial (+a). ' +
+        'Two artificials → Two-Phase method is preferred.',
+    },
+    methodExplanation:
+      'Equality constraint gets +a1 only. ≥ constraint gets −e2 + a2. ' +
+      'Phase I: minimize w = a1 + a2. If w* = 0, both constraints are feasible. ' +
+      'Phase II: minimize original cost 8x1 + 5x2 from the Phase I BFS.',
+    solvingHints: {
+      phase1_initial:
+        'Phase I objective: MIN w = a1 + a2. ' +
+        'Two ERO steps needed to clear both artificials from the Phase I Z-row. ' +
+        'Then pivot to drive w toward zero.',
+      select_pivot:
+        'Phase I: enter variable with most positive Z-row entry (MIN problem). ' +
+        'Goal is to get both artificials to zero.',
+      phase1_complete:
+        'w* = 0: both artificials are zero. Both constraints are satisfied. ' +
+        'Remove artificial columns, restore MIN cost objective for Phase II.',
+      phase2_initial:
+        'Phase II Z-row is rebuilt using 8x1 + 5x2. ' +
+        'Remember to do ERO to adjust Z-row for current basis before pivoting.',
+      after_pivot:
+        'Cost decreasing. Check Z-row for remaining positive entries (MIN).',
+      optimal:
+        'Minimum cost found. Verify x1 + x2 = 20 (equality met) and 40x1 + 25x2 ≥ 600 (calories met).',
+    },
+    highlights: {
+      vars: ['Dish A (x1, servings)', 'Dish B (x2, servings)'],
+      objective: ['$8 per serving', '$5 per serving', 'Minimize the total catering cost'],
+      constraints: [
+        ['EXACTLY 20 total servings'],
+        ['at least 600 calories', '40 cal/serving', '25 cal/serving'],
+      ],
+    },
+  },
+
+  // ── 19: Factory Production Quota — Two-Phase MAX, 2 vars, Intermediate ───
+  {
+    id: 'wp-production-quota',
+    title: 'Factory Production Quota',
+    category: 'Production Planning',
+    difficulty: 'Intermediate',
+    numVars: 2,
+    scenario:
+      'A factory produces two products: Model X (x1) and Model Y (x2). ' +
+      'Profit: $10 per Model X and $15 per Model Y. ' +
+      'A government contract requires EXACTLY 8 units of Model X per day — no more, no less. ' +
+      'Labor constraint: each Model X requires 2 hours and each Model Y requires 3 hours. ' +
+      'The factory has 50 labor hours available per day. ' +
+      'Maximize total daily profit.',
+    variables: [
+      { name: 'x1', description: 'Model X units produced per day' },
+      { name: 'x2', description: 'Model Y units produced per day' },
+    ],
+    objectiveType: 'max',
+    objectiveCoefficients: [10, 15],
+    constraints: [
+      { id: 'c1', coefficients: [1, 0], operator: '=', rhs: 8, label: 'Model X contract (exact)' },
+      { id: 'c2', coefficients: [2, 3], operator: '<=', rhs: 50, label: 'Labor hours' },
+    ],
+    method: 'two-phase',
+    formulationHints: {
+      variables:
+        'x1 = Model X units per day, x2 = Model Y units per day.',
+      objective:
+        'Maximize profit: $10 per Model X, $15 per Model Y. MAX z = 10x1 + 15x2.',
+      constraints: [
+        'Government contract: EXACTLY 8 units of Model X. x1 = 8. ' +
+        'This is an equality constraint — no slack, no surplus, only artificial.',
+        'Labor: 2x1 + 3x2 ≤ 50. This is a ≤ constraint — add slack only.',
+      ],
+      method:
+        'Equality constraint → artificial variable needed. Use Two-Phase method. ' +
+        'The ≤ constraint is standard — no artificial needed there.',
+    },
+    methodExplanation:
+      'Equality gets +a1 only. ≤ gets +s2. ' +
+      'Phase I minimizes w = a1. If w* = 0, x1 = 8 is achievable. ' +
+      'Phase II maximizes original profit with x1 pinned at 8.',
+    solvingHints: {
+      phase1_initial:
+        'Phase I: MIN w = a1. One ERO to clear a1 from Phase I Z-row. ' +
+        'The equality constraint pins x1 — Phase I will quickly find x1 = 8.',
+      select_pivot:
+        'Phase I is MIN: enter most positive Z-row entry. Drive a1 out of basis.',
+      phase1_complete:
+        'w* = 0: x1 = 8 is confirmed feasible. Remove a1 column. ' +
+        'Restore MAX objective 10x1 + 15x2 for Phase II.',
+      phase2_initial:
+        'Phase II Z-row rebuilt for MAX. Now optimize profit with x1 = 8 established.',
+      after_pivot:
+        'x2 (Model Y) should increase — it has the higher profit per unit.',
+      optimal:
+        'Maximum profit found. Confirm x1 = 8 (contract met) and 2(8) + 3x2 ≤ 50 (labor met).',
+    },
+    highlights: {
+      vars: ['Model X (x1)', 'Model Y (x2)'],
+      objective: ['$10 per Model X', '$15 per Model Y', 'Maximize total daily profit'],
+      constraints: [
+        ['EXACTLY 8 units of Model X per day'],
+        ['2 hours', '3 hours', '50 labor hours available per day'],
+      ],
+    },
+  },
+
+  // ── 20: Research Lab — Two-Phase MIN, 3 vars, Advanced ───────────────────
+  {
+    id: 'wp-research-lab',
+    title: 'Research Lab Resource Allocation',
+    category: 'Resource Allocation',
+    difficulty: 'Advanced',
+    numVars: 3,
+    scenario:
+      'A research lab allocates time across three projects: Project Alpha (x1, hours), ' +
+      'Project Beta (x2, hours), and Project Gamma (x3, hours). ' +
+      'Cost per hour: Alpha = $50, Beta = $30, Gamma = $40. ' +
+      'A grant requires EXACTLY 20 total hours allocated across all projects per week. ' +
+      'Funding agency rules require at least 6 hours on Project Alpha per week. ' +
+      'Equipment sharing means Project Beta and Gamma together cannot exceed 15 hours per week. ' +
+      'Minimize total weekly cost.',
+    variables: [
+      { name: 'x1', description: 'hours on Project Alpha per week' },
+      { name: 'x2', description: 'hours on Project Beta per week' },
+      { name: 'x3', description: 'hours on Project Gamma per week' },
+    ],
+    objectiveType: 'min',
+    objectiveCoefficients: [50, 30, 40],
+    constraints: [
+      { id: 'c1', coefficients: [1, 1, 1], operator: '=', rhs: 20, label: 'Total hours (exact)' },
+      { id: 'c2', coefficients: [1, 0, 0], operator: '>=', rhs: 6, label: 'Alpha minimum' },
+      { id: 'c3', coefficients: [0, 1, 1], operator: '<=', rhs: 15, label: 'Beta + Gamma maximum' },
+    ],
+    method: 'two-phase',
+    formulationHints: {
+      variables:
+        'Three projects: x1 = Alpha hours, x2 = Beta hours, x3 = Gamma hours per week.',
+      objective:
+        'Minimize cost: $50×x1 + $30×x2 + $40×x3.',
+      constraints: [
+        'Grant requirement: EXACTLY 20 total hours. x1 + x2 + x3 = 20. Equality → artificial only.',
+        'Funding rule: at least 6 hours on Alpha. x1 ≥ 6. ≥ constraint → surplus + artificial.',
+        'Equipment: Beta + Gamma ≤ 15. x2 + x3 ≤ 15. ≤ constraint → slack only.',
+      ],
+      method:
+        'Equality constraint AND ≥ constraint → two artificials needed. Two-Phase method. ' +
+        'Phase I: minimize sum of both artificials. Phase II: minimize actual cost.',
+    },
+    methodExplanation:
+      'Equality gets +a1. ≥ gets −e2 + a2. ≤ gets +s3. ' +
+      'Phase I minimizes w = a1 + a2. Two ERO steps to set up Phase I Z-row. ' +
+      'If w* = 0, both the exact total and Alpha minimum are simultaneously achievable.',
+    solvingHints: {
+      phase1_initial:
+        'Phase I Z-row needs TWO ERO steps (one per artificial). ' +
+        'Phase I objective is MIN w = a1 + a2 — completely different from the real cost objective.',
+      select_pivot:
+        'Phase I MIN: enter most positive Z-row coefficient. ' +
+        'Algorithm works to satisfy both the equality and the minimum simultaneously.',
+      phase1_complete:
+        'w* = 0: x1 + x2 + x3 = 20 AND x1 ≥ 6 are both satisfied. ' +
+        'Remove a1 and a2 columns. Restore MIN cost objective for Phase II.',
+      phase2_initial:
+        'Phase II: minimize 50x1 + 30x2 + 40x3 from the feasible BFS. ' +
+        'Rebuild Z-row with ERO for current basis before first pivot.',
+      after_pivot:
+        'Cost decreasing. Beta ($30/hr) is cheapest — expect x2 to increase.',
+      optimal:
+        'Minimum cost allocation found. Verify: x1+x2+x3=20, x1≥6, x2+x3≤15.',
+    },
+    highlights: {
+      vars: ['Project Alpha (x1, hours)', 'Project Beta (x2, hours)', 'Project Gamma (x3, hours)'],
+      objective: ['$50', '$30', '$40', 'Minimize total weekly cost'],
+      constraints: [
+        ['EXACTLY 20 total hours allocated'],
+        ['at least 6 hours on Project Alpha'],
+        ['Project Beta and Gamma together cannot exceed 15 hours'],
+      ],
+    },
+  },
 ];
