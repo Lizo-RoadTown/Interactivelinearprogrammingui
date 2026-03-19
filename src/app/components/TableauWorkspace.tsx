@@ -135,19 +135,19 @@ export default function TableauWorkspace({
     ratioMinRow?: number;
   }) => (
     <TooltipProvider>
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full border-collapse text-base">
         <thead>
           <tr>
-            <th className="px-3 py-2 bg-gray-100 border border-gray-300 font-semibold text-xs">Basis</th>
+            <th className="px-4 py-3 bg-gray-100 border border-gray-300 font-semibold text-sm">Basis</th>
             {headers.map((h, i) => {
-              let thCls = 'px-3 py-2 border border-gray-300 font-semibold text-xs ';
+              let thCls = 'px-4 py-3 border border-gray-300 font-semibold text-sm ';
               if (gp?.highlightedCol === i) thCls += 'bg-blue-200 text-blue-900 ';
               else if (gp?.rhsEmphasis && i === rhsColIdx) thCls += 'bg-purple-100 ';
               else if (i === pivotColForRatio && showRatios && !gp) thCls += 'bg-blue-100 ';
               else thCls += 'bg-gray-100 ';
               return <th key={i} className={thCls}>{h}</th>;
             })}
-            {showRatios && <th className="px-3 py-2 bg-purple-100 border border-gray-300 font-semibold text-xs">Ratio</th>}
+            {showRatios && <th className="px-4 py-3 bg-purple-100 border border-gray-300 font-semibold text-sm">Ratio</th>}
           </tr>
         </thead>
         <tbody>
@@ -155,7 +155,7 @@ export default function TableauWorkspace({
             const dimmed = isGuidedDimmed(rIdx);
             return (
               <tr key={rIdx} className={dimmed ? 'opacity-30' : ''}>
-                <td className="px-3 py-2 bg-gray-50 border border-gray-300 font-medium text-center text-xs">
+                <td className="px-4 py-3 bg-gray-50 border border-gray-300 font-medium text-center text-sm">
                   {basis[rIdx]}
                 </td>
                 {row.map((cell, cIdx) => (
@@ -176,7 +176,7 @@ export default function TableauWorkspace({
                   </Tooltip>
                 ))}
                 {showRatios && (
-                  <td className="px-3 py-2 bg-purple-50 border border-gray-300 text-center text-xs">
+                  <td className="px-4 py-3 bg-purple-50 border border-gray-300 text-center text-sm">
                     {ratios?.[rIdx] != null ? (
                       <span className={ratioMinRow === rIdx ? 'font-bold text-green-700' : ''}>
                         {fmt(ratios[rIdx] as number)}{ratioMinRow === rIdx ? ' ← min' : ''}
@@ -192,11 +192,11 @@ export default function TableauWorkspace({
             ? 'border-t-4 border-indigo-400 bg-indigo-50'
             : 'bg-blue-50'
           }>
-            <td className={`px-3 py-2 border border-gray-300 font-semibold text-center text-xs ${
+            <td className={`px-4 py-3 border border-gray-300 font-semibold text-center text-sm ${
               gp?.zRowEmphasis ? 'bg-indigo-100 text-indigo-800' : ''
             }`}>
               {gp?.zRowEmphasis ? (
-                <span>Z<span className="block text-[10px] font-normal text-indigo-600 leading-tight">objective</span></span>
+                <span>Z<span className="block text-xs font-normal text-indigo-600 leading-tight">objective</span></span>
               ) : 'Z'}
             </td>
             {rows[rows.length - 1].map((cell, cIdx) => (
@@ -210,7 +210,7 @@ export default function TableauWorkspace({
                 {fmt(cell.value)}
               </td>
             ))}
-            {showRatios && <td className="px-3 py-2 bg-purple-50 border border-gray-300" />}
+            {showRatios && <td className="px-4 py-3 bg-purple-50 border border-gray-300" />}
           </tr>
         </tbody>
       </table>
@@ -234,7 +234,7 @@ export default function TableauWorkspace({
         const isRhs = cIdx === rhsColIdx;
         const cellVal = tableau.rows[rIdx][cIdx].value;
 
-        let cls = 'px-3 py-2 text-center border transition-all text-xs ';
+        let cls = 'px-4 py-3 text-center border transition-all text-sm ';
 
         // Cell state overrides (correct/invalid/suboptimal from attempts)
         if (cellState === 'correct') {
@@ -300,7 +300,7 @@ export default function TableauWorkspace({
         const cell = tableau.rows[rIdx][cIdx];
         const isPivotCell = rIdx === pivotRow && cIdx === pivotCol;
         const isSelected = selectedCell?.row === rIdx && selectedCell?.col === cIdx;
-        let cls = 'px-3 py-2 text-center border transition-all text-xs ';
+        let cls = 'px-4 py-3 text-center border transition-all text-sm ';
         if (isSelected) cls += 'ring-2 ring-purple-500 bg-purple-50 border-gray-200';
         else if (isPivotCell && showHints) cls += 'bg-amber-400 font-bold text-white border-amber-500';
         else if (showHints && rIdx === pivotRow) cls += 'bg-amber-100 border-gray-200';
@@ -344,7 +344,7 @@ export default function TableauWorkspace({
           <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAfterStep(Math.max(0, afterStep - 1))} disabled={isAtStart}>
             <ChevronLeft className="w-3 h-3" />
           </Button>
-          <span className="flex-1 text-center text-xs text-gray-500">
+          <span className="flex-1 text-center text-sm text-gray-500">
             {isAtStart ? 'Before pivot' : isAtEnd ? 'After pivot' : `Row op ${afterStep}/${totalRows}`}
           </span>
           <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAfterStep(Math.min(totalRows + 1, afterStep + 1))} disabled={isAtEnd}>
@@ -364,12 +364,12 @@ export default function TableauWorkspace({
 
         {/* Table with partial transformation */}
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-collapse text-base">
             <thead>
               <tr>
-                <th className="px-3 py-2 bg-gray-100 border border-gray-300 font-semibold text-xs">Basis</th>
+                <th className="px-4 py-3 bg-gray-100 border border-gray-300 font-semibold text-sm">Basis</th>
                 {headers.map((h, i) => (
-                  <th key={i} className={`px-3 py-2 border border-gray-300 font-semibold text-xs ${i === pivotCol && pivotCol >= 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>{h}</th>
+                  <th key={i} className={`px-4 py-3 border border-gray-300 font-semibold text-sm ${i === pivotCol && pivotCol >= 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -383,7 +383,7 @@ export default function TableauWorkspace({
                 const displayRow = getRowValues(rIdx);
                 return (
                   <tr key={rIdx} className={isActive ? 'ring-2 ring-inset ring-blue-400' : isZRow ? 'bg-blue-50' : ''}>
-                    <td className={`px-3 py-2 border border-gray-300 font-medium text-center text-xs ${
+                    <td className={`px-4 py-3 border border-gray-300 font-medium text-center text-sm ${
                       isActive ? 'font-bold bg-blue-50' : isDone ? 'bg-green-50 text-green-800' : 'bg-gray-50 text-gray-400'
                     }`}>
                       {basisLabel}
@@ -395,7 +395,7 @@ export default function TableauWorkspace({
                       const beforeVal = previousTableau?.rows[rIdx]?.[cIdx]?.value ?? afterVal;
                       const isPivotCell = rIdx === pivotRow && cIdx === pivotCol;
                       const changed = Math.abs(afterVal - beforeVal) > 1e-9;
-                      let cls = 'px-3 py-2 text-center border text-xs ';
+                      let cls = 'px-4 py-3 text-center border text-sm ';
                       if (isPivotCell && !isBefore) cls += 'bg-amber-400 font-bold text-white border-amber-500';
                       else if (isActive) cls += changed ? 'bg-green-100 font-semibold text-green-900 border-green-300' : 'border-gray-200 text-gray-400';
                       else if (isDone) cls += changed ? 'bg-green-50 text-green-800 border-gray-200' : 'text-gray-400 border-gray-200';
@@ -431,7 +431,7 @@ export default function TableauWorkspace({
     basis: tableau.basisVariables,
     getCellClass: (rIdx, cIdx, isZRow) => {
       const val = tableau.rows[rIdx][cIdx].value;
-      let cls = 'px-3 py-2 text-center border text-xs ';
+      let cls = 'px-4 py-3 text-center border text-sm ';
       if (isZRow && cIdx === rhsColIdx) cls += 'bg-blue-200 font-bold text-blue-900 border-blue-300';
       else if (!isZRow && cIdx === rhsColIdx) cls += 'bg-green-100 font-semibold text-green-900 border-gray-200';
       else if (isZRow) cls += val > 1e-9 ? 'text-green-700 border-gray-200 bg-blue-50' : Math.abs(val) < 1e-9 ? 'text-gray-400 border-gray-200 bg-blue-50' : 'text-red-600 border-gray-200 bg-blue-50';
@@ -451,7 +451,7 @@ export default function TableauWorkspace({
       ratios: computedRatios,
       getCellClass: (rIdx, cIdx, isZRow) => {
         const isSelected = selectedCell?.row === rIdx && selectedCell?.col === cIdx;
-        let cls = 'px-3 py-2 text-center border text-xs cursor-pointer ';
+        let cls = 'px-4 py-3 text-center border text-sm cursor-pointer ';
         if (isSelected) cls += 'ring-2 ring-purple-500 bg-purple-50 border-gray-200';
         else if (phase === 'choose_entering' && isZRow && cIdx < rhsColIdx && tableau.rows[rIdx][cIdx].value < -1e-9)
           cls += cIdx === optEnteringCol ? 'bg-blue-400 text-white font-bold border-blue-500 hover:bg-blue-500' : 'bg-blue-100 font-semibold border-gray-200 hover:bg-blue-200';

@@ -1539,8 +1539,8 @@ function SolvingScreen({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
 
-      {/* TOP HALF: Tableau */}
-      <div className="h-1/2 border-b border-gray-300 bg-white overflow-auto">
+      {/* TOP: Tableau (60%) */}
+      <div className="h-3/5 border-b border-gray-300 bg-white overflow-auto">
         {currentStep ? (
           <TableauWorkspace
             tableau={currentStep.tableau}
@@ -1559,8 +1559,8 @@ function SolvingScreen({
         )}
       </div>
 
-      {/* BOTTOM HALF */}
-      <div className="h-1/2 flex overflow-hidden">
+      {/* BOTTOM (40%): Guidance + Graph */}
+      <div className="h-2/5 flex overflow-hidden">
 
         {/* Bottom-left: Guidance */}
         <div className="w-1/2 border-r border-gray-300 overflow-hidden flex flex-col">

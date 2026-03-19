@@ -285,17 +285,19 @@ export default function MainWorkspace() {
   return (
     <div className="h-screen flex flex-col bg-gray-100">
 
-      {/* ── Header — tall and spacious ─────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="bg-gradient-to-r from-purple-700 to-blue-600 text-white px-8 py-5 flex items-center justify-between shrink-0">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Linear Programming Simulator</h1>
           <p className="text-sm text-purple-200 mt-0.5">Interactive Simplex Method Learning Tool</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="secondary" size="sm" className="px-4" onClick={() => navigate('/practice')}>
-            <BookOpen className="w-4 h-4 mr-2" />Practice Mode
-          </Button>
-        </div>
+        <Button
+          onClick={() => navigate('/practice')}
+          className="bg-white text-indigo-700 hover:bg-indigo-50 font-bold px-6 py-3 text-base rounded-xl shadow-lg hover:shadow-xl transition-all"
+        >
+          <BookOpen className="w-5 h-5 mr-2" />
+          Practice Mode
+        </Button>
       </div>
 
       {/* ── Control bar ───────────────────────────────────────────────── */}
@@ -329,7 +331,7 @@ export default function MainWorkspace() {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* ── TOP HALF: Tableau spans full width ─────────────────────── */}
-        <div className="h-1/2 border-b border-gray-300 bg-white overflow-auto">
+        <div className="h-3/5 border-b border-gray-300 bg-white overflow-auto">
           {displayTableau ? (
             <TableauWorkspace
               tableau={displayTableau}
@@ -353,7 +355,7 @@ export default function MainWorkspace() {
         </div>
 
         {/* ── BOTTOM HALF: left = constraints + narrative, right = graph ── */}
-        <div className="h-1/2 flex overflow-hidden">
+        <div className="h-2/5 flex overflow-hidden">
 
           {/* Bottom-left: constraints + narrative */}
           <div className="w-1/2 flex flex-col border-r border-gray-300 overflow-hidden">

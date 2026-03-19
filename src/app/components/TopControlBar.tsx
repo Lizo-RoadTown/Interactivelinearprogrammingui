@@ -57,37 +57,37 @@ export default function TopControlBar({
   };
 
   return (
-    <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-6">
+    <div className="bg-white border-b-2 border-gray-200 px-6 py-4 flex items-center gap-8">
       {/* Objective */}
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="flex gap-1">
-          <Button variant={objectiveType === 'max' ? 'default' : 'outline'} size="sm"
-            onClick={() => onObjectiveTypeChange('max')} className="h-7 w-14 text-xs">
-            <Maximize2 className="w-3 h-3 mr-1" />Max
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="flex gap-1.5">
+          <Button variant={objectiveType === 'max' ? 'default' : 'outline'}
+            onClick={() => onObjectiveTypeChange('max')} className="h-10 w-18 text-sm font-semibold">
+            <Maximize2 className="w-4 h-4 mr-1.5" />Max
           </Button>
-          <Button variant={objectiveType === 'min' ? 'default' : 'outline'} size="sm"
-            onClick={() => onObjectiveTypeChange('min')} className="h-7 w-14 text-xs">
-            <Minimize2 className="w-3 h-3 mr-1" />Min
+          <Button variant={objectiveType === 'min' ? 'default' : 'outline'}
+            onClick={() => onObjectiveTypeChange('min')} className="h-10 w-18 text-sm font-semibold">
+            <Minimize2 className="w-4 h-4 mr-1.5" />Min
           </Button>
         </div>
-        <span className="text-sm font-medium">z =</span>
+        <span className="text-base font-bold">z =</span>
         {objectiveCoefficients.map((coeff, i) => (
-          <span key={i} className="flex items-center gap-1">
-            <Input className="w-12 h-7 text-center text-sm" value={coeff}
+          <span key={i} className="flex items-center gap-1.5">
+            <Input className="w-16 h-10 text-center text-base font-medium" value={coeff}
               onChange={e => handleCoeff(i, e.target.value)} />
-            <span className="text-sm text-gray-600">
+            <span className="text-base text-gray-700 font-medium">
               {variables[i] ?? `x${i + 1}`}{i < objectiveCoefficients.length - 1 ? ' +' : ''}
             </span>
           </span>
         ))}
       </div>
 
-      <div className="w-px h-8 bg-gray-200 shrink-0" />
+      <div className="w-px h-10 bg-gray-300 shrink-0" />
 
       {/* Method + controls */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-3 shrink-0">
         <Select value={method} onValueChange={onMethodChange}>
-          <SelectTrigger className="w-32 h-7 text-xs">
+          <SelectTrigger className="w-36 h-10 text-sm font-medium">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -97,24 +97,24 @@ export default function TopControlBar({
             <SelectItem value="two-phase">Two-Phase</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={onStepBack} disabled={!canStepBack}>
-          <ChevronLeft className="w-4 h-4" />
+        <Button variant="outline" className="h-10 w-10 p-0" onClick={onStepBack} disabled={!canStepBack}>
+          <ChevronLeft className="w-5 h-5" />
         </Button>
-        <Button variant="default" size="sm" className="h-7 px-3 text-xs" onClick={onSolve}>
-          <Play className="w-3 h-3 mr-1" />Solve
+        <Button variant="default" className="h-10 px-5 text-sm font-semibold" onClick={onSolve}>
+          <Play className="w-4 h-4 mr-1.5" />Solve
         </Button>
-        <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={onStepForward} disabled={!canStepForward}>
-          <ChevronRight className="w-4 h-4" />
+        <Button variant="outline" className="h-10 w-10 p-0" onClick={onStepForward} disabled={!canStepForward}>
+          <ChevronRight className="w-5 h-5" />
         </Button>
-        <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={onReset}>
-          <RotateCcw className="w-3 h-3" />
+        <Button variant="outline" className="h-10 w-10 p-0" onClick={onReset}>
+          <RotateCcw className="w-4 h-4" />
         </Button>
       </div>
 
-      <div className="w-px h-8 bg-gray-200 shrink-0" />
+      <div className="w-px h-10 bg-gray-300 shrink-0" />
 
       {/* Toggles */}
-      <div className="flex items-center gap-4 text-xs">
+      <div className="flex items-center gap-5 text-sm">
         <label className="flex items-center gap-2 cursor-pointer">
           <Switch checked={isInteractive} onCheckedChange={onInteractiveModeToggle} />
           <span>Interactive</span>
