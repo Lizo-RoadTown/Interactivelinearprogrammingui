@@ -28,6 +28,20 @@ export interface FormulationHints {
   method: string;         // hint for method selection
 }
 
+/**
+ * Scenario text highlights — substrings to color-code at each formulation step.
+ * Each array entry is a literal substring of the scenario text.
+ * Color semantics:
+ *   vars        → indigo    (decision variable mentions)
+ *   objective   → purple    (objective coefficients + direction)
+ *   constraints → indexed colors per constraint (green, amber, rose, blue, …)
+ */
+export interface ScenarioHighlights {
+  vars: string[];                // substrings about the decision variables
+  objective: string[];           // substrings about the objective function
+  constraints: string[][];       // constraints[i] = substrings for constraint i
+}
+
 export interface WordProblem {
   id: string;
   title: string;
@@ -49,6 +63,9 @@ export interface WordProblem {
   solvingHints: LessonHints;
 
   specialCaseNote?: string; // shown as a banner when solving special-case problems
+
+  // ── Scenario text highlights ───────────────────────────────────────────────
+  highlights?: ScenarioHighlights;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,6 +132,14 @@ export const WORD_PROBLEMS: WordProblem[] = [
         'All Z-row entries ≥ 0. Read the solution: basic variables take their RHS values, ' +
         'nonbasic variables = 0. Optimal profit z* is in the Z-row RHS cell.',
     },
+    highlights: {
+      vars: ['toy cars', 'toy trucks'],
+      objective: ['$15 per toy car and $20 per toy truck', 'maximize total profit'],
+      constraints: [
+        ['2 hours of assembly', '4 hours of assembly', '80 hours of assembly time'],
+        ['3 hours of painting', '2 hours of painting', '60 hours of painting time'],
+      ],
+    },
   },
 
   // ── 2: Bakery — Simplex MAX, 2 vars, Beginner ────────────────────────────
@@ -170,6 +195,14 @@ export const WORD_PROBLEMS: WordProblem[] = [
         'x1 entered the basis. z increased. Check if any Z-row coefficients are still negative.',
       optimal:
         'Optimal revenue reached. Read x1 and x2 from the basis — those are the production quantities.',
+    },
+    highlights: {
+      vars: ['cakes (x1)', 'pastry batches (x2)'],
+      objective: ['$12 per cake and $9 per pastry batch', 'maximize revenue'],
+      constraints: [
+        ['3 lbs of flour', '1 lb of flour', '30 lbs of flour'],
+        ['2 eggs', '4 eggs', '40 eggs'],
+      ],
     },
   },
 
@@ -227,6 +260,15 @@ export const WORD_PROBLEMS: WordProblem[] = [
         'Optimal allocation found. Check which constraints are binding (slack = 0) — ' +
         'those resources are fully used.',
     },
+    highlights: {
+      vars: ['corn (x1)', 'soybeans (x2)'],
+      objective: ['$200 profit', '$150 profit', 'maximize total profit'],
+      constraints: [
+        ['100 acres available'],
+        ['3 hours of seasonal labor', '2 hours', '240 hours of labor available'],
+        ['at most 60 acres can be planted with corn'],
+      ],
+    },
   },
 
   // ── 4: Electronics — Simplex MAX, 2 vars, Intermediate ───────────────────
@@ -279,6 +321,14 @@ export const WORD_PROBLEMS: WordProblem[] = [
         'Progress toward optimum. Objective increased. Check for remaining negative Z-row entries.',
       optimal:
         'Optimal production mix found.',
+    },
+    highlights: {
+      vars: ['smartphones (x1)', 'tablets (x2)'],
+      objective: ['$80 per smartphone and $150 per tablet', 'maximize profit'],
+      constraints: [
+        ['2 hours of assembly', '3 hours of assembly', '120 assembly hours'],
+        ['1 hour of quality testing', '2 hours of testing', '70 testing hours'],
+      ],
     },
   },
 
@@ -338,6 +388,15 @@ export const WORD_PROBLEMS: WordProblem[] = [
       optimal:
         'Optimal production quantities found. Some products may be zero (not worth producing at optimum).',
     },
+    highlights: {
+      vars: ['A (x1)', 'B (x2)', 'C (x3)'],
+      objective: ['$5 for A, $8 for B, $6 for C', 'maximize total profit'],
+      constraints: [
+        ['A needs 2 hrs, B needs 1 hr, C needs 3 hrs. Total: 60 hrs available'],
+        ['A needs 1 hr, B needs 2 hrs, C needs 1 hr. Total: 40 hrs available'],
+        ['A needs 1 unit, B needs 1 unit, C needs 2 units. Total: 30 units available'],
+      ],
+    },
   },
 
   // ── 6: Nutrition Diet — Big-M MIN, 2 vars, Intermediate ─────────────────
@@ -395,6 +454,14 @@ export const WORD_PROBLEMS: WordProblem[] = [
       optimal:
         'MIN optimum reached. Both artificials should be nonbasic at zero. ' +
         'If any artificial is still positive, the original problem is infeasible.',
+    },
+    highlights: {
+      vars: ['Supplement A (x1, servings)', 'Supplement B (x2, servings)'],
+      objective: ['$2/serving', '$3/serving', 'minimize daily cost'],
+      constraints: [
+        ['4g protein', '2g protein', 'at least 16g of protein'],
+        ['2g fiber', '6g fiber', 'at least 18g of fiber'],
+      ],
     },
   },
 
@@ -455,6 +522,15 @@ export const WORD_PROBLEMS: WordProblem[] = [
         'Optimal solution satisfies all constraints including the contract. ' +
         'Verify: x2 should be ≥ 10 in the solution.',
     },
+    highlights: {
+      vars: ['regular widgets (x1)', 'premium widgets (x2)'],
+      objective: ['$8 per regular widget and $15 per premium', 'Maximize daily profit'],
+      constraints: [
+        ['2 kg of raw material', '3 kg', '120 kg raw material'],
+        ['1 labor hour', '2 hours', '60 labor hours'],
+        ['at least 10 premium widgets per day'],
+      ],
+    },
   },
 
   // ── 8: Advertising Mix — Big-M MAX, 2 vars, Intermediate ─────────────────
@@ -510,6 +586,15 @@ export const WORD_PROBLEMS: WordProblem[] = [
         'Each pivot improves the objective while maintaining feasibility.',
       optimal:
         'Optimal allocation satisfies all budget constraints. Note the social media and TV amounts in the solution.',
+    },
+    highlights: {
+      vars: ['TV (x1, thousands of $)', 'social media (x2, thousands of $)'],
+      objective: ['$6,000 per $1k TV spend, $8,000 per $1k social spend', 'Maximize total expected return'],
+      constraints: [
+        ['Total budget cap: $20,000 (x1 + x2 ≤ 20)'],
+        ['at least $5,000 on TV (x1 ≥ 5)'],
+        ['at most $12,000 (x2 ≤ 12)'],
+      ],
     },
   },
 
@@ -573,6 +658,17 @@ export const WORD_PROBLEMS: WordProblem[] = [
       optimal:
         'Optimal staffing found. All ≥ constraints satisfied (artificials = 0). ' +
         'Cost is minimized subject to all constraints.',
+    },
+    highlights: {
+      vars: ['morning (x1)', 'afternoon (x2)', 'evening (x3)'],
+      objective: ['$300/morning shift, $400/afternoon, $350/evening', 'Minimize total daily staffing cost'],
+      constraints: [
+        ['at least 8 nurses in the morning'],
+        ['at least 6 in the afternoon'],
+        ['at least 4 in the evening'],
+        ['at most 25 nurses total (break room limit)'],
+        ['capped at 10 nurses maximum'],
+      ],
     },
   },
 
@@ -638,6 +734,14 @@ export const WORD_PROBLEMS: WordProblem[] = [
         'Optimal solution found. Both the regulatory requirement (x1 + x2 = 12) and ' +
         'the processing time constraint are satisfied.',
     },
+    highlights: {
+      vars: ['A (x1)', 'B (x2)'],
+      objective: ['$500 per batch of A and $800 per batch of B', 'maximize profit'],
+      constraints: [
+        ['EXACTLY 12 batches (x1 + x2 = 12)'],
+        ['2 hours processing', '3 hours', '30 processing hours available daily'],
+      ],
+    },
   },
 
   // ── 11: Meal Plan — Two-Phase MIN, 2 vars, Advanced ──────────────────────
@@ -697,6 +801,14 @@ export const WORD_PROBLEMS: WordProblem[] = [
         'Cost decreasing toward optimum while maintaining all constraints.',
       optimal:
         'Minimum cost meal plan found. Both the exact portion count and caloric requirement are met.',
+    },
+    highlights: {
+      vars: ['Protein portions (x1, $3 each)', 'Carb portions (x2, $2 each)'],
+      objective: ['$3 each', '$2 each', 'Minimize the total cost'],
+      constraints: [
+        ['EXACTLY 8 portions total (x1 + x2 = 8)'],
+        ['200 cal', '100 cal', 'at least 1,000 calories'],
+      ],
     },
   },
 
@@ -761,6 +873,14 @@ export const WORD_PROBLEMS: WordProblem[] = [
       'This problem has ALTERNATIVE OPTIMAL SOLUTIONS. The objective function is parallel to the ' +
       'constraint x1 + 2x2 = 10. Every point on that constraint edge between the two optimal ' +
       'corner points is also optimal — there are infinitely many optimal solutions.',
+    highlights: {
+      vars: ['t-shirts (x1)', 'hoodies (x2)'],
+      objective: ['$15 per t-shirt and $30 per hoodie', 'Maximize profit'],
+      constraints: [
+        ['1 yard of fabric', '2 yards of fabric', '10 yards of fabric'],
+        ['at most 6 t-shirts can be made'],
+      ],
+    },
   },
 
   // ── 13: Infeasible — Special Case, Big-M MAX, 2 vars ─────────────────────
@@ -823,6 +943,15 @@ export const WORD_PROBLEMS: WordProblem[] = [
     specialCaseNote:
       'This problem is INFEASIBLE. The two contract minimums (x1 ≥ 10, x2 ≥ 8) require at least ' +
       '18 units total, but machine capacity limits total to 15. No feasible solution exists.',
+    highlights: {
+      vars: ['Product A', 'Product B'],
+      objective: ['$5 per unit of A and $7 per unit of B'],
+      constraints: [
+        ['at least 10 units of Product A per day (x1 ≥ 10)'],
+        ['at least 8 units of Product B per day (x2 ≥ 8)'],
+        ['cannot exceed 15 units per day (x1 + x2 ≤ 15)'],
+      ],
+    },
   },
 
   // ── 14: Unbounded — Special Case, Simplex MAX, 2 vars ────────────────────
@@ -884,5 +1013,13 @@ export const WORD_PROBLEMS: WordProblem[] = [
     specialCaseNote:
       'This problem is UNBOUNDED. The bond investment (x2) has no upper limit, and increasing it ' +
       'always improves the objective. A real model would include a total budget constraint.',
+    highlights: {
+      vars: ['stocks (x1, millions)', 'bonds (x2, millions)'],
+      objective: ['3% on stocks, 2% on bonds', 'Maximize total return'],
+      constraints: [
+        ['capped at $5M due to risk limits (x1 ≤ 5)'],
+        ['at least as much in bonds as in stocks (x2 ≥ x1'],
+      ],
+    },
   },
 ];

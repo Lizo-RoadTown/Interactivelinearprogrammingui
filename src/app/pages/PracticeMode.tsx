@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router';
 import GraphView from '../components/GraphView';
 import TableauWorkspace from '../components/TableauWorkspace';
 import GraphBuildPhase from '../components/GraphBuildPhase';
+import HighlightedScenario, { ActiveHighlights } from '../components/HighlightedScenario';
 import TableauSetupPhase from '../components/TableauSetupPhase';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -503,12 +504,20 @@ function FormulationWizard({
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-2xl mx-auto space-y-5">
 
-          {/* Word problem (always visible) */}
+          {/* Word problem (always visible) — with progressive highlights */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
             <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-2">The Problem</p>
-            <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">
-              {problem.scenario}
-            </p>
+            <HighlightedScenario
+              scenario={problem.scenario}
+              highlights={problem.highlights}
+              active={{
+                vars: fs.subPhase === 'vars' || fs.subPhase === 'review',
+                objective: fs.subPhase === 'obj' || fs.subPhase === 'review',
+                constraintIdx: fs.subPhase === 'constraints'
+                  ? fs.currentConstraint
+                  : fs.subPhase === 'review' ? 'all' : undefined,
+              }}
+            />
           </div>
 
           {/* Feedback box */}
