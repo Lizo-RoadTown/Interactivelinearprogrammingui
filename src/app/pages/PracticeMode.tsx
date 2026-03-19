@@ -1417,32 +1417,25 @@ function SolvingScreen({
   problem,
   method,
   wordProblem,
+  solver,
 }: {
   problem: LPProblem;
   method: string;
   wordProblem?: WordProblem;
+  solver: ReturnType<typeof useLPSolver>;
 }) {
   const {
     steps, currentStep, currentStepIndex,
     canStepBack, canStepForward, isLoading, error,
     currentSimplexPath, currentPoint, solverResponse,
-    solve, stepForward, stepBack, jumpToStep,
-  } = useLPSolver();
+    stepForward, stepBack, jumpToStep,
+  } = solver;
 
   const prevStep = currentStepIndex > 0 ? steps[currentStepIndex - 1] : null;
 
   // Sub-phase state: loading → graph_build (2-var) or tableau_setup → pivoting
   type SolvingSubPhase = 'loading' | 'graph_build' | 'tableau_setup' | 'pivoting';
   const [solvingSubPhase, setSolvingSubPhase] = useState<SolvingSubPhase>('loading');
-
-  // Auto-solve on mount
-  const solvedRef = useRef(false);
-  useEffect(() => {
-    if (!solvedRef.current) {
-      solvedRef.current = true;
-      solve(problem, method);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Transition out of loading once solver completes
   useEffect(() => {
@@ -1759,6 +1752,11 @@ export default function PracticeMode() {
   const [solveLP, setSolveLP] = useState<LPProblem | null>(null);
   const [solveMethod, setSolveMethod] = useState<string>('simplex');
 
+  // Lifted solver — solve() is fired eagerly when the method is confirmed,
+  // so the backend response arrives while the student is still on
+  // GraphBuildPhase / TableauSetupPhase rather than on a loading spinner.
+  const solver = useLPSolver();
+
   // ── Navigation helpers ──────────────────────────────────────────────────
 
   function handleSelectProblem(p: WordProblem) {
@@ -1794,6 +1792,10 @@ export default function PracticeMode() {
 
   function handleMethodSelected(method: 'simplex' | 'big-m' | 'two-phase') {
     setSolveMethod(method);
+    // Fire the API call NOW — before transitioning to the solving phase.
+    // The student will spend time on GraphBuildPhase / TableauSetupPhase, so by
+    // the time they reach the pivoting view the response is usually already here.
+    if (solveLP) solver.solve(solveLP, method);
     setPhase('solving');
   }
 
@@ -1968,6 +1970,7 @@ export default function PracticeMode() {
             problem={solveLP}
             method={solveMethod}
             wordProblem={selectedProblem ?? undefined}
+            solver={solver}
           />
         )}
 
