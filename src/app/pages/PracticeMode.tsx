@@ -1625,25 +1625,92 @@ function SolvingScreen({
             {/* Guided interaction panel */}
             {needsInteraction && renderGuidedPanel()}
 
-            {/* Hint (non-interactive steps only) */}
-            {hint && !needsInteraction && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Lightbulb className="w-3.5 h-3.5 text-blue-600" />
-                  <p className="text-xs font-bold text-blue-800">What's happening</p>
-                </div>
-                <p className="text-xs text-blue-900 leading-relaxed">{hint}</p>
-              </div>
-            )}
+            {/* Non-interactive steps: hint + navigation guidance */}
+            {!needsInteraction && (
+              <>
+                {/* Hint */}
+                {hint && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Lightbulb className="w-3.5 h-3.5 text-blue-600" />
+                      <p className="text-xs font-bold text-blue-800">What's happening</p>
+                    </div>
+                    <p className="text-xs text-blue-900 leading-relaxed">{hint}</p>
+                  </div>
+                )}
 
-            {/* Solver explanation (non-pivot steps) */}
-            {currentStep?.explanation && !needsInteraction && (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="text-xs font-bold text-gray-500 mb-1">Solver</p>
-                <p className="text-xs text-gray-700 font-mono leading-relaxed whitespace-pre-wrap">
-                  {currentStep.explanation}
-                </p>
-              </div>
+                {/* Solver explanation */}
+                {currentStep?.explanation && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <p className="text-xs font-bold text-gray-500 mb-1">Solver</p>
+                    <p className="text-xs text-gray-700 font-mono leading-relaxed whitespace-pre-wrap">
+                      {currentStep.explanation}
+                    </p>
+                  </div>
+                )}
+
+                {/* After-pivot: prominent Continue button to next pivot */}
+                {stepType === 'after_pivot' && canStepForward && (
+                  <div className="space-y-2">
+                    <div className="bg-green-50 border border-green-300 rounded-lg p-3">
+                      <p className="text-xs text-green-800">
+                        <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-green-600" />
+                        Pivot complete. Step through the row operations above, then continue.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={stepForward}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      Continue to Next Pivot
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Optimal: celebration + summary */}
+                {stepType === 'optimal' && (
+                  <div className="bg-green-50 border border-green-300 rounded-lg p-4">
+                    <p className="text-sm font-bold text-green-800 flex items-center gap-1.5 mb-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Optimal Solution Found!
+                    </p>
+                    <p className="text-xs text-green-700 leading-relaxed">
+                      All Z-row entries are non-negative. The simplex method has converged.
+                      Read the basic variable values from the RHS column of the final tableau above.
+                    </p>
+                  </div>
+                )}
+
+                {/* Infeasible / Unbounded */}
+                {(stepType === 'infeasible' || stepType === 'unbounded') && (
+                  <div className="bg-red-50 border border-red-300 rounded-lg p-4">
+                    <p className="text-sm font-bold text-red-800 flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4" />
+                      {stepType === 'infeasible' ? 'No Feasible Solution' : 'Unbounded Solution'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Phase I complete: transition message */}
+                {stepType === 'phase1_complete' && canStepForward && (
+                  <div className="space-y-2">
+                    <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                      <p className="text-xs text-indigo-800">
+                        Phase I is complete. All artificial variables have been driven to zero.
+                        The original objective will now be restored for Phase II.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={stepForward}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      Begin Phase II
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
 
           </div>
