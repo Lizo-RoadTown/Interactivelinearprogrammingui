@@ -20,8 +20,9 @@ __pycache__/
 .env.local
 .env.*.local
 
-# Claude local settings (personal, not for team)
-.claude/settings.local.json
+# Claude Code (dev tooling, not part of the app)
+.claude/
+CLAUDE.md
 
 # Editor / OS
 .DS_Store
