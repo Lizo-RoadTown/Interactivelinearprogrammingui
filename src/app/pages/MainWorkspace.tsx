@@ -282,23 +282,83 @@ export default function MainWorkspace() {
     return <p className="text-xs text-gray-500">{currentStep.explanation}</p>;
   })();
 
+  const [showSolver, setShowSolver] = useState(false);
+
+  // If solver has been used, stay in solver view
+  useEffect(() => { if (solverResponse) setShowSolver(true); }, [solverResponse]);
+
   return (
     <div className="h-screen flex flex-col bg-gray-100">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-purple-700 to-blue-600 text-white px-8 py-5 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Linear Programming Simulator</h1>
-          <p className="text-sm text-purple-200 mt-0.5">Interactive Simplex Method Learning Tool</p>
+      <div className="bg-gradient-to-r from-purple-700 to-blue-600 text-white px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="cursor-pointer" onClick={() => setShowSolver(false)}>
+          <h1 className="text-xl font-bold tracking-tight">Linear Programming Simulator</h1>
+          <p className="text-xs text-purple-200 mt-0.5">Interactive Simplex Method Learning Tool</p>
         </div>
-        <Button
-          onClick={() => navigate('/practice')}
-          className="bg-white text-indigo-700 hover:bg-indigo-50 font-bold px-6 py-3 text-base rounded-xl shadow-lg hover:shadow-xl transition-all"
-        >
-          <BookOpen className="w-5 h-5 mr-2" />
-          Practice Mode
-        </Button>
+        {showSolver && (
+          <Button
+            onClick={() => navigate('/practice')}
+            className="bg-white text-indigo-700 hover:bg-indigo-50 font-bold px-5 py-2 text-sm rounded-lg shadow"
+          >
+            <BookOpen className="w-4 h-4 mr-2" />
+            Practice Mode
+          </Button>
+        )}
       </div>
+
+      {/* ── HERO: Practice Mode front and center ─────────────────────── */}
+      {!showSolver && (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-gray-50 to-gray-100">
+          {/* Practice Mode — the star */}
+          <div
+            onClick={() => navigate('/practice')}
+            className="group cursor-pointer w-full max-w-2xl bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-10 shadow-2xl hover:shadow-3xl hover:scale-[1.02] transition-all duration-200 mb-8"
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-white/20 rounded-xl p-3">
+                <BookOpen className="w-10 h-10 text-white" />
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold text-white">Practice Mode</h2>
+                <p className="text-indigo-200 text-lg mt-1">Learn by doing</p>
+              </div>
+            </div>
+            <p className="text-white/90 text-base leading-relaxed mb-6">
+              Work through real word problems step by step. Build formulations from scratch,
+              identify constraints, choose pivot variables by clicking directly on the tableau,
+              and get immediate feedback on your reasoning.
+            </p>
+            <div className="flex flex-wrap gap-3 mb-6">
+              {['Beginner', 'Intermediate', 'Advanced'].map(level => (
+                <span key={level} className="bg-white/20 text-white text-sm px-3 py-1 rounded-full">
+                  {level} problems
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 text-white font-semibold text-lg group-hover:gap-3 transition-all">
+              Start Practicing <span className="text-2xl">→</span>
+            </div>
+          </div>
+
+          {/* Secondary option */}
+          <div
+            onClick={() => setShowSolver(true)}
+            className="cursor-pointer w-full max-w-2xl bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:scale-[1.01] transition-all border border-gray-200"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <Zap className="w-6 h-6 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-800">Free-form Solver</h3>
+            </div>
+            <p className="text-gray-500 text-sm">
+              Enter any LP problem and explore the full simplex solution with interactive tableaus and graphs.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Solver view (hidden until clicked) ────────────────────────── */}
+      {showSolver && <>
 
       {/* ── Control bar ───────────────────────────────────────────────── */}
       <TopControlBar
@@ -458,6 +518,8 @@ export default function MainWorkspace() {
       {steps.length > 0 && !isInteractive && (
         <StepTimeline currentStep={currentStepIndex} totalSteps={steps.length} onStepChange={jumpToStep} />
       )}
+
+      </>}
     </div>
   );
 }
