@@ -2,6 +2,10 @@
 
 An interactive educational tool for teaching the **Simplex Method** in Linear Programming. Students work through word problems, build formulations, watch the graphical and algebraic solution unfold step by step, and make their own pivot choices — with immediate feedback on both correct and incorrect decisions.
 
+**Live demo:** [interactivelinearprogrammingui-1.onrender.com](https://interactivelinearprogrammingui-1.onrender.com/)
+
+> Note: The demo runs on Render's free tier — the first load may take 30–60 seconds while the backend wakes up.
+
 ---
 
 ## Quick Start
