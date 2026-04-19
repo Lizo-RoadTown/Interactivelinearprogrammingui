@@ -1,0 +1,53 @@
+{
+  "problems": [
+    {
+      "id": "prod-mix-basic",
+      "title": "Bakery Production Mix",
+      "category": "production",
+      "difficulty": "beginner",
+      "scenario": "A small bakery makes two products: muffins and cookies. Each muffin earns $3 profit and requires 2 cups of flour and 1 egg. Each cookie earns $2 profit and requires 1 cup of flour and 2 eggs. The bakery has 100 cups of flour and 80 eggs available today. How many of each should they make to maximize profit?",
+      "numVars": 2,
+      "objectiveType": "max",
+      "objectiveCoefficients": [3, 2],
+      "variables": ["muffins", "cookies"],
+      "constraints": [
+        {"coefficients": [2, 1], "operator": "<=", "rhs": 100, "label": "flour"},
+        {"coefficients": [1, 2], "operator": "<=", "rhs": 80,  "label": "eggs"}
+      ],
+      "method": "simplex"
+    },
+    {
+      "id": "diet-cost",
+      "title": "Minimum Cost Diet",
+      "category": "diet",
+      "difficulty": "intermediate",
+      "scenario": "A nutritionist is designing a minimum-cost daily meal using two foods. Food A costs $4 per serving and provides 3 units of protein and 2 units of vitamins. Food B costs $5 per serving and provides 2 units of protein and 3 units of vitamins. The meal must contain at least 12 units of protein and at least 12 units of vitamins. How many servings of each minimize cost?",
+      "numVars": 2,
+      "objectiveType": "min",
+      "objectiveCoefficients": [4, 5],
+      "variables": ["foodA", "foodB"],
+      "constraints": [
+        {"coefficients": [3, 2], "operator": ">=", "rhs": 12, "label": "protein"},
+        {"coefficients": [2, 3], "operator": ">=", "rhs": 12, "label": "vitamins"}
+      ],
+      "method": "big-m"
+    },
+    {
+      "id": "factory-three-products",
+      "title": "Three-Product Factory",
+      "category": "production",
+      "difficulty": "advanced",
+      "scenario": "A factory produces three products. Profits per unit are $5, $4, and $3. Each product uses machine time, labor, and raw material. Product 1 uses 2 hours of machine time, 1 hour of labor, and 1 unit of material. Product 2 uses 1, 2, and 1. Product 3 uses 1, 1, and 2. The factory has 40 machine hours, 30 labor hours, and 35 units of material. Maximize profit.",
+      "numVars": 3,
+      "objectiveType": "max",
+      "objectiveCoefficients": [5, 4, 3],
+      "variables": ["product1", "product2", "product3"],
+      "constraints": [
+        {"coefficients": [2, 1, 1], "operator": "<=", "rhs": 40, "label": "machine hours"},
+        {"coefficients": [1, 2, 1], "operator": "<=", "rhs": 30, "label": "labor hours"},
+        {"coefficients": [1, 1, 2], "operator": "<=", "rhs": 35, "label": "material"}
+      ],
+      "method": "simplex"
+    }
+  ]
+}

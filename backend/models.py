@@ -159,3 +159,34 @@ class SensitivityResponse(BaseModel):
     steps: list[str]      # arithmetic steps with substituted values
     result: dict          # computed quantities (structure depends on operation)
     conclusion: str       # plain-English interpretation
+
+
+# ── Educator Portal ──────────────────────────────────────────────────────────
+
+class ListProblemsRequest(BaseModel):
+    difficulty: Optional[str] = None    # 'beginner' | 'intermediate' | 'advanced'
+    category: Optional[str] = None
+    search: Optional[str] = None
+
+
+class ValidateProblemRequest(BaseModel):
+    problem: dict
+
+
+class ExportProblemRequest(BaseModel):
+    problem_id: str
+
+
+class EducatorProblemsResponse(BaseModel):
+    problems: list[dict]
+    implemented: bool = True            # False if beginner hasn't finished the function
+
+
+class EducatorValidationResponse(BaseModel):
+    errors: list[str]
+    implemented: bool = True
+
+
+class EducatorExportResponse(BaseModel):
+    markdown: str
+    implemented: bool = True

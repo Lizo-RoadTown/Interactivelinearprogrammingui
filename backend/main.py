@@ -26,6 +26,8 @@ from .models import (
     SolverResponse, PivotResponse, CellExplainResponse,
     SimplexStepOut, TableauOut, TableauCellOut, PointOut,
     SensitivityRequest, SensitivityResponse,
+    ListProblemsRequest, ValidateProblemRequest, ExportProblemRequest,
+    EducatorProblemsResponse, EducatorValidationResponse, EducatorExportResponse,
 )
 from .solver_core import (
     SimplexSolver, TwoPhaseSolver, compute_graphical_data,
@@ -33,6 +35,10 @@ from .solver_core import (
     _fmt_cell, BIG_M,
 )
 from . import sensitivity as sa
+from .educator import bank as edu_bank
+from .educator import listing as edu_listing
+from .educator import validation as edu_validation
+from .educator import export as edu_export
 
 app = FastAPI(title="LP Simulator API", version="1.0.0")
 
@@ -541,3 +547,59 @@ def sensitivity_analysis(req: SensitivityRequest):
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sensitivity error: {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  EDUCATOR PORTAL — word problem bank
+#  Endpoints delegate to student-written functions in backend/educator/.
+#  When a beginner function is not yet implemented, the endpoint returns
+#  `implemented: false` and a fallback so the UI stays functional.
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/educator/list", response_model=EducatorProblemsResponse)
+def educator_list(req: ListProblemsRequest):
+    """List & filter the problem bank. Delegates to BEGINNER A's list_problems()."""
+    bank = edu_bank.load_bank()
+    try:
+        result = edu_listing.list_problems(
+            bank,
+            difficulty=req.difficulty,
+            category=req.category,
+            search=req.search,
+        )
+        return EducatorProblemsResponse(problems=result, implemented=True)
+    except NotImplementedError:
+        # Beginner A hasn't finished yet — return the whole bank so the UI works
+        return EducatorProblemsResponse(problems=bank, implemented=False)
+
+
+@app.post("/api/educator/validate", response_model=EducatorValidationResponse)
+def educator_validate(req: ValidateProblemRequest):
+    """Validate a proposed problem. Delegates to BEGINNER B's validate_problem()."""
+    try:
+        errors = edu_validation.validate_problem(req.problem)
+        return EducatorValidationResponse(errors=list(errors), implemented=True)
+    except NotImplementedError:
+        return EducatorValidationResponse(errors=[], implemented=False)
+
+
+@app.post("/api/educator/export", response_model=EducatorExportResponse)
+def educator_export(req: ExportProblemRequest):
+    """Export a problem to Markdown. Delegates to BEGINNER C's export_to_markdown()."""
+    bank = edu_bank.load_bank()
+    problem = edu_bank.find_problem(bank, req.problem_id)
+    if problem is None:
+        raise HTTPException(status_code=404, detail=f"Problem {req.problem_id!r} not found")
+    try:
+        md = edu_export.export_to_markdown(problem)
+        return EducatorExportResponse(markdown=md, implemented=True)
+    except NotImplementedError:
+        # Fallback: return a minimal stub so the UI shows something
+        stub = f"# {problem.get('title', req.problem_id)}\n\n(export_to_markdown not yet implemented)"
+        return EducatorExportResponse(markdown=stub, implemented=False)
+
+
+@app.get("/api/educator/problems")
+def educator_all_problems():
+    """Unfiltered bank dump — useful for frontend to seed dropdowns."""
+    return {"problems": edu_bank.load_bank()}
