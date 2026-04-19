@@ -1,0 +1,21 @@
+name: Keep Render backend awake
+
+on:
+  schedule:
+    # Every 10 minutes. Render free-tier sleeps after 15 min idle;
+    # this prevents cold-start wait on the first real user visit.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:  # allow manual trigger for testing
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/health
+        run: |
+          URL="https://interactivelinearprogrammingui.onrender.com/api/health"
+          echo "Pinging $URL"
+          # --max-time 90 covers a cold start if the backend happened to be asleep
+          # --retry 3 survives transient blips without failing the workflow
+          curl --fail --silent --show-error --max-time 90 --retry 3 --retry-delay 5 "$URL"
+          echo ""
