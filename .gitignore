@@ -24,6 +24,9 @@ __pycache__/
 .claude/
 CLAUDE.md
 
+# Reference materials (copyrighted textbook PDFs — not for public repo)
+Instructions/
+
 # Editor / OS
 .DS_Store
 Thumbs.db
