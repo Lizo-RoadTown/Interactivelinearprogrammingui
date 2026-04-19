@@ -124,3 +124,38 @@ class PivotResponse(BaseModel):
 
 class CellExplainResponse(BaseModel):
     explanation: str
+
+
+# ── Chapter 8 sensitivity analysis ───────────────────────────────────────────
+
+class SensitivityRequest(BaseModel):
+    """
+    Request for a post-optimality sensitivity analysis operation.
+
+    Includes the original LP problem (so backend re-solves if needed) plus
+    the specific operation to perform and its parameters.
+    """
+    problem: LPProblemIn
+    operation: str
+    # operation ∈ {
+    #   'matrix_form',              # §8.2 — return B, B⁻¹, N, C_B, C_N, b
+    #   'of_coeff_basic',           # §8.3.1 — params: {variable: str}
+    #   'of_coeff_nonbasic',        # §8.3.2 — params: {variable: str}
+    #   'rhs_range',                # §8.3.3 — params: {constraint_index: int (0-based)}
+    #   'shadow_prices',            # §8.3.3.1 — no params
+    #   'add_activity',             # §8.3.5 — params: {a_new: list[float], c_new: float, var_label?: str}
+    #   'add_constraint',           # §8.3.6 — params: {coefficients: list[float], operator: str, rhs: float}
+    # }
+    params: Optional[dict] = None
+
+
+class SensitivityResponse(BaseModel):
+    """
+    Structured "show your work" output from a sensitivity operation.
+    See backend/sensitivity.py for the shape of `result`.
+    """
+    operation: str        # section label e.g. '§8.3.1'
+    formula: str          # textbook formula as string
+    steps: list[str]      # arithmetic steps with substituted values
+    result: dict          # computed quantities (structure depends on operation)
+    conclusion: str       # plain-English interpretation

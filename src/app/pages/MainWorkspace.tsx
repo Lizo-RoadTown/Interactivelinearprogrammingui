@@ -341,18 +341,34 @@ export default function MainWorkspace() {
             </div>
           </div>
 
-          {/* Secondary option */}
-          <div
-            onClick={() => setShowSolver(true)}
-            className="cursor-pointer w-full max-w-2xl bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:scale-[1.01] transition-all border border-gray-200"
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <Zap className="w-6 h-6 text-blue-600" />
-              <h3 className="text-lg font-semibold text-gray-800">Free-form Solver</h3>
+          {/* Secondary options */}
+          <div className="w-full max-w-2xl space-y-3">
+            <div
+              onClick={() => setShowSolver(true)}
+              className="cursor-pointer bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:scale-[1.01] transition-all border border-gray-200"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <Zap className="w-6 h-6 text-blue-600" />
+                <h3 className="text-lg font-semibold text-gray-800">Free-form Solver</h3>
+              </div>
+              <p className="text-gray-500 text-sm">
+                Enter any LP problem and explore the full simplex solution with interactive tableaus and graphs.
+              </p>
             </div>
-            <p className="text-gray-500 text-sm">
-              Enter any LP problem and explore the full simplex solution with interactive tableaus and graphs.
-            </p>
+
+            <div
+              onClick={() => navigate('/sensitivity')}
+              className="cursor-pointer bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:scale-[1.01] transition-all border border-gray-200"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <BookOpen className="w-6 h-6 text-indigo-600" />
+                <h3 className="text-lg font-semibold text-gray-800">Sensitivity Analysis <span className="text-xs text-gray-400 font-normal">(Chapter 8)</span></h3>
+              </div>
+              <p className="text-gray-500 text-sm">
+                Post-optimality "what-if" analysis: matrix form, allowable ranges, shadow prices,
+                add/modify variables and constraints.
+              </p>
+            </div>
           </div>
         </div>
       )}

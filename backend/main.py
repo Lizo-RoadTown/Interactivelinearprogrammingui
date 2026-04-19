@@ -25,12 +25,14 @@ from .models import (
     LPProblemIn, PivotRequest, CellExplainRequest,
     SolverResponse, PivotResponse, CellExplainResponse,
     SimplexStepOut, TableauOut, TableauCellOut, PointOut,
+    SensitivityRequest, SensitivityResponse,
 )
 from .solver_core import (
     SimplexSolver, TwoPhaseSolver, compute_graphical_data,
     _bfs_from_tab, _cell_explanation, _optimal_pivot_info, _apply_pivot_to_T,
     _fmt_cell, BIG_M,
 )
+from . import sensitivity as sa
 
 app = FastAPI(title="LP Simulator API", version="1.0.0")
 
@@ -416,3 +418,126 @@ def explain_cell(req: CellExplainRequest):
     }
     explanation = _cell_explanation(req.row, req.col, tab, req.sense, req.varNames)
     return CellExplainResponse(explanation=explanation)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  CHAPTER 8 — SENSITIVITY ANALYSIS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _solve_for_sensitivity(problem: LPProblemIn):
+    """Re-solve the problem and return a solver in 'optimal' status."""
+    sense, obj, constraints, var_names = _problem_in_to_solver_args(problem)
+    if problem.method == 'two-phase':
+        solver = TwoPhaseSolver(sense, obj, constraints, var_names)
+    else:
+        solver = SimplexSolver(sense, obj, constraints, var_names)
+    if solver.status != 'optimal':
+        raise HTTPException(status_code=409,
+                            detail=f"Problem not optimal (status={solver.status}); "
+                                   f"sensitivity analysis requires an optimal solution.")
+    return solver
+
+
+def _matrix_form_result(solver) -> dict:
+    """Convert extract_matrix_form output to JSON-serializable dict."""
+    mf = sa.extract_matrix_form(solver)
+    return {
+        'B': mf['B'].tolist(),
+        'B_inv': mf['B_inv'].tolist(),
+        'N': mf['N'].tolist(),
+        'CB': mf['CB'].tolist(),
+        'CN': mf['CN'].tolist(),
+        'b': mf['b'].tolist(),
+        'xB': mf['xB'].tolist(),
+        'z_star': mf['z_star'],
+        'basis_variables': [mf['all_vars'][j] for j in mf['basis']],
+        'nonbasic_variables': [mf['all_vars'][j] for j in mf['nonbasic']],
+        'sense': mf['sense'],
+    }
+
+
+@app.post("/api/sensitivity", response_model=SensitivityResponse)
+def sensitivity_analysis(req: SensitivityRequest):
+    solver = _solve_for_sensitivity(req.problem)
+    params = req.params or {}
+
+    try:
+        op = req.operation
+
+        if op == 'matrix_form':
+            mf_dict = _matrix_form_result(solver)
+            # Render B, B⁻¹ visually in steps
+            B = np.array(mf_dict['B'])
+            B_inv = np.array(mf_dict['B_inv'])
+            steps = [
+                f"Basic variables: {mf_dict['basis_variables']}",
+                f"Nonbasic variables: {mf_dict['nonbasic_variables']}",
+                f"C_B = {mf_dict['CB']}   C_N = {mf_dict['CN']}",
+                f"b = {mf_dict['b']}",
+                "B = ", *(f"   {list(row)}" for row in B),
+                "B⁻¹ = ", *(f"   {[round(x, 4) for x in row]}" for row in B_inv),
+                f"xB = B⁻¹·b = {[round(x, 4) for x in mf_dict['xB']]}",
+                f"z* = C_B · B⁻¹ · b = {mf_dict['z_star']}",
+            ]
+            return SensitivityResponse(
+                operation='§8.2 — simplex matrix form',
+                formula='Optimal table from basis: [I | B⁻¹N | B⁻¹b],  z-row: [0 | C_B·B⁻¹N − C_N | C_B·B⁻¹·b]',
+                steps=steps,
+                result=mf_dict,
+                conclusion='Matrix form reconstructs the optimal tableau from the basis alone — '
+                           'no simplex iterations needed. All sensitivity operations build on this.',
+            )
+
+        if op == 'of_coeff_basic':
+            var = params.get('variable')
+            if not var:
+                raise HTTPException(status_code=422, detail="params.variable required")
+            out = sa.of_coeff_range_basic(solver, var)
+            return SensitivityResponse(**out)
+
+        if op == 'of_coeff_nonbasic':
+            var = params.get('variable')
+            if not var:
+                raise HTTPException(status_code=422, detail="params.variable required")
+            out = sa.of_coeff_range_nonbasic(solver, var)
+            return SensitivityResponse(**out)
+
+        if op == 'rhs_range':
+            idx = params.get('constraint_index')
+            if idx is None:
+                raise HTTPException(status_code=422, detail="params.constraint_index required (0-based)")
+            out = sa.rhs_range(solver, int(idx))
+            return SensitivityResponse(**out)
+
+        if op == 'shadow_prices':
+            out = sa.shadow_prices(solver)
+            return SensitivityResponse(**out)
+
+        if op == 'add_activity':
+            a_new = params.get('a_new')
+            c_new = params.get('c_new')
+            label = params.get('var_label', 'x_new')
+            if a_new is None or c_new is None:
+                raise HTTPException(status_code=422, detail="params.a_new and params.c_new required")
+            out = sa.add_activity(solver, a_new=list(a_new), c_new=float(c_new), var_label=label)
+            return SensitivityResponse(**out)
+
+        if op == 'add_constraint':
+            coefs = params.get('coefficients')
+            operator = params.get('operator')
+            rhs = params.get('rhs')
+            if coefs is None or operator is None or rhs is None:
+                raise HTTPException(status_code=422,
+                                    detail="params.coefficients, .operator, and .rhs required")
+            out = sa.add_constraint(solver, coefficients=list(coefs),
+                                    operator=str(operator), rhs=float(rhs))
+            return SensitivityResponse(**out)
+
+        raise HTTPException(status_code=422, detail=f"Unknown operation: {op!r}")
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sensitivity error: {e}")

@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import MainWorkspace from "./pages/MainWorkspace";
 import PracticeMode from "./pages/PracticeMode";
+import SensitivityMode from "./pages/SensitivityMode";
 
 export const router = createBrowserRouter([
   {
@@ -10,5 +11,9 @@ export const router = createBrowserRouter([
   {
     path: "/practice",
     Component: PracticeMode,
+  },
+  {
+    path: "/sensitivity",
+    Component: SensitivityMode,
   },
 ]);
