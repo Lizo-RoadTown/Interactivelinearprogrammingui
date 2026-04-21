@@ -41,41 +41,66 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Dashdark palette — applied when `.dark` is on an ancestor (e.g. <body>).
+ *
+ * Surfaces & base
+ *   background: slate-950    (#020617)   deepest dark, page background
+ *   card:       slate-900    (#0f172a)   cards and raised surfaces
+ *   popover:    slate-900    (#0f172a)   dropdowns, tooltips
+ *   secondary:  slate-800    (#1e293b)   subtle surface (e.g. input bg)
+ *   muted:      slate-800    (#1e293b)   quiet surface
+ *   border:     slate-800    (#1e293b)   card/input borders
+ *
+ * Text
+ *   foreground:  slate-100   (#f1f5f9)   primary text
+ *   muted-fg:    slate-400   (#94a3b8)   secondary / labels
+ *
+ * Accents
+ *   primary:   fuchsia-500   (#d946ef)   primary brand / CTA
+ *   accent:    cyan-500      (#06b6d4)   secondary highlight
+ *   destructive: rose-500    (#f43f5e)   errors
+ *   ring:      fuchsia-500   (#d946ef)   focus ring
+ * ────────────────────────────────────────────────────────────────────────── */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+  --background: #020617;
+  --foreground: #f1f5f9;
+  --card: #0f172a;
+  --card-foreground: #f1f5f9;
+  --popover: #0f172a;
+  --popover-foreground: #f1f5f9;
+  --primary: #d946ef;
+  --primary-foreground: #ffffff;
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #06b6d4;
+  --accent-foreground: #ffffff;
+  --destructive: #f43f5e;
+  --destructive-foreground: #ffffff;
+  --border: #1e293b;
+  --input: #1e293b;
+  --input-background: #0f172a;
+  --switch-background: #334155;
+  --ring: #d946ef;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  /* Chart colors tuned to the Dashdark palette */
+  --chart-1: #d946ef;   /* fuchsia */
+  --chart-2: #06b6d4;   /* cyan */
+  --chart-3: #a855f7;   /* purple */
+  --chart-4: #f97316;   /* orange */
+  --chart-5: #22d3ee;   /* sky */
+  /* Sidebar surfaces */
+  --sidebar: #020617;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #d946ef;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #f1f5f9;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #d946ef;
 }
 
 @theme inline {
