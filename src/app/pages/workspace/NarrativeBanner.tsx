@@ -35,8 +35,8 @@ const ICONS: Record<BannerData['kind'], React.ComponentType<{ className?: string
 export default function NarrativeBanner({ banner, fallback }: Props) {
   if (!banner) {
     return (
-      <div className="h-11 px-4 flex items-center text-sm text-muted-foreground border-b border-border bg-card/40 shrink-0">
-        {fallback ?? 'Workspace ready.'}
+      <div className="min-h-[2.75rem] px-4 py-2 flex items-center text-sm text-muted-foreground border-b border-border bg-card/40 shrink-0">
+        <span className="truncate">{fallback ?? 'Workspace ready.'}</span>
       </div>
     );
   }
@@ -45,15 +45,15 @@ export default function NarrativeBanner({ banner, fallback }: Props) {
   const style = STYLES[banner.kind];
 
   return (
-    <div className={`h-11 px-4 flex items-center gap-3 text-sm border-b shrink-0 ${style}`}>
-      <Icon className="w-4 h-4 shrink-0" />
-      <span className="flex-1 truncate">{banner.text}</span>
+    <div className={`min-h-[2.75rem] px-4 py-2 flex items-start gap-3 text-sm border-b shrink-0 ${style}`}>
+      <Icon className="w-4 h-4 shrink-0 mt-0.5" />
+      <span className="flex-1 leading-snug">{banner.text}</span>
       {banner.action && (
         <Button
           size="sm"
           variant="outline"
           onClick={banner.action.onClick}
-          className="h-7 px-3 text-xs"
+          className="h-7 px-3 text-xs shrink-0 mt-0.5"
         >
           {banner.action.label}
         </Button>

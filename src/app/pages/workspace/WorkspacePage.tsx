@@ -23,6 +23,7 @@ import SolutionLens from './lenses/SolutionLens';
 import SensitivityLens from './lenses/SensitivityLens';
 import MatrixFormLens from './lenses/MatrixFormLens';
 import ShadowPricesLens from './lenses/ShadowPricesLens';
+import { useSimplexTutorial } from './tutorials/SimplexTutorial';
 import { useLPWorkspace, LensId } from '../../hooks/useLPWorkspace';
 import { WORD_PROBLEMS, WordProblem } from '../../data/wordProblems';
 import { LPProblem } from '../../types';
@@ -76,6 +77,17 @@ export default function WorkspacePage() {
   // Problem-switcher state (Phase A convenience; Phase F will replace with templates)
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Tutorial attachment — e.g. ?tutorial=simplex attaches a scripted
+  // narrative to the workspace. The tutorial drives the banner, tableau
+  // highlights, and cell-click handler; the underlying LP state is unchanged.
+  const tutorialName = searchParams.get('tutorial');
+  const simplexTutorial = useSimplexTutorial(
+    tutorialName === 'simplex',
+    ws.solver,
+    ws.problem?.objectiveType ?? 'max',
+    ws.method,
+  );
+
   // Only one secondary lens open at a time. The LensRail toggle cycles
   // selected → deselected. Primary lenses (tableau, graph) are always
   // visible in the center; the rail covers secondary lenses.
@@ -112,6 +124,29 @@ export default function WorkspacePage() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* Tutorial toggle — attach / detach the Simplex walkthrough */}
+          {tutorialName === 'simplex' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate(`/workspace?problem=${seedProblemId}`)}
+              className="text-xs border-primary/40 text-primary"
+              title="Detach the walkthrough — return to free workspace mode"
+            >
+              Walkthrough ON
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate(`/workspace?problem=${seedProblemId}&tutorial=simplex`)}
+              className="text-xs"
+              title="Attach a Simplex pivot walkthrough"
+            >
+              Start walkthrough
+            </Button>
+          )}
+
           <div className="relative">
             <Button
               size="sm"
@@ -128,7 +163,10 @@ export default function WorkspacePage() {
                   <button
                     key={w.id}
                     onClick={() => {
-                      navigate(`/workspace?problem=${w.id}`);
+                      const q = new URLSearchParams();
+                      q.set('problem', w.id);
+                      if (tutorialName) q.set('tutorial', tutorialName);
+                      navigate(`/workspace?${q.toString()}`);
                       setPickerOpen(false);
                     }}
                     className={`w-full text-left px-3 py-2 text-xs hover:bg-muted/60 ${
@@ -149,7 +187,7 @@ export default function WorkspacePage() {
 
       {/* ── Narrative banner (thin instruction layer) ───────────────────────── */}
       <NarrativeBanner
-        banner={ws.banner}
+        banner={simplexTutorial.banner ?? ws.banner}
         fallback={
           isLoading ? 'Solving…' :
           error ? `Error: ${error}` :
@@ -209,6 +247,8 @@ export default function WorkspacePage() {
                 showRatioTest={currentStep?.stepType === 'select_pivot'}
                 afterStep={0}
                 onAfterStepChange={() => {}}
+                guidedPhase={simplexTutorial.tableauProps ?? undefined}
+                onCellClick={simplexTutorial.needsInteraction ? simplexTutorial.onCellClick : undefined}
               />
             )}
           </div>
@@ -232,6 +272,7 @@ export default function WorkspacePage() {
                 objectiveCoefficients={ws.problem.objectiveCoefficients}
                 showObjectiveLine={true}
                 currentPoint={currentPoint ?? undefined}
+                guidedGraph={simplexTutorial.graphProps ?? undefined}
               />
             ) : (
               <div className="h-full flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
