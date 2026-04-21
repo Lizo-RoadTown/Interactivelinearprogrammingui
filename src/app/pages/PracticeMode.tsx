@@ -825,24 +825,58 @@ function EnterOwnForm({
     });
   }, [numVars, numConstraints]);
 
+  // Clear error whenever the form changes — users shouldn't have to stare at a
+  // stale error after they've fixed the problem that caused it.
+  useEffect(() => {
+    if (error) setError('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [objCoeffs, constraints, numVars, numConstraints, objectiveType]);
+
+  // Accept anything that parseFloat can turn into a finite number, plus treat
+  // empty strings as "not filled in" (distinct from 0). We don't call
+  // parseFloat('' ) because it returns NaN which is ambiguous with a typo.
+  function parseCell(raw: string): number | null {
+    const trimmed = raw.trim();
+    if (trimmed === '' || trimmed === '-' || trimmed === '.') return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+
   function handleSubmit() {
-    const oc = objCoeffs.map(parseFloat);
-    if (oc.some(isNaN)) { setError('Please fill in all objective coefficients.'); return; }
-    const cs: OwnLPState['constraints'] = constraints.map((c, i) => {
-      const coef = c.coefficients.map(parseFloat);
-      if (coef.some(isNaN)) { setError(`Fill in all coefficients for constraint ${i + 1}.`); }
-      const rhs = parseFloat(c.rhs);
-      if (isNaN(rhs)) { setError(`Fill in the right-hand side for constraint ${i + 1}.`); }
-      return { coefficients: coef, operator: c.operator, rhs };
-    });
-    if (error) return;
+    // Collect ALL errors up front. Previous version set-state inside the map
+    // then returned early on stale `error`, which meant the submit would
+    // sometimes proceed with invalid data and sometimes get stuck on an old
+    // error after the user fixed the input. This version decides in one pass.
+    const errors: string[] = [];
+
+    const oc: number[] = [];
+    for (let i = 0; i < numVars; i++) {
+      const v = parseCell(objCoeffs[i] ?? '');
+      if (v === null) errors.push(`Objective coefficient for x${i + 1} is missing.`);
+      oc.push(v ?? 0);
+    }
+
+    const cs: OwnLPState['constraints'] = [];
+    for (let i = 0; i < constraints.length; i++) {
+      const c = constraints[i];
+      const coef: number[] = [];
+      for (let j = 0; j < numVars; j++) {
+        const v = parseCell(c.coefficients[j] ?? '');
+        if (v === null) errors.push(`Constraint ${i + 1}: coefficient for x${j + 1} is missing.`);
+        coef.push(v ?? 0);
+      }
+      const rhs = parseCell(c.rhs);
+      if (rhs === null) errors.push(`Constraint ${i + 1}: right-hand side is missing.`);
+      cs.push({ coefficients: coef, operator: c.operator, rhs: rhs ?? 0 });
+    }
+
+    if (errors.length > 0) {
+      setError(errors[0]);  // show the first issue; others surface after fix
+      return;
+    }
+
     setError('');
-    onDone({
-      numVars,
-      objectiveType,
-      objectiveCoefficients: oc,
-      constraints: cs,
-    });
+    onDone({ numVars, objectiveType, objectiveCoefficients: oc, constraints: cs });
   }
 
   return (
@@ -903,17 +937,19 @@ function EnterOwnForm({
                 <div key={i} className="flex items-center gap-1">
                   {i > 0 && <span className="text-gray-400">+</span>}
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="0"
                     value={objCoeffs[i] ?? ''}
+                    onFocus={e => e.target.select()}
                     onChange={e => {
                       const c = [...objCoeffs];
                       c[i] = e.target.value;
                       setObjCoeffs(c);
                     }}
-                    className="w-14 text-sm text-center border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:border-indigo-400"
+                    className="w-16 text-base text-center border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
                   />
-                  <span className="text-xs font-mono text-gray-700">x{i + 1}</span>
+                  <span className="text-sm font-mono text-gray-700">x{i + 1}</span>
                 </div>
               ))}
             </div>
@@ -924,15 +960,17 @@ function EnterOwnForm({
             <label className="text-xs font-medium text-gray-600 block mb-2">Constraints</label>
             <div className="space-y-2">
               {constraints.map((c, idx) => (
-                <div key={idx} className="flex items-center gap-2 flex-wrap p-2 bg-gray-50 rounded-lg">
-                  <span className="text-xs text-gray-400 w-4">C{idx + 1}</span>
+                <div key={idx} className="flex items-center gap-2 flex-wrap p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-mono text-gray-500 w-6">C{idx + 1}</span>
                   {Array.from({ length: numVars }, (_, i) => (
                     <div key={i} className="flex items-center gap-1">
-                      {i > 0 && <span className="text-gray-400 text-xs">+</span>}
+                      {i > 0 && <span className="text-gray-400 text-sm">+</span>}
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="0"
                         value={c.coefficients[i] ?? ''}
+                        onFocus={e => e.target.select()}
                         onChange={e => {
                           const nc = constraints.map((row, ri) => {
                             if (ri !== idx) return row;
@@ -942,9 +980,9 @@ function EnterOwnForm({
                           });
                           setConstraints(nc);
                         }}
-                        className="w-12 text-xs text-center border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-indigo-400"
+                        className="w-16 text-base text-center border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
                       />
-                      <span className="text-xs font-mono text-gray-600">x{i + 1}</span>
+                      <span className="text-sm font-mono text-gray-600">x{i + 1}</span>
                     </div>
                   ))}
                   <select
@@ -955,23 +993,25 @@ function EnterOwnForm({
                       );
                       setConstraints(nc);
                     }}
-                    className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none"
+                    className="text-base border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
                   >
                     <option value="<=">≤</option>
                     <option value=">=">≥</option>
                     <option value="=">=</option>
                   </select>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="RHS"
                     value={c.rhs}
+                    onFocus={e => e.target.select()}
                     onChange={e => {
                       const nc = constraints.map((row, ri) =>
                         ri === idx ? { ...row, rhs: e.target.value } : row
                       );
                       setConstraints(nc);
                     }}
-                    className="w-16 text-sm text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-indigo-400"
+                    className="w-20 text-base text-center border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
                   />
                 </div>
               ))}
