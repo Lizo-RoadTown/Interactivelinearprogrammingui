@@ -83,6 +83,10 @@ export type CommitPayload =
   | { type: 'constraint-coefficient'; constraintIndex: number; variableIndex: number; value: number }
   | { type: 'constraint-operator'; constraintIndex: number; op: '<=' | '>=' | '=' }
   | { type: 'constraint-rhs'; constraintIndex: number; value: number }
+  // Phase 2 — graph build
+  | { type: 'graph-line'; constraintIndex: number }      // reveal the line on the graph
+  | { type: 'graph-side'; constraintIndex: number; side: 'below' | 'above' } // reveal which half-plane is feasible
+  | { type: 'feasible-region-complete' }                  // all sides set → fill the intersection
   | { type: 'note'; text: string };  // free-form annotation on the canvas
 
 export interface TutorialScript {
@@ -263,11 +267,106 @@ const TOY_FACTORY_PHASE1: Question[] = [
   },
 ];
 
+// ── Toy Factory — graph build phase (Phase 2) ────────────────────────────────
+//
+// With the LP formulated, now draw it on a blank graph. One line per
+// constraint, materialized when the student answers intercepts. Then
+// pick the feasible side for each. The intersection shades into the
+// feasible region. No objective line yet — that's the discovery moment
+// in the next phase.
+
+const TOY_FACTORY_PHASE2: Question[] = [
+
+  // ── Constraint 1: assembly — draw the line ────────────────────────────────
+  {
+    kind: 'number',
+    id: 'toy-g-c1-x1int',
+    phase: 2,
+    prompt: 'Constraint 1 is 2x₁ + 4x₂ ≤ 80. To draw its line, find where it crosses the x₁-axis. Set x₂ = 0, then solve 2x₁ = 80. What is x₁?',
+    placeholder: 'e.g. 40',
+    correct: 40,
+    hint: 'Set x₂ = 0 in 2x₁ + 4x₂ = 80 → 2x₁ = 80 → x₁ = ?',
+    commit: { type: 'note', text: 'c1-x1int' }, // commit handled by-id below
+  },
+  {
+    kind: 'number',
+    id: 'toy-g-c1-x2int',
+    phase: 2,
+    prompt: 'And where does it cross the x₂-axis? Set x₁ = 0 in 2x₁ + 4x₂ = 80.',
+    placeholder: 'e.g. 20',
+    correct: 20,
+    hint: '4x₂ = 80 → x₂ = ?',
+    commit: { type: 'graph-line', constraintIndex: 0 },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-g-c1-side',
+    phase: 2,
+    prompt: 'C1 says 2x₁ + 4x₂ ≤ 80 — which side of the line satisfies the constraint?',
+    options: [
+      { id: 'below', label: 'The side containing (0,0) — the origin' },
+      { id: 'above', label: 'The side away from the origin' },
+    ],
+    correctId: 'below',
+    hint: 'Quick test: plug (0,0) in. 2·0 + 4·0 = 0. Is 0 ≤ 80? Yes — so the origin side is feasible.',
+    commit: { type: 'graph-side', constraintIndex: 0, side: 'below' },
+  },
+
+  // ── Constraint 2: painting — draw the line ────────────────────────────────
+  {
+    kind: 'number',
+    id: 'toy-g-c2-x1int',
+    phase: 2,
+    prompt: 'Now constraint 2 is 3x₁ + 2x₂ ≤ 60. Where does it cross the x₁-axis?',
+    placeholder: 'e.g. 20',
+    correct: 20,
+    hint: 'Set x₂ = 0 → 3x₁ = 60 → x₁ = ?',
+    commit: { type: 'note', text: 'c2-x1int' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-g-c2-x2int',
+    phase: 2,
+    prompt: 'And where does C2 cross the x₂-axis?',
+    placeholder: 'e.g. 30',
+    correct: 30,
+    hint: 'Set x₁ = 0 → 2x₂ = 60 → x₂ = ?',
+    commit: { type: 'graph-line', constraintIndex: 1 },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-g-c2-side',
+    phase: 2,
+    prompt: 'Same question for C2 — which side of the line is feasible?',
+    options: [
+      { id: 'below', label: 'The origin side' },
+      { id: 'above', label: 'Away from the origin' },
+    ],
+    correctId: 'below',
+    hint: 'Same test: at the origin 3·0 + 2·0 = 0 ≤ 60 ✓ — origin side is feasible.',
+    commit: { type: 'graph-side', constraintIndex: 1, side: 'below' },
+  },
+
+  // Marker question — clicking "Reveal feasible region" completes phase 2
+  {
+    kind: 'mc',
+    id: 'toy-g-feasible',
+    phase: 2,
+    prompt: 'Both constraints are drawn. The feasible region is the set of points that satisfy ALL constraints — where the two half-planes overlap plus x₁,x₂ ≥ 0. Ready to see it?',
+    options: [
+      { id: 'yes', label: 'Show me the feasible region' },
+    ],
+    correctId: 'yes',
+    hint: '',
+    commit: { type: 'feasible-region-complete' },
+  },
+];
+
 export const TOY_FACTORY_SCRIPT: TutorialScript = {
   id: 'script-toy-factory-v1',
   problemId: 'wp-toy-factory',
   title: 'Toy Factory — guided walkthrough',
-  questions: TOY_FACTORY_PHASE1,  // phases 2+ appended as scripts are extended
+  questions: [...TOY_FACTORY_PHASE1, ...TOY_FACTORY_PHASE2],
 };
 
 export const TUTORIAL_SCRIPTS: TutorialScript[] = [

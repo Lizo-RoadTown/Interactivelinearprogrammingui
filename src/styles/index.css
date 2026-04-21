@@ -13,3 +13,22 @@
 .animate-fill-pop {
   animation: fill-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+
+/* Constraint line drawing animation — uses a large initial dashoffset (larger
+ * than any line length in a typical graph). Combined with stroke-dasharray
+ * set to the line length inline, this creates a clean "draw from one end to
+ * the other" reveal. */
+@keyframes line-draw {
+  from { stroke-dashoffset: 2000; opacity: 0.25; }
+  to   { stroke-dashoffset: 0; opacity: 1; }
+}
+
+/* Half-plane shading fade-in */
+@keyframes region-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-region-fade {
+  animation: region-fade 400ms ease-out both;
+}

@@ -21,6 +21,8 @@ import {
   getScript, Question, TextQuestion, NumberQuestion, MCQuestion, FieldsQuestion,
   CommitPayload,
 } from '../../data/tutorialScripts';
+import DiscoveryGraph from './DiscoveryGraph';
+import { LPDraft } from './guidedTypes';
 import {
   ArrowLeft, CheckCircle, Lightbulb, Eye, Sparkles,
 } from 'lucide-react';
@@ -92,19 +94,6 @@ function gradeFieldsAnswer(q: FieldsQuestion, values: Record<string, string>): b
 //
 // Builds a partial LPProblem-like object from the sequence of commits the
 // student has made correctly. This is what the Canvas renders.
-
-interface LPDraft {
-  variables: { name: string; description: string }[];
-  objectiveType: 'max' | 'min' | null;
-  objectiveCoefficients: (number | null)[];
-  constraints: {
-    started: boolean;
-    label: string;
-    coefficients: (number | null)[];
-    operator: '<=' | '>=' | '=' | null;
-    rhs: number | null;
-  }[];
-}
 
 function emptyDraft(numVars: number, numConstraints: number): LPDraft {
   return {
@@ -201,25 +190,37 @@ export default function GuidedLearnPage() {
   const totalQ = script.questions.length;
   const isDone = currentIdx >= totalQ;
 
-  // Build the partial LP draft from all correct commits so far
-  const draft = useMemo(() => {
+  // Build the partial LP draft + graph-phase state from all correct commits
+  const { draft, linesDrawn, sideDrawnFor, feasibleRevealed } = useMemo(() => {
     let d = emptyDraft(problem.numVars, problem.constraints.length);
+    const linesSet = new Set<number>();
+    const sidesSet = new Set<number>();
+    let feasible = false;
+
     for (let i = 0; i < currentIdx; i++) {
       const q = script.questions[i];
       const ans = answers[q.id];
-      if (ans?.correct || ans?.shownAnswer) {
-        const fa = q.kind === 'fields' ? fieldsAnswers[q.id] : undefined;
-        d = applyCommit(d, q.commit, q.id, fa);
-        // Also apply the "correct" fields answer for fields questions if shown
-        if (q.kind === 'fields' && ans?.shownAnswer && !fa) {
-          const correct: Record<string, string> = {};
-          q.fields.forEach(f => { correct[f.id] = String(f.correct); });
-          d = applyCommit(d, q.commit, q.id, correct);
-        }
+      if (!(ans?.correct || ans?.shownAnswer)) continue;
+
+      const fa = q.kind === 'fields' ? fieldsAnswers[q.id] : undefined;
+      d = applyCommit(d, q.commit, q.id, fa);
+      if (q.kind === 'fields' && ans?.shownAnswer && !fa) {
+        const correct: Record<string, string> = {};
+        q.fields.forEach(f => { correct[f.id] = String(f.correct); });
+        d = applyCommit(d, q.commit, q.id, correct);
       }
+
+      // Track graph-phase state from commit type
+      if (q.commit.type === 'graph-line') linesSet.add(q.commit.constraintIndex);
+      if (q.commit.type === 'graph-side') sidesSet.add(q.commit.constraintIndex);
+      if (q.commit.type === 'feasible-region-complete') feasible = true;
     }
-    return d;
+
+    return { draft: d, linesDrawn: linesSet, sideDrawnFor: sidesSet, feasibleRevealed: feasible };
   }, [currentIdx, answers, fieldsAnswers, script, problem]);
+
+  // Whether the graph should be visible at all (any line drawn yet)
+  const anyGraphContent = linesDrawn.size > 0 || sideDrawnFor.size > 0 || feasibleRevealed;
 
   // Handlers
   const handleAnswer = (q: Question, ok: boolean, studentAnswer: unknown) => {
@@ -356,13 +357,38 @@ export default function GuidedLearnPage() {
           </div>
         </section>
 
-        {/* RIGHT: LP canvas (fills in as answers accumulate) */}
+        {/* RIGHT: LP canvas + graph (both fill in as answers accumulate) */}
         <section className="overflow-y-auto bg-card/20">
-          <div className="p-6 space-y-4 max-w-2xl mx-auto">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-              Your LP formulation — grows as you answer
-            </p>
-            <Canvas draft={draft} variablesCount={problem.numVars} constraintsCount={problem.constraints.length} />
+          <div className="p-6 space-y-6 max-w-2xl mx-auto">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+                Your LP formulation — grows as you answer
+              </p>
+              <Canvas draft={draft} variablesCount={problem.numVars} constraintsCount={problem.constraints.length} />
+            </div>
+
+            {/* Graph section — appears as soon as the student starts earning graph content */}
+            {(anyGraphContent || problem.numVars === 2) && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+                  Your graph — fills in as you answer
+                </p>
+                <div className="bg-card/40 border border-border rounded-xl p-3">
+                  {problem.numVars === 2 ? (
+                    <DiscoveryGraph
+                      draft={draft}
+                      linesDrawn={linesDrawn}
+                      sideDrawnFor={sideDrawnFor}
+                      feasibleRegionRevealed={feasibleRevealed}
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic p-6 text-center">
+                      Graph visualization requires a 2-variable problem.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </section>
       </div>
