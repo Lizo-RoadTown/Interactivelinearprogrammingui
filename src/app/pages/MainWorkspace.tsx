@@ -312,7 +312,7 @@ export default function MainWorkspace() {
         )}
       </div>
 
-      {/* ── HERO: Practice Mode front and center ─────────────────────── */}
+      {/* ── HERO: two tiles, Workspace dominant ─────────────────────────── */}
       {!showSolver && (
         <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-950 relative overflow-hidden">
           {/* Background gradient accents */}
@@ -321,89 +321,65 @@ export default function MainWorkspace() {
             <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-3xl"></div>
           </div>
 
-          {/* Practice Mode — the star */}
+          {/* LP Workspace — the star */}
           <div
-            onClick={() => navigate('/practice')}
+            onClick={() => navigate('/workspace')}
             className="group relative cursor-pointer w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-10 shadow-2xl hover:border-fuchsia-500/40 hover:shadow-fuchsia-500/20 transition-all duration-200 mb-6 overflow-hidden"
           >
-            {/* Gradient border accent */}
             <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-600/20 via-purple-600/10 to-transparent opacity-60 pointer-events-none"></div>
             <div className="relative">
               <div className="flex items-center gap-4 mb-4">
-                <div className="bg-gradient-to-br from-fuchsia-500 to-purple-600 rounded-xl p-3 shadow-lg shadow-fuchsia-500/30">
+                <div className="bg-gradient-to-br from-fuchsia-500 to-cyan-400 rounded-xl p-3 shadow-lg shadow-fuchsia-500/30">
                   <BookOpen className="w-10 h-10 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold text-white">Practice Mode</h2>
-                  <p className="text-fuchsia-300/80 text-base mt-1">Learn by doing</p>
+                  <h2 className="text-3xl font-bold text-white">LP Workspace</h2>
+                  <p className="text-fuchsia-300/80 text-base mt-1">One place for everything</p>
                 </div>
               </div>
-              <p className="text-slate-300 text-base leading-relaxed mb-6">
-                Work through real word problems step by step. Build formulations from scratch,
-                identify constraints, choose pivot variables by clicking directly on the tableau,
-                and get immediate feedback on your reasoning.
+              <p className="text-slate-300 text-base leading-relaxed mb-5">
+                Tableau and graph side by side, with lenses for formulation, solution, sensitivity
+                (Chapter 8 sliders), matrix form, and shadow prices — all sharing the same LP.
+                Drag, explore, and see the math respond in real time.
               </p>
-              <div className="flex flex-wrap gap-2 mb-6">
-                {['Beginner', 'Intermediate', 'Advanced'].map(level => (
-                  <span key={level} className="bg-slate-800/80 border border-slate-700 text-slate-200 text-xs px-3 py-1 rounded-full">
-                    {level} problems
+              <div className="flex flex-wrap gap-2 mb-5">
+                {['Tableau', 'Graph', 'Sensitivity', 'Matrix form', 'Shadow prices'].map(label => (
+                  <span key={label} className="bg-slate-800/80 border border-slate-700 text-slate-200 text-xs px-3 py-1 rounded-full">
+                    {label}
                   </span>
                 ))}
               </div>
               <div className="flex items-center gap-2 text-fuchsia-300 font-semibold text-base group-hover:gap-3 transition-all">
-                Start Practicing <span className="text-xl">→</span>
+                Open Workspace <span className="text-xl">→</span>
               </div>
             </div>
           </div>
 
-          {/* Secondary options */}
-          <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 relative">
-            <div
-              onClick={() => navigate('/workspace')}
-              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-primary/40 hover:bg-slate-900/80 transition-all"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
-                  <BookOpen className="w-4 h-4 text-primary" />
-                </div>
-                <h3 className="text-sm font-semibold text-slate-100">LP Workspace <span className="text-[10px] text-slate-500 font-normal">(new)</span></h3>
+          {/* Secondary: free-form solver */}
+          <div
+            onClick={() => setShowSolver(true)}
+            className="cursor-pointer w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-cyan-500/40 hover:bg-slate-900/80 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                <Zap className="w-4.5 h-4.5 text-cyan-400" />
               </div>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                Unified environment: tableau + graph + every lens you need. Solve, explore, manipulate — all in one place.
-              </p>
-            </div>
-
-            <div
-              onClick={() => setShowSolver(true)}
-              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-cyan-500/40 hover:bg-slate-900/80 transition-all"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-cyan-400" />
-                </div>
+              <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold text-slate-100">Free-form Solver</h3>
+                <p className="text-slate-400 text-xs leading-relaxed mt-0.5">
+                  Enter any LP from scratch and step through the simplex manually. Advanced.
+                </p>
               </div>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                Enter any LP problem and explore the full simplex solution with interactive tableaus and graphs.
-              </p>
-            </div>
-
-            <div
-              onClick={() => navigate('/sensitivity')}
-              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-fuchsia-500/40 hover:bg-slate-900/80 transition-all opacity-75"
-              title="Being rebuilt as the Sensitivity lens inside the LP Workspace"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30 flex items-center justify-center">
-                  <BookOpen className="w-4 h-4 text-fuchsia-400" />
-                </div>
-                <h3 className="text-sm font-semibold text-slate-100">Sensitivity <span className="text-[10px] text-slate-500 font-normal">(Ch. 8)</span></h3>
-              </div>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                Legacy — rebuilding inside the LP Workspace (Phase D).
-              </p>
+              <span className="text-slate-500 text-lg">→</span>
             </div>
           </div>
+
+          {/* Small footer — transition note */}
+          <p className="text-slate-600 text-[11px] mt-6 max-w-2xl text-center">
+            Looking for the old Practice Mode or Sensitivity page? They&apos;re being merged into the Workspace.
+            Direct links still work: <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/practice'); }}>Practice</a>{' · '}
+            <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/sensitivity'); }}>Sensitivity</a>.
+          </p>
         </div>
       )}
 
