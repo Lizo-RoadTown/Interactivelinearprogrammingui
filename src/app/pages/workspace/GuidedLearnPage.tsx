@@ -22,6 +22,7 @@ import {
   CommitPayload,
 } from '../../data/tutorialScripts';
 import DiscoveryGraph from './DiscoveryGraph';
+import GuidedTableau, { TableauReveal } from './GuidedTableau';
 import { LPDraft } from './guidedTypes';
 import {
   ArrowLeft, CheckCircle, Lightbulb, Eye, Sparkles,
@@ -198,12 +199,19 @@ export default function GuidedLearnPage() {
   const totalQ = script.questions.length;
   const isDone = currentIdx >= totalQ;
 
-  // Build the partial LP draft + graph-phase state from all correct commits
-  const { draft, linesDrawn, sideDrawnFor, feasibleRevealed } = useMemo(() => {
+  // Build the partial LP draft + graph-phase state + tableau reveal from all correct commits
+  const { draft, linesDrawn, sideDrawnFor, feasibleRevealed, tableauReveal } = useMemo(() => {
     let d = emptyDraft(problem.numVars, problem.constraints.length);
     const linesSet = new Set<number>();
     const sidesSet = new Set<number>();
     let feasible = false;
+    const tab: TableauReveal = {
+      slacksAdded: false,
+      slackIdentityRevealed: false,
+      zRowXRevealed: false,
+      initialBasicValuesRevealed: false,
+      initialZRevealed: false,
+    };
 
     for (let i = 0; i < currentIdx; i++) {
       const q = script.questions[i];
@@ -222,9 +230,15 @@ export default function GuidedLearnPage() {
       if (q.commit.type === 'graph-line') linesSet.add(q.commit.constraintIndex);
       if (q.commit.type === 'graph-side') sidesSet.add(q.commit.constraintIndex);
       if (q.commit.type === 'feasible-region-complete') feasible = true;
+      // Track tableau reveal state
+      if (q.commit.type === 'slacks-added')                tab.slacksAdded = true;
+      if (q.commit.type === 'slack-identity-revealed')     tab.slackIdentityRevealed = true;
+      if (q.commit.type === 'z-row-x-revealed')            tab.zRowXRevealed = true;
+      if (q.commit.type === 'initial-basic-values-revealed') tab.initialBasicValuesRevealed = true;
+      if (q.commit.type === 'initial-z-revealed')          tab.initialZRevealed = true;
     }
 
-    return { draft: d, linesDrawn: linesSet, sideDrawnFor: sidesSet, feasibleRevealed: feasible };
+    return { draft: d, linesDrawn: linesSet, sideDrawnFor: sidesSet, feasibleRevealed: feasible, tableauReveal: tab };
   }, [currentIdx, answers, fieldsAnswers, script, problem]);
 
   // Whether the graph should be visible at all (any line drawn yet)
@@ -413,6 +427,18 @@ export default function GuidedLearnPage() {
                       Graph visualization requires a 2-variable problem.
                     </p>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Tableau section — appears once Phase 3 starts (slacksAdded) */}
+            {tableauReveal.slacksAdded && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+                  Your initial tableau — fills in as you answer
+                </p>
+                <div className="bg-card/40 border border-border rounded-xl p-3">
+                  <GuidedTableau draft={draft} reveal={tableauReveal} />
                 </div>
               </div>
             )}

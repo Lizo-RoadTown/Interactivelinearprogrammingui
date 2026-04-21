@@ -112,6 +112,12 @@ export type CommitPayload =
   | { type: 'graph-side'; constraintIndex: number; side: 'below' | 'above' } // reveal which half-plane is feasible
   | { type: 'feasible-region-complete' }                  // all sides set → fill the intersection
   | { type: 'optimum-found'; zValue: number }             // student discovered the optimum via slider
+  // Phase 3 — tableau setup
+  | { type: 'slacks-added'; count: number }               // reveal slack columns in the tableau skeleton
+  | { type: 'slack-identity-revealed' }                   // fill in s_i identity cells
+  | { type: 'z-row-x-revealed' }                          // fill in Z-row decision var coefficients
+  | { type: 'initial-basic-values-revealed' }             // fill in RHS column values for the basis
+  | { type: 'initial-z-revealed' }                        // fill in Z-row RHS (0 at initial BFS)
   | { type: 'note'; text: string };  // free-form annotation on the canvas
 
 export interface TutorialScript {
@@ -417,11 +423,104 @@ const TOY_FACTORY_PHASE2: Question[] = [
   },
 ];
 
+// ── Toy Factory — Phase 3: build the initial simplex tableau ────────────────
+
+const TOY_FACTORY_PHASE3: Question[] = [
+  {
+    kind: 'mc',
+    id: 'toy-t-what-to-add',
+    phase: 3,
+    prompt: 'You solved the graph by dragging. Now let\'s do the same answer the algebraic way — with the simplex method. First step: the simplex only works with equations, not inequalities. What do we add to a ≤ constraint to turn it into an equation?',
+    options: [
+      { id: 'slack',     label: 'A slack variable (+s) — absorbs unused capacity' },
+      { id: 'surplus',   label: 'A surplus variable (−e)' },
+      { id: 'artificial', label: 'An artificial variable (+a)' },
+    ],
+    correctId: 'slack',
+    hint: 'Think about what "≤" means: "left side can be SMALLER than right side." If left is smaller by 3, we add 3 to make it equal. That 3 is slack — unused capacity.',
+    commit: { type: 'note', text: 'know-to-add-slacks' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-t-slack-count',
+    phase: 3,
+    prompt: 'The Toy Factory has two ≤ constraints. How many slack variables will we need?',
+    placeholder: 'e.g. 2',
+    correct: 2,
+    hint: 'One slack per ≤ constraint.',
+    commit: { type: 'slacks-added', count: 2 },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-t-slack-identity',
+    phase: 3,
+    prompt: 'Each slack only "belongs" to its own constraint. So s₁ appears in C1\'s equation with coefficient 1 and in C2\'s equation with coefficient 0. In the tableau, the slack columns form an identity matrix. In row C1, what are the coefficients (s₁, s₂)?',
+    options: [
+      { id: 'one-zero', label: '(1, 0) — s₁ appears in C1, s₂ does not' },
+      { id: 'zero-one', label: '(0, 1)' },
+      { id: 'one-one',  label: '(1, 1)' },
+      { id: 'zero-zero', label: '(0, 0)' },
+    ],
+    correctId: 'one-zero',
+    hint: 'Row C1\'s equation: 2x₁ + 4x₂ + s₁ = 80. Only s₁ shows up in C1 — s₂ belongs to C2.',
+    commit: { type: 'slack-identity-revealed' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-t-zrow-sign',
+    phase: 3,
+    prompt: 'The Z-row represents the equation z − 15x₁ − 20x₂ = 0, rearranged from z = 15x₁ + 20x₂. In the initial tableau, what are the Z-row coefficients for (x₁, x₂)?',
+    options: [
+      { id: 'neg-neg', label: '(−15, −20) — the NEGATIVE of the objective coefficients' },
+      { id: 'pos-pos', label: '(15, 20) — same as the objective' },
+      { id: 'neg-pos', label: '(−15, 20)' },
+      { id: 'pos-neg', label: '(15, −20)' },
+    ],
+    correctId: 'neg-neg',
+    hint: 'For MAX, moving the objective to the left side of the equation z − 15x₁ − 20x₂ = 0 makes the x coefficients negative. The simplex will drive them toward zero.',
+    commit: { type: 'z-row-x-revealed' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-t-initial-s1',
+    phase: 3,
+    prompt: 'At the initial BFS we have x₁ = x₂ = 0 (the origin). From C1: 2(0) + 4(0) + s₁ = 80. What is s₁?',
+    placeholder: 'e.g. 80',
+    correct: 80,
+    hint: 'Simplify: 0 + 0 + s₁ = 80, so s₁ = ?',
+    commit: { type: 'note', text: 'initial-s1' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-t-initial-s2',
+    phase: 3,
+    prompt: 'Same logic for C2: 3(0) + 2(0) + s₂ = 60. What is s₂?',
+    placeholder: 'e.g. 60',
+    correct: 60,
+    hint: 's₂ takes up all of C2\'s capacity because nothing is being produced yet.',
+    commit: { type: 'initial-basic-values-revealed' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-t-initial-z',
+    phase: 3,
+    prompt: 'And the initial objective value: z = 15(0) + 20(0) = ?',
+    placeholder: 'e.g. 0',
+    correct: 0,
+    hint: 'Nothing produced → no profit yet. z = 0.',
+    commit: { type: 'initial-z-revealed' },
+  },
+];
+
 export const TOY_FACTORY_SCRIPT: TutorialScript = {
   id: 'script-toy-factory-v1',
   problemId: 'wp-toy-factory',
   title: 'Toy Factory — guided walkthrough',
-  questions: [...TOY_FACTORY_PHASE1, ...TOY_FACTORY_PHASE2],
+  questions: [
+    ...TOY_FACTORY_PHASE1,
+    ...TOY_FACTORY_PHASE2,
+    ...TOY_FACTORY_PHASE3,
+  ],
 };
 
 export const TUTORIAL_SCRIPTS: TutorialScript[] = [
