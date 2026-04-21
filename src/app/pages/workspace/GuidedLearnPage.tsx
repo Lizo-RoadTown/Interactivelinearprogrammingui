@@ -603,118 +603,198 @@ function FieldsInput({
   );
 }
 
-// ── Canvas: the LP building up ───────────────────────────────────────────────
+// ── Canvas: the LP as a gameboard ────────────────────────────────────────────
+//
+// Empty slots are big, obvious, inviting — dashed boxes with a "?" waiting to
+// be filled. When an answer lands, the slot flips to a bright solid card with
+// the value rendered large. The `fill-pop` animation gives each fill a
+// physical sense of arrival: scale from 0.6 to 1.0 with a small bounce.
 
 function Canvas({ draft, variablesCount, constraintsCount }: {
   draft: LPDraft;
   variablesCount: number;
   constraintsCount: number;
 }) {
-  const hasAnyVar = draft.variables.length > 0;
-  const hasSense = draft.objectiveType !== null;
-  const hasAnyObjCoeff = draft.objectiveCoefficients.some(v => v !== null);
-  const anyConstraintStarted = draft.constraints.some(c => c.started);
-
   return (
-    <div className="space-y-4 font-mono text-sm">
+    <div className="space-y-6">
 
-      {/* Decision variables */}
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">Decision variables</p>
-        <div className="bg-card border border-dashed border-border rounded-lg p-3 min-h-[3.5rem]">
-          {!hasAnyVar && (
-            <p className="text-xs text-muted-foreground italic">Your variables will appear here.</p>
-          )}
+      {/* ── Decision variables ──────────────────────────────────────────── */}
+      <Section label="Decision variables">
+        <div className="space-y-3">
           {Array.from({ length: variablesCount }, (_, i) => {
             const v = draft.variables[i];
             return (
-              <div key={i} className="flex items-baseline gap-2 text-foreground">
-                <span className="text-primary">x{i + 1}</span>
-                <span className="text-muted-foreground">=</span>
-                <span>{v ? v.description : <span className="text-muted-foreground italic text-xs">…</span>}</span>
+              <div key={i} className="flex items-center gap-3">
+                <VarChip label={`x${i + 1}`} />
+                <span className="text-2xl text-muted-foreground">=</span>
+                <SlotText value={v?.description} placeholder="click into the first question →" />
               </div>
             );
           })}
         </div>
-      </div>
+      </Section>
 
-      {/* Objective */}
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">Objective function</p>
-        <div className="bg-card border border-dashed border-border rounded-lg p-3 min-h-[2.5rem]">
-          {!hasSense && !hasAnyObjCoeff ? (
-            <p className="text-xs text-muted-foreground italic">Your objective function will appear here.</p>
-          ) : (
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-primary font-semibold uppercase">
-                {draft.objectiveType ?? '____'}
-              </span>
-              <span className="text-muted-foreground">z =</span>
-              {Array.from({ length: variablesCount }, (_, i) => {
-                const c = draft.objectiveCoefficients[i];
-                return (
-                  <span key={i} className="flex items-baseline gap-1">
-                    {i > 0 && <span className="text-muted-foreground">+</span>}
-                    <span className={c !== null ? 'text-foreground' : 'text-muted-foreground italic'}>
-                      {c !== null ? c : '__'}
-                    </span>
-                    <span className="text-primary">x{i + 1}</span>
-                  </span>
-                );
-              })}
-            </div>
-          )}
+      {/* ── Objective function ─────────────────────────────────────────── */}
+      <Section label="Objective function">
+        <div className="flex items-center gap-3 flex-wrap">
+          <SenseBadge sense={draft.objectiveType} />
+          <span className="text-2xl text-muted-foreground">z =</span>
+          {Array.from({ length: variablesCount }, (_, i) => {
+            const c = draft.objectiveCoefficients[i];
+            return (
+              <div key={i} className="flex items-center gap-2">
+                {i > 0 && <span className="text-2xl text-muted-foreground">+</span>}
+                <SlotNumber value={c} />
+                <VarChip label={`x${i + 1}`} size="sm" />
+              </div>
+            );
+          })}
         </div>
-      </div>
+      </Section>
 
-      {/* Constraints */}
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">Constraints</p>
-        <div className="bg-card border border-dashed border-border rounded-lg divide-y divide-border">
-          {!anyConstraintStarted && (
-            <p className="text-xs text-muted-foreground italic p-3">Your constraints will appear here.</p>
-          )}
+      {/* ── Constraints ─────────────────────────────────────────────────── */}
+      <Section label="Subject to">
+        <div className="space-y-4">
           {Array.from({ length: constraintsCount }, (_, ci) => {
             const c = draft.constraints[ci];
-            if (!c.started) {
-              return (
-                <div key={ci} className="p-3 text-xs text-muted-foreground italic">
-                  Constraint {ci + 1}: not yet defined
-                </div>
-              );
-            }
             return (
-              <div key={ci} className="p-3 flex items-baseline gap-2 flex-wrap">
-                <span className="text-[10px] text-muted-foreground min-w-14">{c.label}</span>
-                {Array.from({ length: variablesCount }, (_, vi) => {
-                  const coef = c.coefficients[vi];
-                  return (
-                    <span key={vi} className="flex items-baseline gap-1">
-                      {vi > 0 && <span className="text-muted-foreground">+</span>}
-                      <span className={coef !== null ? 'text-foreground' : 'text-muted-foreground italic'}>
-                        {coef !== null ? coef : '__'}
-                      </span>
-                      <span className="text-primary">x{vi + 1}</span>
-                    </span>
-                  );
-                })}
-                <span className="text-muted-foreground">
-                  {c.operator ? (c.operator === '<=' ? '≤' : c.operator === '>=' ? '≥' : '=') : '__'}
-                </span>
-                <span className={c.rhs !== null ? 'text-accent font-semibold' : 'text-muted-foreground italic'}>
-                  {c.rhs !== null ? c.rhs : '__'}
-                </span>
+              <div key={ci} className="bg-card/40 border border-border rounded-xl p-4 space-y-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    C{ci + 1}
+                  </span>
+                  {c?.started && c.label && (
+                    <span className="text-xs text-primary font-semibold">{c.label}</span>
+                  )}
+                  {!c?.started && (
+                    <span className="text-xs text-muted-foreground italic">not yet defined</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {Array.from({ length: variablesCount }, (_, vi) => {
+                    const coef = c?.coefficients[vi] ?? null;
+                    return (
+                      <div key={vi} className="flex items-center gap-2">
+                        {vi > 0 && <span className="text-2xl text-muted-foreground">+</span>}
+                        <SlotNumber value={coef} />
+                        <VarChip label={`x${vi + 1}`} size="sm" />
+                      </div>
+                    );
+                  })}
+                  <OperatorSlot op={c?.operator ?? null} />
+                  <SlotNumber value={c?.rhs ?? null} accent />
+                </div>
               </div>
             );
           })}
         </div>
-      </div>
+      </Section>
 
-      {/* Non-negativity (always assumed) */}
-      <div className="text-xs text-muted-foreground italic">
-        All variables ≥ 0 (standard assumption for this problem type).
+      {/* Non-negativity footer */}
+      <div className="text-xs text-muted-foreground italic text-center pt-2">
+        All variables assumed ≥ 0
       </div>
     </div>
+  );
+}
+
+// ── Canvas primitives ────────────────────────────────────────────────────────
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-bold mb-2.5">{label}</p>
+      <div className="bg-card/40 border border-border rounded-xl p-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function VarChip({ label, size = 'md' }: { label: string; size?: 'sm' | 'md' }) {
+  const cls = size === 'sm'
+    ? 'px-2.5 py-1 text-base font-mono'
+    : 'px-3 py-1.5 text-lg font-mono';
+  return (
+    <span className={`${cls} rounded-lg bg-primary/15 border border-primary/40 text-primary font-semibold tabular-nums`}>
+      {label}
+    </span>
+  );
+}
+
+function SlotNumber({ value, accent = false }: { value: number | null; accent?: boolean }) {
+  if (value === null) {
+    return (
+      <span className="inline-flex items-center justify-center w-14 h-14 rounded-xl border-2 border-dashed border-border/80 bg-muted/30 text-muted-foreground/60 text-2xl font-mono">
+        ?
+      </span>
+    );
+  }
+  const colorCls = accent
+    ? 'bg-accent/25 border-accent/60 text-accent-foreground shadow-accent/20'
+    : 'bg-emerald-500/25 border-emerald-500/60 text-emerald-100 shadow-emerald-500/20';
+  return (
+    <span
+      key={value} // forces remount + anim replay when the value arrives
+      className={`inline-flex items-center justify-center w-14 h-14 rounded-xl border-2 ${colorCls} shadow-lg font-mono text-2xl font-bold tabular-nums animate-fill-pop`}
+    >
+      {value}
+    </span>
+  );
+}
+
+function SlotText({ value, placeholder }: { value: string | undefined; placeholder: string }) {
+  if (!value) {
+    return (
+      <span className="flex-1 px-4 py-2.5 rounded-xl border-2 border-dashed border-border/80 bg-muted/30 text-sm text-muted-foreground/70 italic">
+        {placeholder}
+      </span>
+    );
+  }
+  return (
+    <span
+      key={value}
+      className="flex-1 px-4 py-2.5 rounded-xl border-2 border-emerald-500/60 bg-emerald-500/20 text-emerald-100 text-base font-medium shadow-lg shadow-emerald-500/20 animate-fill-pop"
+    >
+      {value}
+    </span>
+  );
+}
+
+function SenseBadge({ sense }: { sense: 'max' | 'min' | null }) {
+  if (sense === null) {
+    return (
+      <span className="inline-flex items-center justify-center px-4 py-2 rounded-xl border-2 border-dashed border-border/80 bg-muted/30 text-muted-foreground/60 text-xl font-bold uppercase">
+        ???
+      </span>
+    );
+  }
+  return (
+    <span
+      key={sense}
+      className="inline-flex items-center justify-center px-4 py-2 rounded-xl border-2 border-primary/60 bg-primary/20 text-primary text-xl font-bold uppercase shadow-lg shadow-primary/20 animate-fill-pop"
+    >
+      {sense}
+    </span>
+  );
+}
+
+function OperatorSlot({ op }: { op: '<=' | '>=' | '=' | null }) {
+  if (op === null) {
+    return (
+      <span className="inline-flex items-center justify-center w-12 h-14 rounded-xl border-2 border-dashed border-border/80 bg-muted/30 text-muted-foreground/60 text-2xl font-mono">
+        ?
+      </span>
+    );
+  }
+  const sym = op === '<=' ? '≤' : op === '>=' ? '≥' : '=';
+  return (
+    <span
+      key={op}
+      className="inline-flex items-center justify-center w-12 h-14 rounded-xl border-2 border-primary/60 bg-primary/20 text-primary text-3xl font-bold shadow-lg shadow-primary/20 animate-fill-pop"
+    >
+      {sym}
+    </span>
   );
 }
 
