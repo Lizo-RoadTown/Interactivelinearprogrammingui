@@ -262,7 +262,7 @@ export default function GuidedLearnPage() {
   const isDone = currentIdx >= totalQ;
 
   // Build the partial LP draft + graph-phase state + tableau reveal + pivot history
-  const { draft, linesDrawn, sideDrawnFor, feasibleRevealed, tableauReveal, latestPivot } = useMemo(() => {
+  const { draft, linesDrawn, sideDrawnFor, feasibleRevealed, tableauReveal, latestPivot, sensitivityReveals } = useMemo(() => {
     let d = emptyDraft(problem.numVars, problem.constraints.length);
     const linesSet = new Set<number>();
     const sidesSet = new Set<number>();
@@ -283,6 +283,9 @@ export default function GuidedLearnPage() {
       zValue: number;
       bfs: Record<string, number>;
     } = null;
+    // Phase 6 reveals — each 's-reveal' commit flips one named key on.
+    // Panels read this set to decide which of their "?" slots to fill.
+    const reveals = new Set<string>();
 
     for (let i = 0; i < currentIdx; i++) {
       const q = script.questions[i];
@@ -311,11 +314,13 @@ export default function GuidedLearnPage() {
       if (q.commit.type === 'pivot-applied') {
         latestPiv = q.commit;
       }
+      if (q.commit.type === 's-reveal') reveals.add(q.commit.key);
     }
 
     return {
       draft: d, linesDrawn: linesSet, sideDrawnFor: sidesSet,
       feasibleRevealed: feasible, tableauReveal: tab, latestPivot: latestPiv,
+      sensitivityReveals: reveals,
     };
   }, [currentIdx, answers, fieldsAnswers, script, problem]);
 
@@ -722,34 +727,14 @@ export default function GuidedLearnPage() {
                       draft={sensitivityActive ? liveDraft : draft}
                       vertex={selectedVertex}
                       nDecVars={problem.numVars}
+                      reveals={sensitivityReveals}
                     />
-                    {/* Piece 2: once a vertex is picked, pull basic columns
-                        out of the original constraints to form B. */}
-                    {selectedVertex && (
-                      <BuildBPanel
-                        draft={sensitivityActive ? liveDraft : draft}
-                        vertex={selectedVertex}
-                        nDecVars={problem.numVars}
-                        onBComplete={(B, basisLabels) => setBuiltB({ B, basisLabels })}
-                      />
-                    )}
-                    {selectedVertex && builtB && (
-                      <InverseBPanel
-                        B={builtB.B}
-                        basisLabels={builtB.basisLabels}
-                        onInverseComplete={(Binv) => setBuiltBinv(Binv)}
-                      />
-                    )}
-                    {selectedVertex && builtB && builtBinv && (
-                      <FormulasPanel
-                        draft={sensitivityActive ? liveDraft : draft}
-                        vertex={selectedVertex}
-                        B={builtB.B}
-                        Binv={builtBinv}
-                        basisLabels={builtB.basisLabels}
-                        nDecVars={problem.numVars}
-                      />
-                    )}
+                    {/* Pieces 2-4 (Build B, Invert B, Four formulas) are
+                        pending a gameboard-pedagogy rebuild — removed from
+                        render until rebuilt as earn-each-slot panels.
+                        The components (BuildBPanel, InverseBPanel,
+                        FormulasPanel) still exist in the codebase; they
+                        just aren't rendered here. */}
                   </div>
                 )}
               </div>

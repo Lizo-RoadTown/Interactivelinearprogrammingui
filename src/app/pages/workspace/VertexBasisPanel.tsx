@@ -1,27 +1,34 @@
 /**
- * VertexBasisPanel — shows the algebraic information about the feasible-
- * polygon vertex the student just clicked. This is the bridge between
- * the graph (where the student has built intuition about where vertices
- * are) and the matrix form of the simplex (where each vertex IS a choice
- * of basis).
+ * VertexBasisPanel — the "basis gameboard" for Phase 6.
  *
- * The goal of this panel for Phase 6: make the student see, for a
- * specific clicked vertex, exactly which variables are basic at that
- * corner and WHY. Tight constraints → their slacks are 0 → those slacks
- * are NON-basic. Decision variables on axes (x_i = 0) → those x_i are
- * NON-basic. Everything else in the problem is basic. That set of basic
- * variables is what we'll call B in the next step.
+ * Same pattern as the Phase 3 tableau: start with empty "?" slots and
+ * fill them only when the student has EARNED each reveal by answering
+ * a question correctly. The panel does NOT spoil the answer by showing
+ * the basis as soon as a vertex is clicked.
+ *
+ * What the panel shows at each stage:
+ *   - Before any vertex is clicked: "click a corner to begin".
+ *   - After a vertex is clicked (but no basis revealed yet): the vertex
+ *     coordinates and which constraints are tight / which decision vars
+ *     are on an axis. These are OBSERVATIONS the student can make from
+ *     the graph — they aren't the answer yet.
+ *   - Once a 'basis-identified' reveal key is set for the chosen vertex,
+ *     the Basic / Non-basic lists fill in.
+ *
+ * Reveal key shape: 'basis-{x},{y}' — unique per vertex so the student
+ * has to re-earn the reveal if they jump to a different corner.
  */
 
 import { FeasibleVertex } from './DiscoveryGraph';
 import { LPDraft } from './guidedTypes';
-import { colorFor, colorForFill } from './constraintColors';
+import { colorFor } from './constraintColors';
 
 interface Props {
   draft: LPDraft;
   vertex: FeasibleVertex | null;
-  /** How many decision variables the problem has. */
   nDecVars: number;
+  /** Set of reveal keys that have been earned via correct answers. */
+  reveals: Set<string>;
 }
 
 function fmt(v: number): string {
@@ -30,13 +37,23 @@ function fmt(v: number): string {
   return v.toFixed(2).replace(/\.?0+$/, '');
 }
 
-export default function VertexBasisPanel({ draft, vertex, nDecVars }: Props) {
+function revealKeyFor(vertex: FeasibleVertex): string {
+  return `basis-${Math.round(vertex.x * 100) / 100},${Math.round(vertex.y * 100) / 100}`;
+}
+
+/** Exported so Phase 6 script / answer handlers can form the key when
+ *  committing a reveal for the currently clicked vertex. */
+export function basisRevealKey(x: number, y: number): string {
+  return `basis-${Math.round(x * 100) / 100},${Math.round(y * 100) / 100}`;
+}
+
+export default function VertexBasisPanel({ draft, vertex, nDecVars, reveals }: Props) {
   if (!vertex) {
     return (
       <div className="bg-card/40 border border-dashed border-border/60 rounded-xl p-4 text-center">
         <p className="text-[11px] text-muted-foreground italic">
-          Click any corner of the feasible region on the graph — each corner is
-          a <span className="font-semibold not-italic">basis</span>.
+          Click any corner of the feasible region on the graph — each corner is a
+          {' '}<span className="font-semibold not-italic">basis</span>.
         </p>
       </div>
     );
@@ -46,22 +63,12 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars }: Props) {
   const allDecLabels = Array.from({ length: nDecVars }, (_, i) => `x${i + 1}`);
   const allSlackLabels = Array.from({ length: nConstraints }, (_, i) => `s${i + 1}`);
 
-  // At this vertex:
-  //   - Decision vars listed in zeroDecisionVars are 0 → non-basic
-  //   - Constraints listed in tightConstraints have slack = 0 → those
-  //     slacks are non-basic
-  // Everything else is basic. We also want to show each variable's
-  // value at this vertex for the "tableau RHS" readout.
   const x1 = vertex.x;
   const x2 = vertex.y;
-  const decVarValues = [x1, x2];
-  const slackValues = draft.constraints.map(c => {
-    if (c.rhs == null) return 0;
-    const a = c.coefficients[0] ?? 0;
-    const b = c.coefficients[1] ?? 0;
-    return c.rhs - (a * x1 + b * x2);
-  });
 
+  const isRevealed = reveals.has(revealKeyFor(vertex));
+
+  // Figure out basis / non-basic at this vertex (only used when revealed).
   const nonBasicDecVars = vertex.zeroDecisionVars;
   const nonBasicSlacks = vertex.tightConstraints;
   const basicDecVars = Array.from({ length: nDecVars }, (_, i) => i)
@@ -69,14 +76,25 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars }: Props) {
   const basicSlacks = Array.from({ length: nConstraints }, (_, i) => i)
     .filter(i => !nonBasicSlacks.includes(i));
 
-  const basicLabels = [
-    ...basicDecVars.map(i => ({ label: allDecLabels[i], value: decVarValues[i], color: null as string | null })),
-    ...basicSlacks.map(i => ({ label: allSlackLabels[i], value: slackValues[i], color: colorFor(i) })),
-  ];
-  const nonBasicLabels = [
-    ...nonBasicDecVars.map(i => ({ label: allDecLabels[i], value: 0 as number, color: null as string | null })),
-    ...nonBasicSlacks.map(i => ({ label: allSlackLabels[i], value: 0 as number, color: colorFor(i) })),
-  ];
+  const basicLabels = isRevealed
+    ? [
+        ...basicDecVars.map(i => ({ label: allDecLabels[i], color: null as string | null })),
+        ...basicSlacks.map(i => ({ label: allSlackLabels[i], color: colorFor(i) })),
+      ]
+    : null;
+  const nonBasicLabels = isRevealed
+    ? [
+        ...nonBasicDecVars.map(i => ({ label: allDecLabels[i], color: null as string | null })),
+        ...nonBasicSlacks.map(i => ({ label: allSlackLabels[i], color: colorFor(i) })),
+      ]
+    : null;
+
+  // Number of slots to show as "?" when not revealed. The basis has size
+  // equal to the number of constraints; so does the non-basic set's size
+  // relative to total vars.
+  const basisSize = nConstraints;
+  const totalVars = nDecVars + nConstraints;
+  const nonBasicSize = totalVars - basisSize;
 
   return (
     <div className="bg-card/40 border-2 border-orange-400/50 rounded-xl p-4 space-y-3 animate-fill-pop">
@@ -89,24 +107,21 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars }: Props) {
         </p>
       </div>
 
-      {/* Which constraints are tight here — the "why" behind the basis */}
+      {/* Observations the student can make directly from the graph — these
+          are cues, not answers. The basis below still needs to be earned. */}
       <div>
-        <p className="text-[10px] text-muted-foreground mb-1">At this corner…</p>
+        <p className="text-[10px] text-muted-foreground mb-1">At this corner you can see…</p>
         <ul className="text-[11px] space-y-1">
           {vertex.tightConstraints.map(i => {
             const c = draft.constraints[i];
             const color = colorFor(i);
             return (
               <li key={`tight-${i}`} className="flex items-center gap-2">
-                <span
-                  className="inline-block w-2 h-2 rounded-full"
-                  style={{ backgroundColor: color }}
-                />
+                <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
                 <span>
                   <span className="font-semibold" style={{ color }}>C{i + 1}</span>
                   {c?.label && <span className="text-muted-foreground"> ({c.label})</span>}
-                  {' '}is <span className="font-semibold text-foreground">tight</span> →
-                  its slack <span className="font-mono font-semibold" style={{ color }}>s{i + 1}</span> = 0
+                  {' '}is tight (the point is ON that line)
                 </span>
               </li>
             );
@@ -116,33 +131,39 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars }: Props) {
               <span className="inline-block w-2 h-2 rounded-full bg-primary" />
               <span>
                 <span className="font-mono font-semibold text-primary">x{i + 1}</span>
-                {' '}is on its axis → <span className="font-mono font-semibold text-primary">x{i + 1}</span> = 0
+                {' '}= 0 (the point is on its axis)
               </span>
             </li>
           ))}
         </ul>
       </div>
 
-      {/* Basic vs Non-basic split — the whole point of the panel */}
+      {/* Basic vs Non-basic split — slots are "?" until revealed */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/40">
         <div>
           <p className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold mb-1.5">
             Basic (in solution)
           </p>
           <div className="space-y-1">
-            {basicLabels.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground italic">(none)</p>
-            ) : basicLabels.map(({ label, value, color }) => (
-              <div
-                key={label}
-                className="flex items-center justify-between px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/40 font-mono text-xs"
-              >
-                <span style={color ? { color } : { color: 'rgb(16, 185, 129)' }} className="font-semibold">
-                  {label}
-                </span>
-                <span className="text-foreground tabular-nums">= {fmt(value)}</span>
-              </div>
-            ))}
+            {basicLabels
+              ? basicLabels.map(({ label, color }) => (
+                  <div
+                    key={label}
+                    className="flex items-center px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/40 font-mono text-xs animate-fill-pop"
+                  >
+                    <span style={color ? { color } : { color: 'rgb(16, 185, 129)' }} className="font-semibold">
+                      {label}
+                    </span>
+                  </div>
+                ))
+              : Array.from({ length: basisSize }, (_, i) => (
+                  <div
+                    key={`unk-${i}`}
+                    className="flex items-center justify-center px-2 py-1 rounded bg-muted/20 border-2 border-dashed border-border/60 font-mono text-xs text-muted-foreground/50"
+                  >
+                    ?
+                  </div>
+                ))}
           </div>
         </div>
         <div>
@@ -150,31 +171,35 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars }: Props) {
             Non-basic (= 0)
           </p>
           <div className="space-y-1">
-            {nonBasicLabels.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground italic">(none)</p>
-            ) : nonBasicLabels.map(({ label, color }) => (
-              <div
-                key={label}
-                className="flex items-center justify-between px-2 py-1 rounded bg-muted/40 border border-border font-mono text-xs"
-                style={color ? { borderColor: colorForFill(Number(label.slice(1)) - 1, 0.35) } : undefined}
-              >
-                <span style={color ? { color } : undefined} className="font-semibold text-muted-foreground">
-                  {label}
-                </span>
-                <span className="text-muted-foreground tabular-nums">= 0</span>
-              </div>
-            ))}
+            {nonBasicLabels
+              ? nonBasicLabels.map(({ label, color }) => (
+                  <div
+                    key={label}
+                    className="flex items-center px-2 py-1 rounded bg-muted/40 border border-border font-mono text-xs animate-fill-pop"
+                  >
+                    <span style={color ? { color } : undefined} className="font-semibold text-muted-foreground">
+                      {label}
+                    </span>
+                  </div>
+                ))
+              : Array.from({ length: nonBasicSize }, (_, i) => (
+                  <div
+                    key={`unk-${i}`}
+                    className="flex items-center justify-center px-2 py-1 rounded bg-muted/20 border-2 border-dashed border-border/60 font-mono text-xs text-muted-foreground/50"
+                  >
+                    ?
+                  </div>
+                ))}
           </div>
         </div>
       </div>
 
-      <p className="text-[10px] text-muted-foreground/80 italic leading-relaxed">
-        The <span className="font-semibold not-italic">basis</span> is the set of variables
-        {' '}that are &gt; 0 at this corner. Choosing a basis = choosing a vertex. In the
-        {' '}next step we&apos;ll pull the matching columns out of the original problem to
-        {' '}form the matrix <span className="font-mono font-semibold">B</span> — that matrix
-        {' '}is what the whole sensitivity chapter is built on.
-      </p>
+      {!isRevealed && (
+        <p className="text-[10px] text-muted-foreground/80 italic leading-relaxed">
+          The slots will fill in once you identify the basis. Use the clues above —
+          which variables must be 0 here (non-basic) and which are &gt; 0 (basic)?
+        </p>
+      )}
     </div>
   );
 }

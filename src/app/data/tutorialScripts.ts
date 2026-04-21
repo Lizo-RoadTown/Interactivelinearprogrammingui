@@ -191,6 +191,11 @@ export type CommitPayload =
       zValue: number;                                      // new z* so far
       bfs: Record<string, number>;                         // new BFS point, e.g. {x1: 0, x2: 20}
     }
+  // Phase 6 — sensitivity gameboard reveals. Each correct answer in the
+  // sensitivity walkthrough commits a reveal-key that unlocks one cell of
+  // the corresponding gameboard panel (basis list / B / B⁻¹ / formulas).
+  // Same mechanic as the Phase 3 tableau: "?" slots wait until earned.
+  | { type: 's-reveal'; key: string }
   | { type: 'note'; text: string };  // free-form annotation on the canvas
 
 /**
@@ -838,6 +843,30 @@ const TOY_FACTORY_PHASE6: Question[] = [
     correctId: 'per-unit',
     hint: 'Shadow price = marginal value of a resource. One more hour of assembly is worth $3.75 in extra profit (within the allowable range).',
     commit: { type: 'note', text: 'shadow-price-understood' },
+  },
+
+  // ── Piece 1: earn the basis at the optimum vertex ─────────────────────
+  // The student clicks the vertex themselves (on the graph). The panel
+  // that appears shows clues — which constraints are tight, which
+  // decision vars sit on an axis — but leaves the Basic / Non-basic
+  // slots as "?" until they EARN the reveal by answering this question.
+  {
+    kind: 'mc',
+    id: 'toy-s-basis-optimum',
+    phase: 6,
+    prompt: 'PRINCIPLE: every corner of the feasible region IS a basis. CLICK the optimum vertex (10, 15) on the graph — dots appeared at every corner. Then look at the Vertex Basis panel below the graph: it shows the clues (which constraints are tight, which decision vars are on an axis) but the Basic/Non-basic slots are still empty. Using those clues, which two variables are BASIC at (10, 15)?',
+    options: [
+      { id: 'x1-x2', label: '{ x₁, x₂ } — both constraints are tight, so s₁ = s₂ = 0 (non-basic), leaving x₁ and x₂ basic' },
+      { id: 's1-s2', label: '{ s₁, s₂ }' },
+      { id: 'x1-s1', label: '{ x₁, s₁ }' },
+      { id: 'x2-s2', label: '{ x₂, s₂ }' },
+    ],
+    correctId: 'x1-x2',
+    hint: 'Tight constraint → slack = 0 → slack is non-basic. Both constraints are tight at (10, 15), so s₁ and s₂ are non-basic. That leaves x₁ and x₂ as the basis.',
+    // Reveal keyed to the optimum vertex coordinates — the basis panel
+    // only fills in its slots when this key is set AND the student has
+    // that exact vertex clicked.
+    commit: { type: 's-reveal', key: 'basis-10,15' },
   },
 ];
 
