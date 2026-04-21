@@ -24,6 +24,17 @@ export interface TableauReveal {
 interface Props {
   draft: LPDraft;
   reveal: TableauReveal;
+  /**
+   * Optional live override: the current post-pivot tableau state. When set,
+   * GuidedTableau renders this matrix + basis instead of computing the initial
+   * tableau from the LPDraft. Used after Phase 4 pivots.
+   */
+  override?: {
+    matrix: number[][];
+    basis: string[];
+    /** Most recent pivot to pulse-highlight: { row, col } in the matrix. */
+    highlightPivot?: { row: number; col: number };
+  };
 }
 
 function fmt(v: number): string {
@@ -32,7 +43,7 @@ function fmt(v: number): string {
   return v.toFixed(2).replace(/\.?0+$/, '');
 }
 
-export default function GuidedTableau({ draft, reveal }: Props) {
+export default function GuidedTableau({ draft, reveal, override }: Props) {
   const nDecVars = draft.variables.length || 2;
   const nSlacks = reveal.slacksAdded ? draft.constraints.length : 0;
   const nConstraints = draft.constraints.length;
@@ -42,13 +53,20 @@ export default function GuidedTableau({ draft, reveal }: Props) {
   const slackLabels = Array.from({ length: nSlacks }, (_, i) => `s${i + 1}`);
   const allLabels = [...decVarLabels, ...slackLabels];
 
-  // Basis labels for each constraint row (initial basis = slack variables)
-  const basisLabels = Array.from({ length: nConstraints }, (_, i) =>
-    reveal.slacksAdded ? `s${i + 1}` : '?'
-  );
+  // Basis labels for each constraint row — slacks initially, or override from a pivot
+  const basisLabels = override
+    ? override.basis
+    : Array.from({ length: nConstraints }, (_, i) => (reveal.slacksAdded ? `s${i + 1}` : '?'));
 
   /** Get the value in row r, col c (or null if not yet revealed). */
   const cellValue = (r: number, c: number): number | null => {
+    // If a post-pivot override is set, render that matrix directly.
+    if (override) {
+      const row = override.matrix[r];
+      if (!row) return null;
+      const v = row[c];
+      return v == null ? null : v;
+    }
     if (r < nConstraints) {
       // Constraint row
       if (c < nDecVars) {

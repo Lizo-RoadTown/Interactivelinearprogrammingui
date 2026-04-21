@@ -199,8 +199,8 @@ export default function GuidedLearnPage() {
   const totalQ = script.questions.length;
   const isDone = currentIdx >= totalQ;
 
-  // Build the partial LP draft + graph-phase state + tableau reveal from all correct commits
-  const { draft, linesDrawn, sideDrawnFor, feasibleRevealed, tableauReveal } = useMemo(() => {
+  // Build the partial LP draft + graph-phase state + tableau reveal + pivot history
+  const { draft, linesDrawn, sideDrawnFor, feasibleRevealed, tableauReveal, latestPivot } = useMemo(() => {
     let d = emptyDraft(problem.numVars, problem.constraints.length);
     const linesSet = new Set<number>();
     const sidesSet = new Set<number>();
@@ -212,6 +212,15 @@ export default function GuidedLearnPage() {
       initialBasicValuesRevealed: false,
       initialZRevealed: false,
     };
+    let latestPiv: null | {
+      pivotNumber: number;
+      entering: string;
+      leaving: string;
+      matrix: number[][];
+      basis: string[];
+      zValue: number;
+      bfs: Record<string, number>;
+    } = null;
 
     for (let i = 0; i < currentIdx; i++) {
       const q = script.questions[i];
@@ -236,9 +245,16 @@ export default function GuidedLearnPage() {
       if (q.commit.type === 'z-row-x-revealed')            tab.zRowXRevealed = true;
       if (q.commit.type === 'initial-basic-values-revealed') tab.initialBasicValuesRevealed = true;
       if (q.commit.type === 'initial-z-revealed')          tab.initialZRevealed = true;
+      // Track pivots — keep only the latest for rendering
+      if (q.commit.type === 'pivot-applied') {
+        latestPiv = q.commit;
+      }
     }
 
-    return { draft: d, linesDrawn: linesSet, sideDrawnFor: sidesSet, feasibleRevealed: feasible, tableauReveal: tab };
+    return {
+      draft: d, linesDrawn: linesSet, sideDrawnFor: sidesSet,
+      feasibleRevealed: feasible, tableauReveal: tab, latestPivot: latestPiv,
+    };
   }, [currentIdx, answers, fieldsAnswers, script, problem]);
 
   // Whether the graph should be visible at all (any line drawn yet)
@@ -418,9 +434,9 @@ export default function GuidedLearnPage() {
                       linesDrawn={linesDrawn}
                       sideDrawnFor={sideDrawnFor}
                       feasibleRegionRevealed={feasibleRevealed}
-                      objectiveZ={sliderZ}
-                      optimumConfirmed={!!optimumCommit}
-                      optimumTarget={optimumCommit?.zValue ?? currentDragTarget}
+                      objectiveZ={latestPivot ? latestPivot.zValue : sliderZ}
+                      optimumConfirmed={!!optimumCommit || !!latestPivot}
+                      optimumTarget={latestPivot?.zValue ?? optimumCommit?.zValue ?? currentDragTarget}
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground italic p-6 text-center">
@@ -435,10 +451,18 @@ export default function GuidedLearnPage() {
             {tableauReveal.slacksAdded && (
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
-                  Your initial tableau — fills in as you answer
+                  {latestPivot
+                    ? `Your tableau — after pivot ${latestPivot.pivotNumber} (z = ${latestPivot.zValue})`
+                    : 'Your initial tableau — fills in as you answer'}
                 </p>
                 <div className="bg-card/40 border border-border rounded-xl p-3">
-                  <GuidedTableau draft={draft} reveal={tableauReveal} />
+                  <GuidedTableau
+                    draft={draft}
+                    reveal={tableauReveal}
+                    override={latestPivot
+                      ? { matrix: latestPivot.matrix, basis: latestPivot.basis }
+                      : undefined}
+                  />
                 </div>
               </div>
             )}

@@ -118,6 +118,17 @@ export type CommitPayload =
   | { type: 'z-row-x-revealed' }                          // fill in Z-row decision var coefficients
   | { type: 'initial-basic-values-revealed' }             // fill in RHS column values for the basis
   | { type: 'initial-z-revealed' }                        // fill in Z-row RHS (0 at initial BFS)
+  // Phase 4 — simplex pivots (full post-pivot tableau carried in the commit)
+  | {
+      type: 'pivot-applied';
+      pivotNumber: number;                                 // 1-indexed
+      entering: string;
+      leaving: string;
+      matrix: number[][];                                  // (m+1) × (n+1) post-pivot
+      basis: string[];                                     // length m
+      zValue: number;                                      // new z* so far
+      bfs: Record<string, number>;                         // new BFS point, e.g. {x1: 0, x2: 20}
+    }
   | { type: 'note'; text: string };  // free-form annotation on the canvas
 
 export interface TutorialScript {
@@ -512,6 +523,172 @@ const TOY_FACTORY_PHASE3: Question[] = [
   },
 ];
 
+// ── Toy Factory — Phase 4: simplex pivots ───────────────────────────────────
+//
+// Two pivots take the student from z=0 (origin BFS) to z=450 at (10, 15).
+// Hard-coded post-pivot states in commit payloads; for a second example
+// problem the backend solver will provide them.
+
+// Pivot 1 result: x₂ enters, s₁ leaves.
+//   Tableau becomes:
+//     x₂ | 0.5  1    0.25  0    | 20
+//     s₂ | 2    0   -0.5   1    | 20
+//     z  | -5   0    5     0    | 400
+const PIVOT1_MATRIX: number[][] = [
+  [0.5,  1,  0.25,  0,  20],
+  [2,    0, -0.5,   1,  20],
+  [-5,   0,  5,     0,  400],
+];
+const PIVOT1_BASIS = ['x2', 's2'];
+
+// Pivot 2 result: x₁ enters, s₂ leaves.
+//   Tableau becomes:
+//     x₂ | 0  1  0.375  -0.25 | 15
+//     x₁ | 1  0 -0.25    0.5  | 10
+//     z  | 0  0  3.75    2.5  | 450
+const PIVOT2_MATRIX: number[][] = [
+  [0,  1,  0.375, -0.25, 15],
+  [1,  0, -0.25,   0.5,  10],
+  [0,  0,  3.75,   2.5,  450],
+];
+const PIVOT2_BASIS = ['x2', 'x1'];
+
+const TOY_FACTORY_PHASE4: Question[] = [
+
+  // ── Pivot 1: choose entering variable ────────────────────────────────────
+  {
+    kind: 'mc',
+    id: 'toy-p1-entering',
+    phase: 4,
+    prompt: 'The Z-row is (−15, −20, 0, 0). For MAX, we pick the MOST negative value — that variable improves z the fastest. Which variable enters the basis?',
+    options: [
+      { id: 'x1', label: 'x₁ (Z-row value: −15)' },
+      { id: 'x2', label: 'x₂ (Z-row value: −20)' },
+      { id: 's1', label: 's₁ (Z-row value: 0)' },
+      { id: 's2', label: 's₂ (Z-row value: 0)' },
+    ],
+    correctId: 'x2',
+    hint: 'Compare −15 and −20. Which is SMALLER (most negative)? That\'s the entering variable — it gives the biggest increase in z per unit.',
+    commit: { type: 'note', text: 'p1-entering-picked' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-p1-ratio1',
+    phase: 4,
+    prompt: 'Ratio test: divide each positive entry in the x₂ column into its RHS. Row s₁ has x₂ coefficient 4 and RHS 80. What\'s 80 / 4?',
+    placeholder: 'e.g. 20',
+    correct: 20,
+    hint: '80 ÷ 4 = ?',
+    commit: { type: 'note', text: 'p1-ratio1' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-p1-ratio2',
+    phase: 4,
+    prompt: 'Row s₂ has x₂ coefficient 2 and RHS 60. What\'s 60 / 2?',
+    placeholder: 'e.g. 30',
+    correct: 30,
+    hint: '60 ÷ 2 = ?',
+    commit: { type: 'note', text: 'p1-ratio2' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-p1-leaving',
+    phase: 4,
+    prompt: 'The ratio test picks the SMALLEST non-negative ratio — that\'s the constraint that binds first as x₂ increases. Which row wins? (Row s₁: 20, Row s₂: 30)',
+    options: [
+      { id: 's1', label: 'Row s₁ leaves (ratio 20 — smaller)' },
+      { id: 's2', label: 'Row s₂ leaves (ratio 30)' },
+    ],
+    correctId: 's1',
+    hint: 'Smaller ratio wins: 20 < 30. That means s₁ leaves the basis and x₂ takes its place.',
+    commit: {
+      type: 'pivot-applied',
+      pivotNumber: 1,
+      entering: 'x2',
+      leaving: 's1',
+      matrix: PIVOT1_MATRIX,
+      basis: PIVOT1_BASIS,
+      zValue: 400,
+      bfs: { x1: 0, x2: 20 },
+    },
+  },
+
+  // ── Pivot 2: the Z-row still has a negative entry (x₁ = −5) ──────────────
+  {
+    kind: 'mc',
+    id: 'toy-p2-entering',
+    phase: 4,
+    prompt: 'Look at the new Z-row: (−5, 0, 5, 0). Is x₂ still negative? No — it\'s 0 now. But x₁ is still −5, so z can still improve. Which variable enters next?',
+    options: [
+      { id: 'x1', label: 'x₁ (Z-row value: −5)' },
+      { id: 'x2', label: 'x₂ (already basic; Z-row value is 0)' },
+      { id: 's1', label: 's₁ (Z-row value: 5 — positive, so no improvement)' },
+      { id: 's2', label: 's₂ (Z-row value: 0)' },
+    ],
+    correctId: 'x1',
+    hint: 'We pick the variable with a negative Z-row entry. Only x₁ has one (−5).',
+    commit: { type: 'note', text: 'p2-entering-picked' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-p2-ratio1',
+    phase: 4,
+    prompt: 'Ratio test for x₁ column. Row x₂ has x₁ coefficient 0.5 and RHS 20. What\'s 20 / 0.5?',
+    placeholder: 'e.g. 40',
+    correct: 40,
+    hint: '20 ÷ 0.5 = ?',
+    commit: { type: 'note', text: 'p2-ratio1' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-p2-ratio2',
+    phase: 4,
+    prompt: 'Row s₂ has x₁ coefficient 2 and RHS 20. What\'s 20 / 2?',
+    placeholder: 'e.g. 10',
+    correct: 10,
+    hint: '20 ÷ 2 = ?',
+    commit: { type: 'note', text: 'p2-ratio2' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-p2-leaving',
+    phase: 4,
+    prompt: 'Ratios: x₂ row has 40, s₂ row has 10. Which row leaves?',
+    options: [
+      { id: 'x2', label: 'Row x₂ leaves (ratio 40)' },
+      { id: 's2', label: 'Row s₂ leaves (ratio 10 — smaller)' },
+    ],
+    correctId: 's2',
+    hint: '10 < 40, so s₂ leaves. x₁ takes its place in the basis.',
+    commit: {
+      type: 'pivot-applied',
+      pivotNumber: 2,
+      entering: 'x1',
+      leaving: 's2',
+      matrix: PIVOT2_MATRIX,
+      basis: PIVOT2_BASIS,
+      zValue: 450,
+      bfs: { x1: 10, x2: 15 },
+    },
+  },
+
+  // ── Optimal check ────────────────────────────────────────────────────────
+  {
+    kind: 'mc',
+    id: 'toy-p-optimal',
+    phase: 4,
+    prompt: 'New Z-row is (0, 0, 3.75, 2.5). Are there ANY negative values left?',
+    options: [
+      { id: 'no',  label: 'No — every Z-row entry is ≥ 0. We\'re OPTIMAL.' },
+      { id: 'yes', label: 'Yes, there are still negative entries' },
+    ],
+    correctId: 'no',
+    hint: 'Check each Z-row value: 0 ≥ 0, 0 ≥ 0, 3.75 ≥ 0, 2.5 ≥ 0. All non-negative → no improvement possible → optimal.',
+    commit: { type: 'note', text: 'optimal-recognized' },
+  },
+];
+
 export const TOY_FACTORY_SCRIPT: TutorialScript = {
   id: 'script-toy-factory-v1',
   problemId: 'wp-toy-factory',
@@ -520,6 +697,7 @@ export const TOY_FACTORY_SCRIPT: TutorialScript = {
     ...TOY_FACTORY_PHASE1,
     ...TOY_FACTORY_PHASE2,
     ...TOY_FACTORY_PHASE3,
+    ...TOY_FACTORY_PHASE4,
   ],
 };
 
