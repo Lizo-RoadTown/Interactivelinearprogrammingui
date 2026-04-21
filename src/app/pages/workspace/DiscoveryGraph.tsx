@@ -24,6 +24,12 @@ interface Props {
   sideDrawnFor: Set<number>;
   /** Whether the final feasible intersection has been revealed. */
   feasibleRegionRevealed: boolean;
+  /** Live objective-line z value during the drag-to-discover phase. null hides the line. */
+  objectiveZ?: number | null;
+  /** Whether the student has confirmed the optimum (show optimum marker). */
+  optimumConfirmed?: boolean;
+  /** Target optimum value (to place the marker). */
+  optimumTarget?: number;
 }
 
 const CONSTRAINT_COLORS = ['#f43f5e', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
@@ -34,6 +40,7 @@ const PAD = 40;
 
 export default function DiscoveryGraph({
   draft, linesDrawn, sideDrawnFor, feasibleRegionRevealed,
+  objectiveZ, optimumConfirmed, optimumTarget,
 }: Props) {
   // Work out the axis extents from whatever constraints have coefficients +
   // RHS set so far. Fall back to a 0..20 window if nothing yet.
@@ -250,6 +257,134 @@ export default function DiscoveryGraph({
           </g>
         );
       })}
+
+      {/* Objective line (interactive) — parallel-shift as the student drags z */}
+      {typeof objectiveZ === 'number' && draft.objectiveCoefficients[0] != null && draft.objectiveCoefficients[1] != null && (() => {
+        const c1 = draft.objectiveCoefficients[0] as number;
+        const c2 = draft.objectiveCoefficients[1] as number;
+        // Line: c1·x1 + c2·x2 = z. Find endpoints within viewport.
+        // Point 1: at x1 = 0 → x2 = z/c2.  Point 2: at x2 = 0 → x1 = z/c1.
+        // If either is outside the viewport, clip to x1 = maxX or x2 = maxY.
+        const p1 = { x: 0, y: c2 !== 0 ? objectiveZ / c2 : 0 };
+        const p2 = { x: c1 !== 0 ? objectiveZ / c1 : 0, y: 0 };
+        // A second render at x1 = maxX (for lines that extend past the viewport)
+        const p3 = { x: maxX, y: c2 !== 0 ? (objectiveZ - c1 * maxX) / c2 : 0 };
+        const p4 = { x: c1 !== 0 ? (objectiveZ - c2 * maxY) / c1 : 0, y: maxY };
+
+        // Use the pair that's most inside the viewport
+        const candidates = [p1, p2, p3, p4].filter(p =>
+          p.x >= -0.01 && p.x <= maxX + 0.01 &&
+          p.y >= -0.01 && p.y <= maxY + 0.01
+        );
+        if (candidates.length < 2) return null;
+        // Pick two endpoints farthest apart
+        let best: [typeof candidates[0], typeof candidates[0]] | null = null;
+        let bestD = -1;
+        for (let i = 0; i < candidates.length; i++) {
+          for (let j = i + 1; j < candidates.length; j++) {
+            const d = Math.hypot(candidates[i].x - candidates[j].x, candidates[i].y - candidates[j].y);
+            if (d > bestD) { bestD = d; best = [candidates[i], candidates[j]]; }
+          }
+        }
+        if (!best) return null;
+
+        // Is any feasible point at or above this z? For now just use the
+        // optimumTarget heuristic: if student is within tolerance, tint green;
+        // past target (outside feasible), tint red.
+        const lineIsInFeasible = optimumTarget != null
+          ? objectiveZ <= optimumTarget + 1
+          : true;
+        const strokeColor = lineIsInFeasible ? '#fb923c' : '#ef4444';
+
+        return (
+          <g>
+            <line
+              x1={scaleX(best[0].x)} y1={scaleY(best[0].y)}
+              x2={scaleX(best[1].x)} y2={scaleY(best[1].y)}
+              stroke={strokeColor} strokeWidth="3" strokeDasharray="8,4"
+              strokeLinecap="round"
+            />
+            {/* z label floating near the line */}
+            <rect
+              x={scaleX((best[0].x + best[1].x) / 2) - 26}
+              y={scaleY((best[0].y + best[1].y) / 2) - 12}
+              width="52" height="20" rx="10"
+              fill={strokeColor} fillOpacity="0.95"
+            />
+            <text
+              x={scaleX((best[0].x + best[1].x) / 2)}
+              y={scaleY((best[0].y + best[1].y) / 2) + 3}
+              fontSize="12" fontWeight="700" textAnchor="middle" fill="#ffffff"
+            >
+              z = {Math.round(objectiveZ)}
+            </text>
+          </g>
+        );
+      })()}
+
+      {/* Optimum marker — glowing vertex once confirmed */}
+      {optimumConfirmed && optimumTarget != null && draft.objectiveCoefficients[0] != null && draft.objectiveCoefficients[1] != null && (() => {
+        // Find the optimal vertex analytically: it's at the intersection of
+        // the binding constraints. For Toy Factory, (10, 15). We solve for it
+        // by finding corner points of the feasible polygon at max z.
+        const c1 = draft.objectiveCoefficients[0] as number;
+        const c2 = draft.objectiveCoefficients[1] as number;
+        // Iterate corner candidates: all pairwise intersections of constraint
+        // lines + the axes, filter to feasible ones, pick the one matching target z.
+        const corners: { x: number; y: number }[] = [];
+        const lines = draft.constraints
+          .map(c => ({ a: c.coefficients[0], b: c.coefficients[1], rhs: c.rhs }))
+          .filter(l => l.a != null && l.b != null && l.rhs != null) as { a: number; b: number; rhs: number }[];
+        // Include x1-axis (y=0) and x2-axis (x=0) as boundary "lines"
+        const axisLines = [
+          { a: 0, b: 1, rhs: 0 },  // x2 = 0
+          { a: 1, b: 0, rhs: 0 },  // x1 = 0
+        ];
+        const all = [...lines, ...axisLines];
+        for (let i = 0; i < all.length; i++) {
+          for (let j = i + 1; j < all.length; j++) {
+            const L1 = all[i], L2 = all[j];
+            const det = L1.a * L2.b - L2.a * L1.b;
+            if (Math.abs(det) < 1e-9) continue;
+            const x = (L1.rhs * L2.b - L2.rhs * L1.b) / det;
+            const y = (L1.a * L2.rhs - L2.a * L1.rhs) / det;
+            if (x < -1e-6 || y < -1e-6) continue;
+            // Check feasibility against all constraints
+            const feasible = lines.every(l => l.a * x + l.b * y <= l.rhs + 1e-6);
+            if (feasible) corners.push({ x, y });
+          }
+        }
+        // Pick corner with z closest to target
+        let best: { x: number; y: number } | null = null;
+        let bestDiff = Infinity;
+        for (const c of corners) {
+          const z = c1 * c.x + c2 * c.y;
+          const diff = Math.abs(z - optimumTarget);
+          if (diff < bestDiff) { bestDiff = diff; best = c; }
+        }
+        if (!best) return null;
+
+        return (
+          <g className="animate-fill-pop">
+            <circle cx={scaleX(best.x)} cy={scaleY(best.y)} r="14" fill="#10b981" fillOpacity="0.2" />
+            <circle cx={scaleX(best.x)} cy={scaleY(best.y)} r="7" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
+            <text
+              x={scaleX(best.x) + 14}
+              y={scaleY(best.y) - 10}
+              fontSize="12"
+              fontWeight="700"
+              fill="#10b981"
+            >
+              ({fmt(best.x)}, {fmt(best.y)})  z* = {Math.round(optimumTarget)}
+            </text>
+          </g>
+        );
+      })()}
     </svg>
   );
+}
+
+function fmt(v: number): string {
+  if (Number.isInteger(v)) return String(v);
+  return v.toFixed(1);
 }

@@ -68,7 +68,31 @@ export interface FieldsQuestion {
   commit: CommitPayload;
 }
 
-export type Question = TextQuestion | NumberQuestion | MCQuestion | FieldsQuestion;
+/**
+ * Interactive drag/slider question. The student moves a slider, watches
+ * the graph respond live, and confirms when they think they've found
+ * the target (e.g., the optimum z). Correctness = slider value within
+ * tolerance of target at the moment they hit "Check."
+ */
+export interface DragQuestion {
+  kind: 'drag';
+  id: string;
+  phase: number;
+  prompt: string;
+  /** What the slider controls — currently only 'objective-z' is supported. */
+  knob: 'objective-z';
+  min: number;
+  max: number;
+  step?: number;
+  /** The value the student should settle on. */
+  target: number;
+  /** Absolute tolerance around target. Defaults to 0.5. */
+  tolerance?: number;
+  hint: string;
+  commit: CommitPayload;
+}
+
+export type Question = TextQuestion | NumberQuestion | MCQuestion | FieldsQuestion | DragQuestion;
 
 /**
  * When a question is answered correctly, this commit describes what to
@@ -87,6 +111,7 @@ export type CommitPayload =
   | { type: 'graph-line'; constraintIndex: number }      // reveal the line on the graph
   | { type: 'graph-side'; constraintIndex: number; side: 'below' | 'above' } // reveal which half-plane is feasible
   | { type: 'feasible-region-complete' }                  // all sides set → fill the intersection
+  | { type: 'optimum-found'; zValue: number }             // student discovered the optimum via slider
   | { type: 'note'; text: string };  // free-form annotation on the canvas
 
 export interface TutorialScript {
@@ -359,6 +384,36 @@ const TOY_FACTORY_PHASE2: Question[] = [
     correctId: 'yes',
     hint: '',
     commit: { type: 'feasible-region-complete' },
+  },
+
+  // ── Phase 2b: discover the optimum by dragging the objective line ─────────
+  {
+    kind: 'drag',
+    id: 'toy-g-optimum',
+    phase: 2,
+    prompt: 'Drag the orange line (z = 15x₁ + 20x₂) outward. Push it as FAR as you can while it still touches the blue feasible region. Where can you stop?',
+    knob: 'objective-z',
+    min: 0,
+    max: 600,
+    step: 5,
+    target: 450,
+    tolerance: 7.5,
+    hint: 'Push the line outward (increase z). At some point it will leave the feasible region entirely — stop just before that. That moment is the max.',
+    commit: { type: 'optimum-found', zValue: 450 },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-g-past-optimum',
+    phase: 2,
+    prompt: 'Now push the slider PAST 450 and watch the line. What\'s happening?',
+    options: [
+      { id: 'stays-inside', label: 'The line stays inside the feasible region' },
+      { id: 'leaves', label: 'The line leaves the feasible region — no (x₁, x₂) in the factory constraints can achieve z > 450' },
+      { id: 'region-grows', label: 'The feasible region grows to accommodate the higher z' },
+    ],
+    correctId: 'leaves',
+    hint: 'Take another look at the graph as you slide past 450. The orange line moves OUTWARD, but the feasible region (blue) stays put. If the line is entirely outside the blue, there\'s no feasible solution at that z.',
+    commit: { type: 'note', text: 'understood-why-450-is-max' },
   },
 ];
 

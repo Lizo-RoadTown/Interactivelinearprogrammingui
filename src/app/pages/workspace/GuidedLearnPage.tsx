@@ -18,7 +18,7 @@ import { useNavigate, useParams } from 'react-router';
 import { Button } from '../../components/ui/button';
 import { WORD_PROBLEMS } from '../../data/wordProblems';
 import {
-  getScript, Question, TextQuestion, NumberQuestion, MCQuestion, FieldsQuestion,
+  getScript, Question, TextQuestion, NumberQuestion, MCQuestion, FieldsQuestion, DragQuestion,
   CommitPayload,
 } from '../../data/tutorialScripts';
 import DiscoveryGraph from './DiscoveryGraph';
@@ -88,6 +88,12 @@ function gradeFieldsAnswer(q: FieldsQuestion, values: Record<string, string>): b
     const tol = f.tolerance ?? 1e-6;
     return Math.abs(n - f.correct) <= tol;
   });
+}
+
+function gradeDragAnswer(q: DragQuestion, value: number | null): boolean {
+  if (value == null || !Number.isFinite(value)) return false;
+  const tol = q.tolerance ?? 0.5;
+  return Math.abs(value - q.target) <= tol;
 }
 
 // ── Commit → LP view reducer ────────────────────────────────────────────────
@@ -166,6 +172,8 @@ export default function GuidedLearnPage() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<AnswerState>({});
   const [fieldsAnswers, setFieldsAnswers] = useState<Record<string, Record<string, string>>>({});
+  /** Live slider z value during a DragQuestion, feeds into the graph. */
+  const [sliderZ, setSliderZ] = useState<number | null>(null);
 
   // Per-render warm phrase seed so feedback text varies a bit between wrongs
   const wrongSeedRef = useRef(0);
@@ -221,6 +229,32 @@ export default function GuidedLearnPage() {
 
   // Whether the graph should be visible at all (any line drawn yet)
   const anyGraphContent = linesDrawn.size > 0 || sideDrawnFor.size > 0 || feasibleRevealed;
+
+  // Has the optimum been found (a commit of type 'optimum-found' in the history)?
+  const optimumCommit = useMemo(() => {
+    for (let i = 0; i < currentIdx; i++) {
+      const q = script.questions[i];
+      const ans = answers[q.id];
+      if (!(ans?.correct || ans?.shownAnswer)) continue;
+      if (q.commit.type === 'optimum-found') return q.commit;
+    }
+    return null;
+  }, [currentIdx, answers, script]);
+
+  // Is the CURRENT question a drag/objective one? If so, feed sliderZ to graph.
+  const currentQ_pre = script.questions[currentIdx];
+  const isCurrentDrag = currentQ_pre?.kind === 'drag';
+  const currentDragTarget = isCurrentDrag ? (currentQ_pre as DragQuestion).target : undefined;
+
+  // Reset slider when arriving at a new drag question
+  useEffect(() => {
+    if (isCurrentDrag) {
+      setSliderZ((currentQ_pre as DragQuestion).min);
+    } else {
+      setSliderZ(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQ_pre?.id]);
 
   // Handlers
   const handleAnswer = (q: Question, ok: boolean, studentAnswer: unknown) => {
@@ -332,6 +366,8 @@ export default function GuidedLearnPage() {
                 onShowMe={handleShowMe}
                 fieldsAnswer={fieldsAnswers[currentQ.id] ?? {}}
                 setFieldsAnswer={(v) => setFieldsAnswers(prev => ({ ...prev, [currentQ.id]: v }))}
+                sliderZ={sliderZ}
+                setSliderZ={setSliderZ}
                 wrongPrefix={pickWarm(WARM_PREFIXES_WRONG, wrongSeedRef.current)}
                 correctPrefix={pickWarm(WARM_PREFIXES_CORRECT, correctSeedRef.current)}
               />
@@ -380,6 +416,9 @@ export default function GuidedLearnPage() {
                       linesDrawn={linesDrawn}
                       sideDrawnFor={sideDrawnFor}
                       feasibleRegionRevealed={feasibleRevealed}
+                      objectiveZ={sliderZ}
+                      optimumConfirmed={!!optimumCommit}
+                      optimumTarget={optimumCommit?.zValue ?? currentDragTarget}
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground italic p-6 text-center">
@@ -400,6 +439,7 @@ export default function GuidedLearnPage() {
 
 function QuestionCard({
   q, answerState, onAnswer, onShowMe, fieldsAnswer, setFieldsAnswer,
+  sliderZ, setSliderZ,
   wrongPrefix, correctPrefix,
 }: {
   q: Question;
@@ -408,6 +448,8 @@ function QuestionCard({
   onShowMe: (q: Question) => void;
   fieldsAnswer: Record<string, string>;
   setFieldsAnswer: (v: Record<string, string>) => void;
+  sliderZ: number | null;
+  setSliderZ: (v: number) => void;
   wrongPrefix: string;
   correctPrefix: string;
 }) {
@@ -480,6 +522,19 @@ function QuestionCard({
           onSubmit={() => {
             const ok = gradeFieldsAnswer(q as FieldsQuestion, fieldsAnswer);
             onAnswer(q, ok, { ...fieldsAnswer });
+          }}
+          disabled={justAnswered}
+        />
+      )}
+
+      {q.kind === 'drag' && (
+        <DragInput
+          q={q as DragQuestion}
+          value={sliderZ}
+          onChange={setSliderZ}
+          onSubmit={() => {
+            const ok = gradeDragAnswer(q as DragQuestion, sliderZ);
+            onAnswer(q, ok, sliderZ);
           }}
           disabled={justAnswered}
         />
@@ -625,6 +680,57 @@ function FieldsInput({
       >
         Check
       </Button>
+    </div>
+  );
+}
+
+function DragInput({
+  q, value, onChange, onSubmit, disabled,
+}: {
+  q: DragQuestion;
+  value: number | null;
+  onChange: (v: number) => void;
+  onSubmit: () => void;
+  disabled?: boolean;
+}) {
+  const v = value ?? q.min;
+  const step = q.step ?? 1;
+  const inTolerance = Math.abs(v - q.target) <= (q.tolerance ?? 0.5);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted-foreground tabular-nums">z = {q.min}</span>
+        <input
+          type="range"
+          aria-label="Objective value z"
+          title="Drag to change z — the objective line moves in the graph as you slide"
+          min={q.min}
+          max={q.max}
+          step={step}
+          value={v}
+          onChange={(e) => onChange(Number(e.target.value))}
+          disabled={disabled}
+          className="flex-1 h-6 accent-orange-500 cursor-pointer"
+        />
+        <span className="text-xs text-muted-foreground tabular-nums">{q.max}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="bg-muted/40 border border-border rounded-lg px-3 py-1.5 font-mono">
+          <span className="text-[10px] text-muted-foreground uppercase">current</span>{' '}
+          <span className={`text-xl font-bold tabular-nums ${inTolerance ? 'text-emerald-300' : 'text-orange-300'}`}>
+            z = {Math.round(v)}
+          </span>
+        </div>
+        <Button
+          onClick={onSubmit}
+          disabled={disabled}
+          className={inTolerance
+            ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+            : 'bg-primary hover:bg-primary/90 text-white'}
+        >
+          {inTolerance ? "I think this is the max" : 'Check this value'}
+        </Button>
+      </div>
     </div>
   );
 }
