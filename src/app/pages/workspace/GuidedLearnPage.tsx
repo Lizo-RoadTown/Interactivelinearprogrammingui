@@ -23,7 +23,7 @@ import {
 } from '../../data/tutorialScripts';
 import DiscoveryGraph from './DiscoveryGraph';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
-import ConstraintMeters from './ConstraintMeters';
+import ConstraintMeter from './ConstraintMeters';
 import { LPDraft } from './guidedTypes';
 import {
   ArrowLeft, CheckCircle, Lightbulb, Eye, Sparkles,
@@ -328,7 +328,6 @@ export default function GuidedLearnPage() {
   // the current question on the left.
   const canvasPanelRef = useRef<HTMLDivElement | null>(null);
   const graphPanelRef = useRef<HTMLDivElement | null>(null);
-  const metersPanelRef = useRef<HTMLDivElement | null>(null);
   const tableauPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -346,17 +345,18 @@ export default function GuidedLearnPage() {
       if (phase === 2) return graphPanelRef.current ?? canvasPanelRef.current;
       if (phase === 3) {
         // The first Phase 3 questions (slack concept, ownership, identity)
-        // are reasoning about the CAPACITY METERS; the tableau fill-in
-        // questions that follow point at the tableau itself.
-        const metersFirst =
+        // are about the CONSTRAINT EQUATIONS now being transformed in
+        // place in the formulation canvas (where the inline meters live).
+        // Tableau-fill questions after that point at the tableau itself.
+        const canvasFirst =
           commitType === 'slacks-added' ||
           commitType === 'slack-identity-revealed' ||
           noteText === 'know-to-add-slacks' ||
           noteText === 'slack-ownership-understood';
-        if (metersFirst) {
-          return metersPanelRef.current ?? tableauPanelRef.current ?? graphPanelRef.current;
+        if (canvasFirst) {
+          return canvasPanelRef.current ?? tableauPanelRef.current ?? graphPanelRef.current;
         }
-        return tableauPanelRef.current ?? metersPanelRef.current ?? graphPanelRef.current;
+        return tableauPanelRef.current ?? canvasPanelRef.current ?? graphPanelRef.current;
       }
       // Phases 4–5: pivots, optimal read-off — all tableau-centric.
       if (phase === 4 || phase === 5) {
@@ -539,6 +539,8 @@ export default function GuidedLearnPage() {
                 variablesCount={problem.numVars}
                 constraintsCount={problem.constraints.length}
                 highlight={activeHighlight}
+                slacksAdded={tableauReveal.slacksAdded}
+                bfs={currentBFS}
               />
             </div>
 
@@ -559,6 +561,7 @@ export default function GuidedLearnPage() {
                       optimumConfirmed={!!optimumCommit || !!latestPivot}
                       optimumTarget={latestPivot?.zValue ?? optimumCommit?.zValue ?? currentDragTarget}
                       bfsPoint={bfsPoint}
+                      slacksMode={tableauReveal.slacksAdded}
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground italic p-6 text-center">
@@ -569,19 +572,10 @@ export default function GuidedLearnPage() {
               </div>
             )}
 
-            {/* Capacity meters — make slack = unused resource concrete,
-                color-bound to each constraint so the identity pattern in the
-                tableau is visually obvious. Appears at Phase 3 onward. */}
-            {metersVisible && (
-              <div ref={metersPanelRef} className="scroll-mt-6">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
-                  Capacity meters — each constraint&apos;s bucket, and its slack
-                </p>
-                <ConstraintMeters draft={draft} bfs={currentBFS} highlight={activeHighlight} />
-              </div>
-            )}
-
-            {/* Tableau section — appears once Phase 3 starts (slacksAdded) */}
+            {/* Tableau section — appears once Phase 3 starts (slacksAdded).
+                The per-constraint meters are now INLINE under each constraint
+                row in the formulation canvas above, anchored to the equation
+                they visualize — so there's no standalone meter panel here. */}
             {tableauReveal.slacksAdded && (() => {
               // Has the student reached optimal? That's when the phase of the
               // current question is >= 5 (we're in the reveal/bridge phase) or
@@ -973,15 +967,29 @@ function DragInput({
 // the value rendered large. The `fill-pop` animation gives each fill a
 // physical sense of arrival: scale from 0.6 to 1.0 with a small bounce.
 
-function Canvas({ draft, variablesCount, constraintsCount, highlight }: {
+function Canvas({
+  draft, variablesCount, constraintsCount, highlight,
+  slacksAdded = false, bfs,
+}: {
   draft: LPDraft;
   variablesCount: number;
   constraintsCount: number;
   highlight?: QuestionHighlight | null;
+  /** Once slacks are added, each row switches from inequality to equation
+   *  form: "+ s_i" slides in, the operator morphs ≤→=, and an inline
+   *  meter appears under the row showing the two pieces of that equation. */
+  slacksAdded?: boolean;
+  /** Current BFS for the inline meters. Defaults to origin when absent. */
+  bfs?: Record<string, number>;
 }) {
   const pulseOperators = highlight?.target === 'constraint-operators';
   const pulseRhs = highlight?.target === 'constraint-rhs';
   const pulseObjCoefs = highlight?.target === 'objective-coefficients';
+  const metersReady =
+    slacksAdded && draft.constraints.every(c =>
+      c.started && c.rhs != null && c.coefficients.every(v => v != null),
+    );
+
   return (
     <div className="space-y-6">
 
@@ -1020,12 +1028,20 @@ function Canvas({ draft, variablesCount, constraintsCount, highlight }: {
       </Section>
 
       {/* ── Constraints ─────────────────────────────────────────────────── */}
-      <Section label="Subject to">
+      <Section label={slacksAdded ? 'Subject to (as equations)' : 'Subject to'}>
         <div className="space-y-4">
           {Array.from({ length: constraintsCount }, (_, ci) => {
             const c = draft.constraints[ci];
+            const allCoefSet = c?.coefficients.every(v => v != null) ?? false;
+            const readyForMeter = slacksAdded && allCoefSet && c?.rhs != null;
+            // After slacks are added, the operator is pinned to '=' regardless
+            // of what the student originally wrote (the script only supports
+            // '≤' problems today); when the first slack-added commit fires
+            // the row morphs from inequality to equation.
+            const displayOp: '<=' | '>=' | '=' | null =
+              slacksAdded && c?.operator === '<=' ? '=' : (c?.operator ?? null);
             return (
-              <div key={ci} className="bg-card/40 border border-border rounded-xl p-4 space-y-2">
+              <div key={ci} className="bg-card/40 border border-border rounded-xl p-4 space-y-3">
                 <div className="flex items-baseline gap-2">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                     C{ci + 1}
@@ -1048,9 +1064,35 @@ function Canvas({ draft, variablesCount, constraintsCount, highlight }: {
                       </div>
                     );
                   })}
-                  <OperatorSlot op={c?.operator ?? null} pulse={pulseOperators} />
+                  {/* Slack term slides in on the left side of the equation
+                      when slacks are added. Coefficient 1 for the owning
+                      constraint; the s_j for j ≠ ci is implicit (coefficient
+                      0) so we don't clutter the line with all zeros. */}
+                  {slacksAdded && (
+                    <div className="flex items-center gap-2 animate-slide-in-right">
+                      <span className="text-2xl text-muted-foreground">+</span>
+                      <SlotNumber value={1} />
+                      <VarChip label={`s${ci + 1}`} size="sm" />
+                    </div>
+                  )}
+                  <OperatorSlot op={displayOp} pulse={pulseOperators} />
                   <SlotNumber value={c?.rhs ?? null} accent pulse={pulseRhs} />
                 </div>
+
+                {/* Inline meter — the physical meaning of this row's equation.
+                    Two segments (used + unused) that visibly add to the RHS. */}
+                {readyForMeter && (
+                  <div className="pt-2 border-t border-border/40">
+                    <ConstraintMeter
+                      constraintIndex={ci}
+                      coefficients={c.coefficients.filter((v): v is number => v != null)}
+                      rhs={c.rhs as number}
+                      bfs={bfs ?? {}}
+                      highlight={highlight}
+                      compact
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1059,8 +1101,15 @@ function Canvas({ draft, variablesCount, constraintsCount, highlight }: {
 
       {/* Non-negativity footer */}
       <div className="text-xs text-muted-foreground italic text-center pt-2">
-        All variables assumed ≥ 0
+        All variables assumed ≥ 0{slacksAdded ? ' (including slacks sᵢ ≥ 0)' : ''}
       </div>
+      {metersReady && (
+        <p className="text-[10px] text-muted-foreground/80 italic leading-relaxed text-center">
+          Each equation above splits into two pieces: what you&apos;re
+          <span className="font-semibold not-italic"> using</span> and what&apos;s
+          <span className="font-semibold not-italic"> unused</span> (the slack). They always add to the capacity.
+        </p>
+      )}
     </div>
   );
 }

@@ -1,0 +1,31 @@
+Pass 1: constraint spine. Inequality pins to a line, tail becomes slack.
+
+The meters, graph, and tableau were three different pictures of the
+same constraint, but nothing tied them together. This pass makes the
+constraint the persistent object and every other visual a
+transformation of it:
+
+- Formulation card transforms in place when slacks are added. The
+  operator morphs from "<=" to "=" and a new "+ s_i" term slides
+  into the equation from the right. Slack arrives as a modification
+  of the thing the student already built, not a separate concept.
+
+- The two-segment meter moves INLINE under each constraint row.
+  Same card, same line — "here is the equation; here is what each
+  side looks like physically right now." The standalone meters
+  panel is gone.
+
+- On the graph, slacksMode fades the half-plane shading, thickens
+  the lines, and re-labels each one as "Cn pinned: = rhs" — the
+  visual of "=" collapsing the region to its boundary. The
+  perpendicular from the current BFS to each line is now labeled
+  "tail s_i = value", which is the same word the student sees
+  sliding into the equation on the left.
+
+So: when we pin the line to "=", the origin is still feasible
+because we added a tail (the slack variable) that absorbed the
+distance. Graph shows the geometric tail; canvas shows the
+algebraic tail; meter shows the quantitative tail. Three views of
+the same transformation.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>

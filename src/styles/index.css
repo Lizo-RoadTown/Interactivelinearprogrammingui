@@ -46,3 +46,16 @@
   animation: attention-pulse 1400ms ease-in-out infinite;
   border-radius: inherit;
 }
+
+/* Slide-in-from-right — used when the slack term "+ sᵢ" joins each
+ * constraint row after the student converts the inequality to an
+ * equation. Gives the slack its own physical arrival, so the
+ * transformation is something the student watches, not just reads. */
+@keyframes slide-in-right {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}

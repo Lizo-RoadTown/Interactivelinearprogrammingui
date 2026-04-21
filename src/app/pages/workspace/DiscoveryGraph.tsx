@@ -38,6 +38,14 @@ interface Props {
    * Makes "binding ⇔ slack = 0" visible geometrically.
    */
   bfsPoint?: { x: number; y: number } | null;
+  /**
+   * Once slacks have been introduced, fade the half-plane shading and
+   * lean on the LINES themselves — because `=` pins each constraint to
+   * its line, and everything that used to be "inside the region" has
+   * been collected into the slack variable. The perpendicular-from-bfs
+   * still shows the slack as a geometric distance.
+   */
+  slacksMode?: boolean;
 }
 
 // Dimensions
@@ -47,6 +55,7 @@ const PAD = 40;
 export default function DiscoveryGraph({
   draft, linesDrawn, sideDrawnFor, feasibleRegionRevealed,
   objectiveZ, optimumConfirmed, optimumTarget, bfsPoint,
+  slacksMode = false,
 }: Props) {
   // Work out the axis extents from whatever constraints have coefficients +
   // RHS set so far. Fall back to a 0..20 window if nothing yet.
@@ -203,35 +212,42 @@ export default function DiscoveryGraph({
         <text key={`yt-${y}`} x={scaleX(0) - 8} y={scaleY(y) + 4} fontSize="11" textAnchor="end" fill="#94a3b8">{y}</text>
       ))}
 
-      {/* Half-plane shading (per-constraint) */}
+      {/* Half-plane shading (per-constraint). When slacks arrive, we pin
+          each constraint to its line (= rhs), so the shading fades way
+          back — the lines are now the main event. */}
       {Array.from(sideDrawnFor).map(idx => {
         const poly = halfPlanePolygon(idx);
         if (!poly) return null;
         const color = CONSTRAINT_COLORS[idx % CONSTRAINT_COLORS.length];
+        const fo = slacksMode ? 0.04 : feasibleRegionRevealed ? 0.08 : 0.18;
         return (
           <polygon
             key={`shade-${idx}`}
             points={poly}
             fill={color}
-            fillOpacity={feasibleRegionRevealed ? 0.08 : 0.18}
+            fillOpacity={fo}
             className="animate-region-fade"
+            style={{ transition: 'fill-opacity 600ms ease' }}
           />
         );
       })}
 
-      {/* Feasible region overlay (after revealed) */}
+      {/* Feasible region overlay (after revealed). Also fades in slacksMode. */}
       {feasiblePolygon && (
         <polygon
           points={feasiblePolygon}
           fill="#06b6d4"
-          fillOpacity="0.28"
+          fillOpacity={slacksMode ? 0.08 : 0.28}
           stroke="#06b6d4"
           strokeWidth="2"
           className="animate-fill-pop"
+          style={{ transition: 'fill-opacity 600ms ease' }}
         />
       )}
 
-      {/* Constraint lines (drawn-in animation) */}
+      {/* Constraint lines (drawn-in animation). In slacksMode the stroke
+          gets thicker and the label switches to "= rhs" to emphasize that
+          the constraint is now pinned to the line. */}
       {Array.from(linesDrawn).map(idx => {
         const pts = lineFor(idx);
         if (!pts) return null;
@@ -240,25 +256,32 @@ export default function DiscoveryGraph({
         const dx = scaleX(b.x) - scaleX(a.x);
         const dy = scaleY(b.y) - scaleY(a.y);
         const length = Math.hypot(dx, dy);
+        const constraint = draft.constraints[idx];
+        const rhsLabel = constraint?.rhs != null ? fmt(constraint.rhs) : '?';
         return (
           <g key={`line-${idx}`}>
             <line
               x1={scaleX(a.x)} y1={scaleY(a.y)} x2={scaleX(b.x)} y2={scaleY(b.y)}
-              stroke={color} strokeWidth="3" strokeLinecap="round"
+              stroke={color}
+              strokeWidth={slacksMode ? 4 : 3}
+              strokeLinecap="round"
               strokeDasharray={length}
               strokeDashoffset={length}
-              style={{ animation: `line-draw 700ms 120ms cubic-bezier(0.4, 0, 0.2, 1) forwards` }}
+              style={{
+                animation: `line-draw 700ms 120ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
+                transition: 'stroke-width 400ms ease',
+              }}
             />
             {/* Label near the middle of the line */}
             <text
               x={scaleX((a.x + b.x) / 2) + 6}
               y={scaleY((a.y + b.y) / 2) - 6}
-              fontSize="12"
+              fontSize={slacksMode ? 13 : 12}
               fill={color}
               fontWeight="700"
               className="animate-fill-pop"
             >
-              C{idx + 1}
+              {slacksMode ? `C${idx + 1} pinned: = ${rhsLabel}` : `C${idx + 1}`}
             </text>
           </g>
         );
@@ -370,17 +393,19 @@ export default function DiscoveryGraph({
                   />
                   {/* Tiny tick at the foot */}
                   <circle cx={scaleX(footX)} cy={scaleY(footY)} r="3" fill={color} opacity="0.8" />
-                  {/* Floating label "s_i = value" */}
+                  {/* Floating label — in slacksMode we call it a TAIL
+                      because that word ties to the Canvas equation where
+                      the slack term just slid in. */}
                   <rect
-                    x={scaleX(midX) - 22} y={scaleY(midY) - 9}
-                    width="44" height="16" rx="8"
-                    fill={colorForFill(idx, 0.9)}
+                    x={scaleX(midX) - (slacksMode ? 38 : 22)} y={scaleY(midY) - 9}
+                    width={slacksMode ? 76 : 44} height="16" rx="8"
+                    fill={colorForFill(idx, 0.92)}
                   />
                   <text
                     x={scaleX(midX)} y={scaleY(midY) + 3}
                     fontSize="10" fontWeight="700" textAnchor="middle" fill="#ffffff"
                   >
-                    s{idx + 1}={fmt(slack)}
+                    {slacksMode ? `tail s${idx + 1} = ${fmt(slack)}` : `s${idx + 1}=${fmt(slack)}`}
                   </text>
                 </g>
               );
