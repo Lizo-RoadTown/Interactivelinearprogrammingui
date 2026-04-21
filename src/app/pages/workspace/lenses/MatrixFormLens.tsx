@@ -335,19 +335,17 @@ export default function MatrixFormLens({ problem, response, isLoading, method }:
             );
           })}
         </div>
-        {auxAttempts >= 2 && !allAuxCorrect && (
-          <details className="bg-accent/10 border border-accent/30 rounded-lg" open>
-            <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-accent flex items-center gap-1.5 select-none">
-              <Lightbulb className="w-3 h-3" />
-              Walk me through this step
-            </summary>
-            <p className="px-3 pb-3 text-xs text-accent leading-relaxed whitespace-pre-line">
-              The rule is mechanical, by constraint type:{'\n'}
-              {'  '}≤  becomes  = by adding a SLACK variable (+s). The slack takes up the "gap" between left and right.{'\n'}
-              {'  '}≥  becomes  = by subtracting a SURPLUS (−e) and adding an ARTIFICIAL (+a). Surplus absorbs the excess on the left; artificial gives simplex somewhere to start.{'\n'}
-              {'  '}=  gets just an ARTIFICIAL (+a). No slack/surplus — the equation is already tight.
+        {!allAuxCorrect && (
+          <div className="bg-accent/10 border border-accent/30 rounded-lg px-3 py-2 text-xs text-accent leading-relaxed">
+            <p className="flex items-center gap-1.5 font-semibold mb-1">
+              <Lightbulb className="w-3 h-3" /> The rule, by constraint type
             </p>
-          </details>
+            <ul className="list-disc ml-4 space-y-0.5">
+              <li><span className="font-mono">≤</span> becomes <span className="font-mono">=</span> by adding a <strong className="text-foreground">slack</strong> (+s). Slack takes up the "gap" between left and right.</li>
+              <li><span className="font-mono">≥</span> becomes <span className="font-mono">=</span> by subtracting a <strong className="text-foreground">surplus</strong> (−e) AND adding an <strong className="text-foreground">artificial</strong> (+a). Surplus absorbs excess; artificial gives simplex somewhere to start.</li>
+              <li><span className="font-mono">=</span> gets just an <strong className="text-foreground">artificial</strong> (+a). No slack or surplus — the equation is already tight.</li>
+            </ul>
+          </div>
         )}
         {allAuxCorrect && (
           <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-2 text-xs text-emerald-200 flex items-center gap-1.5">
@@ -431,19 +429,20 @@ export default function MatrixFormLens({ problem, response, isLoading, method }:
               </tbody>
             </table>
           </div>
-          {basisAttempts >= 2 && !allBasicColsPicked && (
-            <details className="bg-accent/10 border border-accent/30 rounded-lg" open>
-              <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-accent flex items-center gap-1.5 select-none">
-                <Lightbulb className="w-3 h-3" />
-                Walk me through this step
-              </summary>
-              <p className="px-3 pb-3 text-xs text-accent leading-relaxed">
-                Look at the Solution lens (or the final tableau) to see which variables are
-                currently basic. For this LP they are{' '}
-                <span className="font-mono text-foreground">{summary.basis_vars.join(', ')}</span>.
-                Click those column headers above. Every other column goes into N (not clicked here).
+          {!allBasicColsPicked && (
+            <div className="bg-accent/10 border border-accent/30 rounded-lg px-3 py-2 text-xs text-accent leading-relaxed">
+              <p className="flex items-center gap-1.5 font-semibold mb-1">
+                <Lightbulb className="w-3 h-3" /> How to know which columns go into B
               </p>
-            </details>
+              <p>
+                Look at the Solution lens on the left rail (or the final tableau). The variables
+                listed as <em>basic</em> are the ones whose columns go into B. For this LP the
+                basis is{' '}
+                <span className="font-mono text-foreground">{summary.basis_vars.join(', ')}</span>.
+                Click those column headers above — everything else goes into N (and doesn&apos;t
+                get clicked here).
+              </p>
+            </div>
           )}
           {allBasicColsPicked && (
             <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-2 text-xs text-emerald-200 flex items-center gap-1.5">

@@ -321,9 +321,9 @@ export default function MainWorkspace() {
             <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-3xl"></div>
           </div>
 
-          {/* LP Workspace — the star */}
+          {/* LP Workspace — guided walkthrough by default */}
           <div
-            onClick={() => navigate('/workspace')}
+            onClick={() => navigate('/workspace?tutorial=simplex')}
             className="group relative cursor-pointer w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-10 shadow-2xl hover:border-fuchsia-500/40 hover:shadow-fuchsia-500/20 transition-all duration-200 mb-6 overflow-hidden"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-600/20 via-purple-600/10 to-transparent opacity-60 pointer-events-none"></div>
@@ -333,44 +333,63 @@ export default function MainWorkspace() {
                   <BookOpen className="w-10 h-10 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold text-white">LP Workspace</h2>
-                  <p className="text-fuchsia-300/80 text-base mt-1">One place for everything</p>
+                  <h2 className="text-3xl font-bold text-white">Learn by solving</h2>
+                  <p className="text-fuchsia-300/80 text-base mt-1">Guided walkthrough — the system asks, you answer</p>
                 </div>
               </div>
               <p className="text-slate-300 text-base leading-relaxed mb-5">
-                Tableau and graph side by side, with lenses for formulation, solution, sensitivity
-                (Chapter 8 sliders), matrix form, and shadow prices — all sharing the same LP.
-                Drag, explore, and see the math respond in real time.
+                The system walks you through solving an LP step by step. You click the entering
+                variable, identify the leaving row, apply the pivot — and it checks every move.
+                Everything you need — tableau, graph, matrix form, sensitivity sliders, shadow
+                prices — is on the same surface, one click away.
               </p>
               <div className="flex flex-wrap gap-2 mb-5">
-                {['Tableau', 'Graph', 'Sensitivity', 'Matrix form', 'Shadow prices'].map(label => (
+                {['Simplex pivots', 'Chapter 8 sliders', 'Matrix construction', 'Graph link'].map(label => (
                   <span key={label} className="bg-slate-800/80 border border-slate-700 text-slate-200 text-xs px-3 py-1 rounded-full">
                     {label}
                   </span>
                 ))}
               </div>
               <div className="flex items-center gap-2 text-fuchsia-300 font-semibold text-base group-hover:gap-3 transition-all">
-                Open Workspace <span className="text-xl">→</span>
+                Start walkthrough <span className="text-xl">→</span>
               </div>
             </div>
           </div>
 
-          {/* Secondary: free-form solver */}
-          <div
-            onClick={() => setShowSolver(true)}
-            className="cursor-pointer w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-cyan-500/40 hover:bg-slate-900/80 transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shrink-0">
-                <Zap className="w-4.5 h-4.5 text-cyan-400" />
+          {/* Secondary: free exploration */}
+          <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div
+              onClick={() => navigate('/workspace')}
+              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-primary/40 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+                  <BookOpen className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-100">Explore freely</h3>
+                  <p className="text-slate-400 text-[11px] leading-snug mt-0.5">
+                    Open the workspace with no walkthrough. Useful when studying already-solved problems.
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-slate-100">Free-form Solver</h3>
-                <p className="text-slate-400 text-xs leading-relaxed mt-0.5">
-                  Enter any LP from scratch and step through the simplex manually. Advanced.
-                </p>
+            </div>
+
+            <div
+              onClick={() => setShowSolver(true)}
+              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-cyan-500/40 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                  <Zap className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-100">Free-form Solver</h3>
+                  <p className="text-slate-400 text-[11px] leading-snug mt-0.5">
+                    Enter any LP from scratch. Advanced.
+                  </p>
+                </div>
               </div>
-              <span className="text-slate-500 text-lg">→</span>
             </div>
           </div>
 
