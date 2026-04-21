@@ -25,6 +25,7 @@ import DiscoveryGraph, { FeasibleVertex } from './DiscoveryGraph';
 import VertexBasisPanel from './VertexBasisPanel';
 import BuildBPanel from './BuildBPanel';
 import InverseBPanel from './InverseBPanel';
+import FormulasPanel from './FormulasPanel';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
 import ConstraintMeter from './ConstraintMeters';
 import SensitivityControls from './SensitivityControls';
@@ -737,6 +738,16 @@ export default function GuidedLearnPage() {
                         B={builtB.B}
                         basisLabels={builtB.basisLabels}
                         onInverseComplete={(Binv) => setBuiltBinv(Binv)}
+                      />
+                    )}
+                    {selectedVertex && builtB && builtBinv && (
+                      <FormulasPanel
+                        draft={sensitivityActive ? liveDraft : draft}
+                        vertex={selectedVertex}
+                        B={builtB.B}
+                        Binv={builtBinv}
+                        basisLabels={builtB.basisLabels}
+                        nDecVars={problem.numVars}
                       />
                     )}
                   </div>
