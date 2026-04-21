@@ -366,6 +366,18 @@ function FormulationWizard({
   const feedback = (msg: string, kind: FormulateState['feedbackKind']) =>
     update({ feedbackMsg: msg, feedbackKind: kind });
 
+  // Clear stale 'wrong' feedback when the student edits any input. A correct
+  // or hint message stays put (they want to read those).
+  useEffect(() => {
+    if (fs.feedbackKind === 'wrong') {
+      setFs(prev => prev.feedbackKind === 'wrong'
+        ? { ...prev, feedbackMsg: '', feedbackKind: 'none' }
+        : prev);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fs.objectiveType, fs.objectiveCoeffs, fs.constraintCoeffs,
+      fs.constraintOps, fs.constraintRhs, fs.varDescriptions]);
+
   // ── VARS step ───────────────────────────────────────────────────────────
   function submitVars() {
     if (fs.varDescriptions.some(d => d.trim() === '')) {
@@ -377,6 +389,8 @@ function FormulationWizard({
   }
 
   // ── OBJ step ────────────────────────────────────────────────────────────
+  // Explicit Continue step after a correct answer — replaces the old setTimeout
+  // auto-advance, which moved on before students could read the confirmation.
   function submitObj() {
     const result = checkObjective(
       fs.objectiveType,
@@ -387,8 +401,12 @@ function FormulationWizard({
       feedback(result.msg, 'wrong');
     } else {
       feedback(result.msg, 'correct');
-      setTimeout(() => update({ subPhase: 'constraints', currentConstraint: 0, feedbackMsg: '', feedbackKind: 'none' }), 1000);
+      // No auto-advance. Student clicks "Continue →" when ready (rendered below).
     }
+  }
+
+  function advanceFromObj() {
+    update({ subPhase: 'constraints', currentConstraint: 0, feedbackMsg: '', feedbackKind: 'none' });
   }
 
   function showMeObj() {
@@ -413,11 +431,15 @@ function FormulationWizard({
       feedback(result.msg, 'wrong');
     } else {
       feedback(result.msg, 'correct');
-      if (idx + 1 < nc) {
-        setTimeout(() => update({ currentConstraint: idx + 1, feedbackMsg: '', feedbackKind: 'none' }), 800);
-      } else {
-        setTimeout(() => update({ subPhase: 'review', feedbackMsg: '', feedbackKind: 'none' }), 800);
-      }
+      // No auto-advance. "Continue →" button (rendered below) advances explicitly.
+    }
+  }
+
+  function advanceFromConstraint(idx: number) {
+    if (idx + 1 < nc) {
+      update({ currentConstraint: idx + 1, feedbackMsg: '', feedbackKind: 'none' });
+    } else {
+      update({ subPhase: 'review', feedbackMsg: '', feedbackKind: 'none' });
     }
   }
 
@@ -595,15 +617,17 @@ function FormulationWizard({
                 {Array.from({ length: n }, (_, i) => (
                   <div key={i} className="flex items-center gap-1">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="0"
                       value={fs.objectiveCoeffs[i]}
+                      onFocus={e => e.target.select()}
                       onChange={e => {
                         const c = [...fs.objectiveCoeffs];
                         c[i] = e.target.value;
                         update({ objectiveCoeffs: c });
                       }}
-                      className="w-16 text-sm text-center border border-border rounded px-2 py-1.5 focus:outline-none focus:border-primary/60"
+                      className="w-20 text-base text-center border border-border rounded-md px-2 py-2 bg-card focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                     />
                     <span className="text-sm font-mono text-foreground">x{i + 1}</span>
                     {i < n - 1 && <span className="text-muted-foreground mx-1">+</span>}
@@ -617,9 +641,15 @@ function FormulationWizard({
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={submitObj} className="bg-primary hover:bg-primary text-white">
-                  Check Objective →
-                </Button>
+                {fs.feedbackKind === 'correct' ? (
+                  <Button onClick={advanceFromObj} className="bg-emerald-500 hover:bg-emerald-600 text-white">
+                    Continue →
+                  </Button>
+                ) : (
+                  <Button onClick={submitObj} className="bg-primary hover:bg-primary text-white">
+                    Check Objective
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={showMeObj}>
                   Show Me
                 </Button>
@@ -662,9 +692,11 @@ function FormulationWizard({
                   {Array.from({ length: n }, (_, i) => (
                     <div key={i} className="flex items-center gap-1">
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="0"
                         value={fs.constraintCoeffs[idx][i]}
+                        onFocus={e => e.target.select()}
                         onChange={e => {
                           const rows = fs.constraintCoeffs.map((row, ri) =>
                             ri === idx
@@ -673,9 +705,9 @@ function FormulationWizard({
                           );
                           update({ constraintCoeffs: rows });
                         }}
-                        className="w-14 text-sm text-center border border-border rounded px-1.5 py-1 focus:outline-none focus:border-primary/60"
+                        className="w-16 text-base text-center border border-border rounded-md px-2 py-1.5 bg-card focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                       />
-                      <span className="text-xs font-mono text-foreground">x{i + 1}</span>
+                      <span className="text-sm font-mono text-foreground">x{i + 1}</span>
                       {i < n - 1 && <span className="text-muted-foreground">+</span>}
                     </div>
                   ))}
@@ -696,15 +728,17 @@ function FormulationWizard({
                   </select>
 
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="RHS"
                     value={fs.constraintRhs[idx]}
+                    onFocus={e => e.target.select()}
                     onChange={e => {
                       const rhs = [...fs.constraintRhs];
                       rhs[idx] = e.target.value;
                       update({ constraintRhs: rhs });
                     }}
-                    className="w-16 text-sm text-center border border-border rounded px-2 py-1 focus:outline-none focus:border-primary/60"
+                    className="w-20 text-base text-center border border-border rounded-md px-2 py-1.5 bg-card focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
 
@@ -714,12 +748,21 @@ function FormulationWizard({
                 </div>
 
                 <div className="flex gap-2">
-                  <Button
-                    onClick={() => submitConstraint(idx)}
-                    className="bg-primary hover:bg-primary text-white"
-                  >
-                    {idx + 1 < nc ? `Check & Next →` : `Check & Finish →`}
-                  </Button>
+                  {fs.feedbackKind === 'correct' ? (
+                    <Button
+                      onClick={() => advanceFromConstraint(idx)}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                    >
+                      {idx + 1 < nc ? `Continue to Constraint ${idx + 2} →` : `Continue to Review →`}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => submitConstraint(idx)}
+                      className="bg-primary hover:bg-primary text-white"
+                    >
+                      Check Constraint {idx + 1}
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => showMeConstraint(idx)}>
                     Show Me
                   </Button>
@@ -1409,16 +1452,21 @@ function SolvingScreen({
               {/* Feedback from wrong attempts */}
               {feedback && renderFeedback(feedback)}
 
-              {/* Show reasoning after 4+ attempts */}
-              {attemptCount >= 4 && (
-                <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
-                  <p className="text-xs font-bold text-accent mb-1">Step-by-step reasoning:</p>
-                  <p className="text-xs text-accent leading-relaxed">
+              {/* After 2+ attempts: offer a "walk me through" button.
+                  After 3+ attempts: auto-expand the reasoning.
+                  Always: Show Answer escape hatch. */}
+              {attemptCount >= 2 && (
+                <details className="bg-accent/10 border border-accent/30 rounded-lg" open={attemptCount >= 3}>
+                  <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-accent flex items-center gap-1.5 select-none">
+                    <Lightbulb className="w-3.5 h-3.5" />
+                    Walk me through this step
+                  </summary>
+                  <p className="px-3 pb-3 text-xs text-accent leading-relaxed whitespace-pre-line">
                     {problem.objectiveType === 'max'
-                      ? '1. Scan the Z-row for all values.\n2. Negative values mean increasing that variable improves z.\n3. The MOST negative value gives the fastest improvement.\n4. Click that cell.'
-                      : '1. Scan the Z-row for all values.\n2. Positive values mean increasing that variable improves z.\n3. The MOST positive value gives the fastest improvement.\n4. Click that cell.'}
+                      ? '1. Scan every value in the Z-row.\n2. A negative number means "increasing this variable would improve z."\n3. The MOST negative value gives the fastest improvement per unit.\n4. Click that cell.'
+                      : '1. Scan every value in the Z-row.\n2. A positive number means "increasing this variable would improve z."\n3. The MOST positive value gives the fastest improvement per unit.\n4. Click that cell.'}
                   </p>
-                </div>
+                </details>
               )}
 
               <Button onClick={guided.showAnswer} size="sm" variant="outline" className="text-xs">
@@ -1447,16 +1495,21 @@ function SolvingScreen({
             </div>
           )}
 
-          {/* A4: Reveal — column highlighted, auto-transitions to B */}
+          {/* A4: Reveal — column highlighted. Continue when student is ready. */}
           {phase === 'a4_reveal' && (
             <div className="space-y-3">
               {feedback && renderFeedback(feedback)}
-              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
-                <p className="text-xs text-accent">
-                  Column highlighted. Moving to leaving variable selection…
+              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 space-y-2">
+                <p className="text-xs text-accent leading-relaxed">
+                  Entering variable confirmed. The whole column is highlighted — notice how it now points in the direction your objective will improve. When you&apos;re ready, continue to choose the leaving variable.
                 </p>
               </div>
+              <Button
+                onClick={guided.acknowledge}
+                className="w-full bg-accent hover:bg-accent/90 text-white"
+              >
+                Continue to Leaving Variable →
+              </Button>
             </div>
           )}
         </div>
@@ -1485,17 +1538,22 @@ function SolvingScreen({
 
               {feedback && renderFeedback(feedback)}
 
-              {attemptCount >= 4 && (
-                <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
-                  <p className="text-xs font-bold text-accent mb-1">Step-by-step reasoning:</p>
-                  <p className="text-xs text-accent leading-relaxed whitespace-pre-line">
-                    1. Look at each row in the pivot column.{'\n'}
-                    2. Skip rows with zero or negative entries.{'\n'}
-                    3. For positive entries: compute RHS / entry.{'\n'}
-                    4. The row with the smallest ratio leaves the basis.{'\n'}
-                    5. Click that row.
+              {/* After 2+ attempts: offer a "walk me through" button.
+                  After 3+ attempts: auto-expand the reasoning. */}
+              {attemptCount >= 2 && (
+                <details className="bg-accent/10 border border-accent/30 rounded-lg" open={attemptCount >= 3}>
+                  <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-accent flex items-center gap-1.5 select-none">
+                    <Lightbulb className="w-3.5 h-3.5" />
+                    Walk me through this step
+                  </summary>
+                  <p className="px-3 pb-3 text-xs text-accent leading-relaxed whitespace-pre-line">
+                    1. Look at each row in the pivot column (the highlighted blue column).{'\n'}
+                    2. Skip rows with zero or negative entries — those constraints don&apos;t limit the entering variable.{'\n'}
+                    3. For rows with positive entries: divide RHS by the entry. That&apos;s the ratio.{'\n'}
+                    4. The row with the smallest ratio is the first constraint that would be violated.{'\n'}
+                    5. Click that row — its basic variable leaves.
                   </p>
-                </div>
+                </details>
               )}
 
               <Button onClick={guided.showAnswer} size="sm" variant="outline" className="text-xs">
@@ -1505,16 +1563,21 @@ function SolvingScreen({
             </div>
           )}
 
-          {/* B4: Reveal — ratios shown, auto-transitions to Apply */}
+          {/* B4: Reveal — ratios shown. Continue when student is ready. */}
           {phase === 'b4_reveal' && (
             <div className="space-y-3">
               {feedback && renderFeedback(feedback)}
-              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
-                <p className="text-xs text-accent">
-                  Ratios confirmed. Preparing pivot…
+              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 space-y-2">
+                <p className="text-xs text-accent leading-relaxed">
+                  Leaving variable confirmed. The ratio column shows the full minimum-ratio test. Notice how the winning ratio ties directly to the basic variable that hits zero first. Ready to apply the pivot?
                 </p>
               </div>
+              <Button
+                onClick={guided.acknowledge}
+                className="w-full bg-accent hover:bg-accent/90 text-white"
+              >
+                Continue to Apply Pivot →
+              </Button>
             </div>
           )}
 

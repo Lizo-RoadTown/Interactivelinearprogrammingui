@@ -576,20 +576,16 @@ export function useGuidedSimplex({
     }
   }, [state.phase, state.canAdvance]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-transition: A4 (entering correct) → B1 (leaving attention)
-  useEffect(() => {
-    if (state.phase === 'a4_reveal') {
-      const timer = setTimeout(() => dispatch({ type: 'ADVANCE_TO_B' }), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [state.phase]);
+  // Note: the old auto-transitions from a4_reveal → B1 and b4_reveal → B5
+  // rushed past the reveal before students could absorb what just happened.
+  // They are now triggered explicitly by user action (Continue buttons)
+  // via the `acknowledge` action below. This lets students linger on a
+  // correct answer and the accompanying visual confirmation as long as
+  // they want.
 
-  // Auto-transition: B4 (leaving correct) → B5 (apply)
-  useEffect(() => {
-    if (state.phase === 'b4_reveal') {
-      const timer = setTimeout(() => dispatch({ type: 'ADVANCE_TO_APPLY' }), 800);
-      return () => clearTimeout(timer);
-    }
+  const acknowledge = useCallback(() => {
+    if (state.phase === 'a4_reveal') dispatch({ type: 'ADVANCE_TO_B' });
+    else if (state.phase === 'b4_reveal') dispatch({ type: 'ADVANCE_TO_APPLY' });
   }, [state.phase]);
 
   // ── Compute correct answers from tableau ──────────────────────────────────
@@ -989,5 +985,7 @@ export function useGuidedSimplex({
     advanceToApply,
     applyPivot,
     showAnswer,
+    // Explicit continue after reveal phases (replaces old auto-advance)
+    acknowledge,
   };
 }
