@@ -63,16 +63,16 @@ interface OwnLPState {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const DIFFICULTY_BADGE: Record<WPDifficulty, string> = {
-  Beginner:     'bg-green-100 text-green-800 border-green-200',
+  Beginner:     'bg-emerald-500/20 text-emerald-200 border-emerald-500/30',
   Intermediate: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  Advanced:     'bg-red-100 text-red-800 border-red-200',
+  Advanced:     'bg-destructive/20 text-destructive border-destructive/30',
 };
 
 const CATEGORY_COLOR: Record<WPCategory, string> = {
-  'Product Mix':          'bg-blue-600',
+  'Product Mix':          'bg-accent',
   'Resource Allocation':  'bg-emerald-600',
   'Diet / Nutrition':     'bg-orange-500',
-  'Production Planning':  'bg-purple-600',
+  'Production Planning':  'bg-primary',
   'Special Cases':        'bg-rose-600',
 };
 
@@ -135,8 +135,8 @@ function HomeScreen({
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-8 p-8">
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">What would you like to do?</h2>
-        <p className="text-gray-500 text-base max-w-lg">
+        <h2 className="text-3xl font-bold text-foreground mb-2">What would you like to do?</h2>
+        <p className="text-muted-foreground text-base max-w-lg">
           Work through a guided word problem step-by-step, or jump straight in with your own LP.
           Either way, the solver will coach you through every decision.
         </p>
@@ -146,19 +146,19 @@ function HomeScreen({
         {/* Practice Problem */}
         <button
           onClick={onPractice}
-          className="flex-1 group bg-white border-2 border-indigo-200 hover:border-indigo-500
+          className="flex-1 group bg-card border-2 border-primary/30 hover:border-indigo-500
                      rounded-2xl p-8 text-left shadow-sm hover:shadow-lg transition-all"
         >
-          <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4
-                          group-hover:bg-indigo-600 transition-colors">
-            <BookOpen className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" />
+          <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center mb-4
+                          group-hover:bg-primary transition-colors">
+            <BookOpen className="w-6 h-6 text-primary group-hover:text-white transition-colors" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Practice Problem</h3>
-          <p className="text-sm text-gray-600 leading-relaxed">
+          <h3 className="text-xl font-bold text-foreground mb-2">Practice Problem</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Get a real-world word problem. Identify the variables, write the objective function,
             set up constraints, choose a method, and solve — with hints at every step.
           </p>
-          <div className="mt-4 text-xs font-medium text-indigo-600">
+          <div className="mt-4 text-xs font-medium text-primary">
             14 problems · All methods covered →
           </div>
         </button>
@@ -166,15 +166,15 @@ function HomeScreen({
         {/* Enter Own */}
         <button
           onClick={onEnterOwn}
-          className="flex-1 group bg-white border-2 border-emerald-200 hover:border-emerald-500
+          className="flex-1 group bg-card border-2 border-emerald-200 hover:border-emerald-500
                      rounded-2xl p-8 text-left shadow-sm hover:shadow-lg transition-all"
         >
           <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mb-4
                           group-hover:bg-emerald-600 transition-colors">
             <PenLine className="w-6 h-6 text-emerald-600 group-hover:text-white transition-colors" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Enter My Own</h3>
-          <p className="text-sm text-gray-600 leading-relaxed">
+          <h3 className="text-xl font-bold text-foreground mb-2">Enter My Own</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Already have an LP? Enter your objective and constraints directly.
             The system will help you choose the right method and walk you through solving it.
           </p>
@@ -194,24 +194,24 @@ const DIFFICULTY_TIERS: { level: WPDifficulty; desc: string; icon: string; borde
     level: 'Beginner',
     desc: 'Standard Simplex with all ≤ constraints. 2 variables, clear structure.',
     icon: '1',
-    border: 'border-green-300 hover:border-green-500',
-    bg: 'bg-green-50',
+    border: 'border-emerald-500/40 hover:border-green-500',
+    bg: 'bg-emerald-500/10',
     hover: 'hover:shadow-lg hover:shadow-green-100',
   },
   {
     level: 'Intermediate',
     desc: 'Big-M method, mixed constraints (≤ and ≥), 2–3 variables.',
     icon: '2',
-    border: 'border-amber-300 hover:border-amber-500',
-    bg: 'bg-amber-50',
+    border: 'border-amber-500/40 hover:border-amber-500',
+    bg: 'bg-amber-500/10',
     hover: 'hover:shadow-lg hover:shadow-amber-100',
   },
   {
     level: 'Advanced',
     desc: 'Two-Phase, equality constraints, special cases (infeasible, unbounded, alternative optima).',
     icon: '3',
-    border: 'border-red-300 hover:border-red-500',
-    bg: 'bg-red-50',
+    border: 'border-destructive/40 hover:border-red-500',
+    bg: 'bg-destructive/10',
     hover: 'hover:shadow-lg hover:shadow-red-100',
   },
 ];
@@ -231,8 +231,8 @@ function ProblemBrowser({ onSelect }: { onSelect: (p: WordProblem) => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose a Difficulty</h2>
-        <p className="text-gray-500 text-sm max-w-md">
+        <h2 className="text-2xl font-bold text-foreground mb-2">Choose a Difficulty</h2>
+        <p className="text-muted-foreground text-sm max-w-md">
           You'll get a random word problem at the level you choose.
           Formulate the LP, pick the method, and solve it step by step.
         </p>
@@ -247,14 +247,14 @@ function ProblemBrowser({ onSelect }: { onSelect: (p: WordProblem) => void }) {
                        rounded-2xl p-6 text-left transition-all cursor-pointer`}
           >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-lg font-bold
-                            ${tier.level === 'Beginner' ? 'bg-green-200 text-green-800' :
-                              tier.level === 'Intermediate' ? 'bg-amber-200 text-amber-800' :
-                              'bg-red-200 text-red-800'}`}>
+                            ${tier.level === 'Beginner' ? 'bg-emerald-500/30 text-emerald-200' :
+                              tier.level === 'Intermediate' ? 'bg-amber-500/30 text-amber-200' :
+                              'bg-destructive/30 text-destructive'}`}>
               {tier.icon}
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">{tier.level}</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">{tier.desc}</p>
-            <p className="text-xs text-gray-400 mt-3">{counts[tier.level]} problems</p>
+            <h3 className="text-lg font-bold text-foreground mb-1">{tier.level}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">{tier.desc}</p>
+            <p className="text-xs text-muted-foreground mt-3">{counts[tier.level]} problems</p>
           </button>
         ))}
       </div>
@@ -439,9 +439,9 @@ function FormulationWizard({
 
   const feedbackBg = {
     none:    '',
-    correct: 'bg-green-50 border border-green-300 text-green-800',
-    wrong:   'bg-red-50 border border-red-300 text-red-800',
-    hint:    'bg-blue-50 border border-blue-300 text-blue-800',
+    correct: 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-200',
+    wrong:   'bg-destructive/10 border border-destructive/40 text-destructive',
+    hint:    'bg-accent/10 border border-accent/40 text-accent',
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -454,22 +454,22 @@ function FormulationWizard({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Progress bar */}
-      <div className="flex-shrink-0 px-6 py-3 bg-white border-b border-gray-200">
+      <div className="flex-shrink-0 px-6 py-3 bg-card border-b border-border">
         <div className="flex items-center gap-0 max-w-lg">
           {subSteps.map((s, i) => (
             <div key={s} className="flex items-center gap-0 flex-1">
               <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold border-2 transition-colors ${
-                i < currentIdx  ? 'bg-indigo-600 border-indigo-600 text-white' :
-                i === currentIdx ? 'bg-white border-indigo-600 text-indigo-600' :
-                                   'bg-white border-gray-300 text-gray-400'
+                i < currentIdx  ? 'bg-primary border-indigo-600 text-white' :
+                i === currentIdx ? 'bg-card border-indigo-600 text-primary' :
+                                   'bg-card border-border text-muted-foreground'
               }`}>
                 {i < currentIdx ? <CheckCircle className="w-4 h-4" /> : i + 1}
               </div>
-              <span className={`text-xs ml-1.5 hidden sm:block ${i === currentIdx ? 'font-semibold text-indigo-700' : 'text-gray-400'}`}>
+              <span className={`text-xs ml-1.5 hidden sm:block ${i === currentIdx ? 'font-semibold text-primary' : 'text-muted-foreground'}`}>
                 {subLabels[i]}
               </span>
               {i < subSteps.length - 1 && (
-                <div className={`flex-1 h-0.5 mx-2 ${i < currentIdx ? 'bg-indigo-600' : 'bg-gray-200'}`} />
+                <div className={`flex-1 h-0.5 mx-2 ${i < currentIdx ? 'bg-primary' : 'bg-muted/80'}`} />
               )}
             </div>
           ))}
@@ -480,8 +480,8 @@ function FormulationWizard({
         <div className="max-w-2xl mx-auto space-y-5">
 
           {/* Word problem (always visible) — with progressive highlights */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-2">The Problem</p>
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+            <p className="text-xs font-bold text-amber-200 uppercase tracking-wide mb-2">The Problem</p>
             <HighlightedScenario
               scenario={problem.scenario}
               highlights={problem.highlights}
@@ -498,19 +498,19 @@ function FormulationWizard({
           {/* Feedback box */}
           {fs.feedbackKind !== 'none' && fs.feedbackMsg && (
             <div className={`rounded-lg p-3 text-sm flex items-start gap-2 ${feedbackBg[fs.feedbackKind]}`}>
-              {fs.feedbackKind === 'correct' && <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />}
-              {fs.feedbackKind === 'wrong'   && <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />}
-              {fs.feedbackKind === 'hint'    && <Lightbulb className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600" />}
+              {fs.feedbackKind === 'correct' && <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-400" />}
+              {fs.feedbackKind === 'wrong'   && <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-destructive" />}
+              {fs.feedbackKind === 'hint'    && <Lightbulb className="w-4 h-4 mt-0.5 flex-shrink-0 text-accent" />}
               <span>{fs.feedbackMsg}</span>
             </div>
           )}
 
           {/* ── VARS step ───────────────────────────────────────── */}
           {fs.subPhase === 'vars' && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
               <div>
-                <h3 className="text-base font-bold text-gray-900">Step 1: Decision Variables</h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <h3 className="text-base font-bold text-foreground">Step 1: Decision Variables</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   This problem has <strong>{n}</strong> decision variable{n > 1 ? 's' : ''}.
                   In LP, we use x1, x2, … for variable names. What does each one represent?
                 </p>
@@ -519,10 +519,10 @@ function FormulationWizard({
               <div className="space-y-3">
                 {Array.from({ length: n }, (_, i) => (
                   <div key={i} className="flex items-center gap-3">
-                    <div className="w-12 flex-shrink-0 text-sm font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-1.5 text-center">
+                    <div className="w-12 flex-shrink-0 text-sm font-mono font-bold text-primary bg-primary/10 border border-primary/30 rounded-lg px-2 py-1.5 text-center">
                       x{i + 1}
                     </div>
-                    <span className="text-sm text-gray-500">=</span>
+                    <span className="text-sm text-muted-foreground">=</span>
                     <input
                       type="text"
                       placeholder={`What does x${i + 1} represent?`}
@@ -532,20 +532,20 @@ function FormulationWizard({
                         d[i] = e.target.value;
                         update({ varDescriptions: d });
                       }}
-                      className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400"
+                      className="flex-1 text-sm border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:border-primary/60"
                     />
                   </div>
                 ))}
               </div>
 
               {/* Hint */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
-                <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-blue-500" />
+              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 text-xs text-accent">
+                <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-accent" />
                 {problem.formulationHints.variables}
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={submitVars} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button onClick={submitVars} className="bg-primary hover:bg-primary text-white">
                   Confirm Variables →
                 </Button>
                 <Button
@@ -564,25 +564,25 @@ function FormulationWizard({
 
           {/* ── OBJ step ────────────────────────────────────────── */}
           {fs.subPhase === 'obj' && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
               <div>
-                <h3 className="text-base font-bold text-gray-900">Step 2: Objective Function</h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <h3 className="text-base font-bold text-foreground">Step 2: Objective Function</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   Are we maximizing or minimizing? Then enter the coefficient for each variable.
                 </p>
               </div>
 
               <div className="flex items-center gap-3 flex-wrap">
                 {/* MAX / MIN toggle */}
-                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                <div className="flex rounded-lg border border-border overflow-hidden">
                   {(['max', 'min'] as const).map(t => (
                     <button
                       key={t}
                       onClick={() => update({ objectiveType: t })}
                       className={`px-4 py-2 text-sm font-semibold transition-colors ${
                         fs.objectiveType === t
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-white text-gray-600 hover:bg-gray-50'
+                          ? 'bg-primary text-white'
+                          : 'bg-card text-muted-foreground hover:bg-muted/40'
                       }`}
                     >
                       {t.toUpperCase()}
@@ -590,7 +590,7 @@ function FormulationWizard({
                   ))}
                 </div>
 
-                <span className="text-sm font-medium text-gray-700">z =</span>
+                <span className="text-sm font-medium text-foreground">z =</span>
 
                 {Array.from({ length: n }, (_, i) => (
                   <div key={i} className="flex items-center gap-1">
@@ -603,21 +603,21 @@ function FormulationWizard({
                         c[i] = e.target.value;
                         update({ objectiveCoeffs: c });
                       }}
-                      className="w-16 text-sm text-center border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-indigo-400"
+                      className="w-16 text-sm text-center border border-border rounded px-2 py-1.5 focus:outline-none focus:border-primary/60"
                     />
-                    <span className="text-sm font-mono text-gray-700">x{i + 1}</span>
-                    {i < n - 1 && <span className="text-gray-400 mx-1">+</span>}
+                    <span className="text-sm font-mono text-foreground">x{i + 1}</span>
+                    {i < n - 1 && <span className="text-muted-foreground mx-1">+</span>}
                   </div>
                 ))}
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
-                <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-blue-500" />
+              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 text-xs text-accent">
+                <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-accent" />
                 {problem.formulationHints.objective}
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={submitObj} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button onClick={submitObj} className="bg-primary hover:bg-primary text-white">
                   Check Objective →
                 </Button>
                 <Button variant="outline" size="sm" onClick={showMeObj}>
@@ -631,12 +631,12 @@ function FormulationWizard({
           {fs.subPhase === 'constraints' && (() => {
             const idx = fs.currentConstraint;
             return (
-              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+              <div className="bg-card border border-border rounded-xl p-5 space-y-4">
                 <div>
-                  <h3 className="text-base font-bold text-gray-900">
+                  <h3 className="text-base font-bold text-foreground">
                     Step 3: Constraints — {idx + 1} of {nc}
                   </h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     Fill in the coefficients, operator, and right-hand side for constraint {idx + 1}.
                   </p>
                 </div>
@@ -647,8 +647,8 @@ function FormulationWizard({
                     {Array.from({ length: idx }, (_, j) => {
                       const c = problem.constraints[j];
                       return (
-                        <div key={j} className="text-xs text-gray-500 bg-gray-50 rounded px-3 py-1.5 font-mono flex items-center gap-2">
-                          <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                        <div key={j} className="text-xs text-muted-foreground bg-muted/40 rounded px-3 py-1.5 font-mono flex items-center gap-2">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                           Constraint {j + 1}: {c.coefficients.map((v, k) => `${v}x${k+1}`).join(' + ')} {c.operator} {c.rhs}
                         </div>
                       );
@@ -657,8 +657,8 @@ function FormulationWizard({
                 )}
 
                 {/* Current constraint input */}
-                <div className="flex items-center gap-2 flex-wrap p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <span className="text-sm text-gray-500 font-medium">C{idx + 1}:</span>
+                <div className="flex items-center gap-2 flex-wrap p-3 bg-muted/40 rounded-lg border border-border">
+                  <span className="text-sm text-muted-foreground font-medium">C{idx + 1}:</span>
                   {Array.from({ length: n }, (_, i) => (
                     <div key={i} className="flex items-center gap-1">
                       <input
@@ -673,10 +673,10 @@ function FormulationWizard({
                           );
                           update({ constraintCoeffs: rows });
                         }}
-                        className="w-14 text-sm text-center border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:border-indigo-400"
+                        className="w-14 text-sm text-center border border-border rounded px-1.5 py-1 focus:outline-none focus:border-primary/60"
                       />
-                      <span className="text-xs font-mono text-gray-700">x{i + 1}</span>
-                      {i < n - 1 && <span className="text-gray-400">+</span>}
+                      <span className="text-xs font-mono text-foreground">x{i + 1}</span>
+                      {i < n - 1 && <span className="text-muted-foreground">+</span>}
                     </div>
                   ))}
 
@@ -688,7 +688,7 @@ function FormulationWizard({
                       ops[idx] = e.target.value as '<=' | '>=' | '=';
                       update({ constraintOps: ops });
                     }}
-                    className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-indigo-400 bg-white"
+                    className="text-sm border border-border rounded px-2 py-1 focus:outline-none focus:border-primary/60 bg-card"
                   >
                     <option value="<=">≤</option>
                     <option value=">=">≥</option>
@@ -704,19 +704,19 @@ function FormulationWizard({
                       rhs[idx] = e.target.value;
                       update({ constraintRhs: rhs });
                     }}
-                    className="w-16 text-sm text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-indigo-400"
+                    className="w-16 text-sm text-center border border-border rounded px-2 py-1 focus:outline-none focus:border-primary/60"
                   />
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
-                  <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-blue-500" />
+                <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 text-xs text-accent">
+                  <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-accent" />
                   {problem.formulationHints.constraints[idx] ?? 'Re-read the problem for this constraint.'}
                 </div>
 
                 <div className="flex gap-2">
                   <Button
                     onClick={() => submitConstraint(idx)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    className="bg-primary hover:bg-primary text-white"
                   >
                     {idx + 1 < nc ? `Check & Next →` : `Check & Finish →`}
                   </Button>
@@ -730,37 +730,37 @@ function FormulationWizard({
 
           {/* ── REVIEW step ─────────────────────────────────────── */}
           {fs.subPhase === 'review' && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
               <div>
-                <h3 className="text-base font-bold text-gray-900">Step 4: Review Your LP</h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <h3 className="text-base font-bold text-foreground">Step 4: Review Your LP</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   Great work! Here is the LP you built. Does everything look right?
                 </p>
               </div>
 
-              <div className="bg-gray-900 text-green-400 rounded-xl p-4 font-mono text-sm space-y-1">
+              <div className="bg-muted text-emerald-400 rounded-xl p-4 font-mono text-sm space-y-1">
                 <div>
-                  <span className="text-gray-400">// Objective</span>
+                  <span className="text-muted-foreground">// Objective</span>
                 </div>
                 <div>
                   <span className="text-yellow-300">{problem.objectiveType.toUpperCase()}</span>
                   {' z = '}
                   {problem.objectiveCoefficients.map((c, i) => (
-                    <span key={i}>{i > 0 ? ' + ' : ''}<span className="text-green-300">{c}</span>x{i + 1}</span>
+                    <span key={i}>{i > 0 ? ' + ' : ''}<span className="text-emerald-300">{c}</span>x{i + 1}</span>
                   ))}
                 </div>
                 <div className="mt-1">
-                  <span className="text-gray-400">// Subject to</span>
+                  <span className="text-muted-foreground">// Subject to</span>
                 </div>
                 {problem.constraints.map((c, i) => (
                   <div key={i}>
                     {'  '}
                     {c.coefficients.map((v, j) => (
-                      <span key={j}>{j > 0 ? ' + ' : ''}<span className="text-green-300">{v}</span>x{j + 1}</span>
+                      <span key={j}>{j > 0 ? ' + ' : ''}<span className="text-emerald-300">{v}</span>x{j + 1}</span>
                     ))}
                     {' '}<span className="text-yellow-300">{c.operator}</span>
-                    {' '}<span className="text-green-300">{c.rhs}</span>
-                    {c.label && <span className="text-gray-500 ml-2">({c.label})</span>}
+                    {' '}<span className="text-emerald-300">{c.rhs}</span>
+                    {c.label && <span className="text-muted-foreground ml-2">({c.label})</span>}
                   </div>
                 ))}
                 <div>
@@ -772,7 +772,7 @@ function FormulationWizard({
 
               <Button
                 onClick={onDone}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="w-full bg-primary hover:bg-primary text-white"
               >
                 Looks good — Choose a Method →
               </Button>
@@ -882,31 +882,31 @@ function EnterOwnForm({
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-2xl mx-auto space-y-5">
-        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5">
-          <h3 className="text-base font-bold text-gray-900">Enter Your LP</h3>
+        <div className="bg-card border border-border rounded-xl p-5 space-y-5">
+          <h3 className="text-base font-bold text-foreground">Enter Your LP</h3>
 
           {/* Variables / Constraints count */}
           <div className="flex gap-6">
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">
+              <label className="text-xs font-medium text-muted-foreground block mb-1">
                 Number of variables
               </label>
               <select
                 value={numVars}
                 onChange={e => setNumVars(Number(e.target.value))}
-                className="text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:border-indigo-400"
+                className="text-sm border border-border rounded px-3 py-1.5 bg-card focus:outline-none focus:border-primary/60"
               >
                 {[2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">
+              <label className="text-xs font-medium text-muted-foreground block mb-1">
                 Number of constraints
               </label>
               <select
                 value={numConstraints}
                 onChange={e => setNumConstraints(Number(e.target.value))}
-                className="text-sm border border-gray-300 rounded px-3 py-1.5 bg-white focus:outline-none focus:border-indigo-400"
+                className="text-sm border border-border rounded px-3 py-1.5 bg-card focus:outline-none focus:border-primary/60"
               >
                 {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
@@ -915,17 +915,17 @@ function EnterOwnForm({
 
           {/* Objective */}
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-2">Objective</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-2">Objective</label>
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+              <div className="flex rounded-lg border border-border overflow-hidden">
                 {(['max', 'min'] as const).map(t => (
                   <button
                     key={t}
                     onClick={() => setObjectiveType(t)}
                     className={`px-3 py-1.5 text-sm font-semibold transition-colors ${
                       objectiveType === t
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-50'
+                        ? 'bg-primary text-white'
+                        : 'bg-card text-muted-foreground hover:bg-muted/40'
                     }`}
                   >
                     {t.toUpperCase()}
@@ -935,7 +935,7 @@ function EnterOwnForm({
               <span className="text-sm font-medium">z =</span>
               {Array.from({ length: numVars }, (_, i) => (
                 <div key={i} className="flex items-center gap-1">
-                  {i > 0 && <span className="text-gray-400">+</span>}
+                  {i > 0 && <span className="text-muted-foreground">+</span>}
                   <input
                     type="text"
                     inputMode="decimal"
@@ -947,9 +947,9 @@ function EnterOwnForm({
                       c[i] = e.target.value;
                       setObjCoeffs(c);
                     }}
-                    className="w-16 text-base text-center border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                    className="w-16 text-base text-center border border-border rounded px-2 py-1.5 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-indigo-200"
                   />
-                  <span className="text-sm font-mono text-gray-700">x{i + 1}</span>
+                  <span className="text-sm font-mono text-foreground">x{i + 1}</span>
                 </div>
               ))}
             </div>
@@ -957,14 +957,14 @@ function EnterOwnForm({
 
           {/* Constraints */}
           <div>
-            <label className="text-xs font-medium text-gray-600 block mb-2">Constraints</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-2">Constraints</label>
             <div className="space-y-2">
               {constraints.map((c, idx) => (
-                <div key={idx} className="flex items-center gap-2 flex-wrap p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-mono text-gray-500 w-6">C{idx + 1}</span>
+                <div key={idx} className="flex items-center gap-2 flex-wrap p-3 bg-muted/40 rounded-lg">
+                  <span className="text-sm font-mono text-muted-foreground w-6">C{idx + 1}</span>
                   {Array.from({ length: numVars }, (_, i) => (
                     <div key={i} className="flex items-center gap-1">
-                      {i > 0 && <span className="text-gray-400 text-sm">+</span>}
+                      {i > 0 && <span className="text-muted-foreground text-sm">+</span>}
                       <input
                         type="text"
                         inputMode="decimal"
@@ -980,9 +980,9 @@ function EnterOwnForm({
                           });
                           setConstraints(nc);
                         }}
-                        className="w-16 text-base text-center border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                        className="w-16 text-base text-center border border-border rounded px-2 py-1.5 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-indigo-200"
                       />
-                      <span className="text-sm font-mono text-gray-600">x{i + 1}</span>
+                      <span className="text-sm font-mono text-muted-foreground">x{i + 1}</span>
                     </div>
                   ))}
                   <select
@@ -993,7 +993,7 @@ function EnterOwnForm({
                       );
                       setConstraints(nc);
                     }}
-                    className="text-base border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    className="text-base border border-border rounded px-2 py-1.5 bg-card focus:outline-none focus:ring-2 focus:ring-indigo-200"
                   >
                     <option value="<=">≤</option>
                     <option value=">=">≥</option>
@@ -1011,7 +1011,7 @@ function EnterOwnForm({
                       );
                       setConstraints(nc);
                     }}
-                    className="w-20 text-base text-center border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                    className="w-20 text-base text-center border border-border rounded px-2 py-1.5 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-indigo-200"
                   />
                 </div>
               ))}
@@ -1019,14 +1019,14 @@ function EnterOwnForm({
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 flex items-center gap-1.5">
+            <div className="text-sm text-destructive flex items-center gap-1.5">
               <XCircle className="w-4 h-4" /> {error}
             </div>
           )}
 
           <Button
             onClick={handleSubmit}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="w-full bg-primary hover:bg-primary text-white"
           >
             Continue to Method Selection →
           </Button>
@@ -1096,23 +1096,23 @@ function MethodSelector({
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-xl mx-auto space-y-5">
         <div className="text-center">
-          <h3 className="text-xl font-bold text-gray-900">Choose a Method</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <h3 className="text-xl font-bold text-foreground">Choose a Method</h3>
+          <p className="text-sm text-muted-foreground mt-1">
             Based on your constraint types, which solving method should we use?
           </p>
         </div>
 
         {/* Constraint summary */}
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Your constraint operators</p>
+        <div className="bg-muted/40 rounded-xl border border-border p-4">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Your constraint operators</p>
           <div className="flex gap-2 flex-wrap">
             {constraints.map((c, i) => (
               <span
                 key={i}
                 className={`text-xs px-2.5 py-1 rounded-full font-medium border ${
-                  c.operator === '<=' ? 'bg-green-50 text-green-700 border-green-200' :
+                  c.operator === '<=' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' :
                   c.operator === '>=' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                        'bg-purple-50 text-purple-700 border-purple-200'
+                                        'bg-primary/10 text-primary border-primary/30'
                 }`}
               >
                 C{i + 1}: {c.operator}
@@ -1126,9 +1126,9 @@ function MethodSelector({
           {methods.map(m => {
             const isChosen  = chosen === m.id;
             const isCorrect = m.id === correct.method;
-            let border = 'border-gray-200 hover:border-indigo-300';
+            let border = 'border-border hover:border-primary/40';
             if (isChosen && feedback) {
-              border = feedback.kind === 'correct' ? 'border-green-400 bg-green-50' : 'border-red-300 bg-red-50';
+              border = feedback.kind === 'correct' ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-destructive/40 bg-destructive/10';
             }
             return (
               <button
@@ -1138,16 +1138,16 @@ function MethodSelector({
                 className={`w-full text-left border-2 rounded-xl p-4 transition-all ${border} disabled:opacity-60`}
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">
+                  <div className="w-9 h-9 bg-primary/20 rounded-lg flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
                     {m.icon}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-gray-900">{m.label}</span>
-                      {isChosen && feedback?.kind === 'correct' && <CheckCircle className="w-4 h-4 text-green-600" />}
-                      {isChosen && feedback?.kind === 'wrong'   && <XCircle className="w-4 h-4 text-red-500" />}
+                      <span className="text-sm font-bold text-foreground">{m.label}</span>
+                      {isChosen && feedback?.kind === 'correct' && <CheckCircle className="w-4 h-4 text-emerald-400" />}
+                      {isChosen && feedback?.kind === 'wrong'   && <XCircle className="w-4 h-4 text-destructive" />}
                     </div>
-                    <p className="text-xs text-gray-600 mt-0.5 leading-relaxed">{m.desc}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{m.desc}</p>
                   </div>
                 </div>
               </button>
@@ -1159,19 +1159,19 @@ function MethodSelector({
         {feedback && (
           <div className={`rounded-xl p-4 text-sm ${
             feedback.kind === 'correct'
-              ? 'bg-green-50 border border-green-300 text-green-800'
-              : 'bg-amber-50 border border-amber-300 text-amber-800'
+              ? 'bg-emerald-500/10 border border-emerald-500/40 text-emerald-200'
+              : 'bg-amber-500/10 border border-amber-500/40 text-amber-200'
           }`}>
             {feedback.kind === 'correct'
-              ? <CheckCircle className="inline w-4 h-4 mr-1.5 text-green-600" />
-              : <AlertTriangle className="inline w-4 h-4 mr-1.5 text-amber-600" />}
+              ? <CheckCircle className="inline w-4 h-4 mr-1.5 text-emerald-400" />
+              : <AlertTriangle className="inline w-4 h-4 mr-1.5 text-amber-400" />}
             {feedback.msg}
           </div>
         )}
 
         {/* Hint */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
-          <Lightbulb className="inline w-3.5 h-3.5 mr-1 text-blue-500" />
+        <div className="bg-accent/10 border border-accent/30 rounded-xl p-3 text-xs text-accent">
+          <Lightbulb className="inline w-3.5 h-3.5 mr-1 text-accent" />
           <strong>Hint:</strong>{' '}
           {constraints.some(c => c.operator === '=')
             ? 'You have an equality (=) constraint. Which method specifically handles equality constraints?'
@@ -1186,7 +1186,7 @@ function MethodSelector({
           {feedback?.kind === 'correct' && (
             <Button
               onClick={() => onSelect(correct.method)}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="flex-1 bg-primary hover:bg-primary text-white"
             >
               <Zap className="w-4 h-4 mr-1.5" />
               Let's Solve It!
@@ -1321,9 +1321,9 @@ function SolvingScreen({
         <div className="space-y-3">
           {phase === 'e0_arrive' && (
             <div className="space-y-3">
-              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3">
-                <p className="text-sm font-bold text-amber-800 mb-1">Z-Row Setup Required</p>
-                <p className="text-xs text-amber-700 leading-relaxed">
+              <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-3">
+                <p className="text-sm font-bold text-amber-200 mb-1">Z-Row Setup Required</p>
+                <p className="text-xs text-amber-300 leading-relaxed">
                   Before selecting a pivot, the Z-row must be adjusted. Basic artificial
                   variables have nonzero coefficients in the Z-row that must be eliminated
                   using row operations.
@@ -1331,7 +1331,7 @@ function SolvingScreen({
               </div>
               <Button
                 onClick={guided.e0Begin}
-                className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white"
               >
                 Begin Z-Row Setup
               </Button>
@@ -1340,11 +1340,11 @@ function SolvingScreen({
 
           {(phase === 'e0_attention' || phase === 'e0_commitment') && (
             <div className="space-y-3">
-              <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                <p className="text-xs font-bold text-indigo-800 mb-1">
+              <div className="bg-primary/10 border border-primary/40 rounded-lg p-3">
+                <p className="text-xs font-bold text-primary mb-1">
                   Clear Artificial {gs.currentArtificialIdx + 1} of {gs.artificialRows.length}
                 </p>
-                <p className="text-xs text-indigo-700 leading-relaxed">
+                <p className="text-xs text-primary leading-relaxed">
                   A basic artificial variable still has a nonzero coefficient in the Z-row.
                   Click the row where this artificial is basic — that row will be used to
                   eliminate the coefficient via a row operation.
@@ -1354,9 +1354,9 @@ function SolvingScreen({
               {feedback && renderFeedback(feedback)}
 
               {phase === 'e0_commitment' && feedback?.type === 'correct' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
-                  <p className="text-xs text-blue-800">
+                <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
+                  <p className="text-xs text-accent">
                     Applying row operation…
                   </p>
                 </div>
@@ -1374,14 +1374,14 @@ function SolvingScreen({
           {/* A1: Arrive — "Choose Entering Variable" button */}
           {phase === 'a1_arrive' && (
             <div className="space-y-3">
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="text-xs text-gray-700 leading-relaxed">
+              <div className="bg-muted/40 border border-border rounded-lg p-3">
+                <p className="text-xs text-foreground leading-relaxed">
                   The tableau is ready. Your task: identify which variable should enter the basis to improve the objective.
                 </p>
               </div>
               <Button
                 onClick={guided.clickChooseEntering}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="w-full bg-primary hover:bg-primary text-white"
               >
                 Choose Entering Variable
               </Button>
@@ -1391,17 +1391,17 @@ function SolvingScreen({
           {/* A2/A3: Attention + Commitment — instruction, waiting for click */}
           {(phase === 'a2_attention' || phase === 'a3_commitment') && (
             <div className="space-y-3">
-              <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                <p className="text-xs font-bold text-indigo-800 mb-1">
+              <div className="bg-primary/10 border border-primary/40 rounded-lg p-3">
+                <p className="text-xs font-bold text-primary mb-1">
                   Episode A: Choose the Entering Variable
                 </p>
-                <p className="text-xs text-indigo-700 leading-relaxed">
+                <p className="text-xs text-primary leading-relaxed">
                   The Z-row shows how each variable affects the objective.
                   {problem.objectiveType === 'max'
                     ? ' For MAX: negative values indicate improvement. Which variable should enter the basis?'
                     : ' For MIN: positive values indicate improvement. Which variable should enter the basis?'}
                 </p>
-                <p className="text-xs text-indigo-600 mt-2 font-medium">
+                <p className="text-xs text-primary mt-2 font-medium">
                   Click a cell in the Z-row above.
                 </p>
               </div>
@@ -1411,9 +1411,9 @@ function SolvingScreen({
 
               {/* Show reasoning after 4+ attempts */}
               {attemptCount >= 4 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-blue-800 mb-1">Step-by-step reasoning:</p>
-                  <p className="text-xs text-blue-700 leading-relaxed">
+                <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
+                  <p className="text-xs font-bold text-accent mb-1">Step-by-step reasoning:</p>
+                  <p className="text-xs text-accent leading-relaxed">
                     {problem.objectiveType === 'max'
                       ? '1. Scan the Z-row for all values.\n2. Negative values mean increasing that variable improves z.\n3. The MOST negative value gives the fastest improvement.\n4. Click that cell.'
                       : '1. Scan the Z-row for all values.\n2. Positive values mean increasing that variable improves z.\n3. The MOST positive value gives the fastest improvement.\n4. Click that cell.'}
@@ -1436,7 +1436,7 @@ function SolvingScreen({
                 <Button
                   onClick={guided.acceptSuboptimalChoice}
                   size="sm"
-                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                  className="bg-amber-500 hover:bg-amber-600 text-white text-xs"
                 >
                   Use this variable anyway
                 </Button>
@@ -1451,9 +1451,9 @@ function SolvingScreen({
           {phase === 'a4_reveal' && (
             <div className="space-y-3">
               {feedback && renderFeedback(feedback)}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
-                <p className="text-xs text-blue-800">
+              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
+                <p className="text-xs text-accent">
                   Column highlighted. Moving to leaving variable selection…
                 </p>
               </div>
@@ -1470,15 +1470,15 @@ function SolvingScreen({
           {/* B1/B3: Attention + Commitment */}
           {(phase === 'b1_attention' || phase === 'b3_commitment') && (
             <div className="space-y-3">
-              <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                <p className="text-xs font-bold text-indigo-800 mb-1">
+              <div className="bg-primary/10 border border-primary/40 rounded-lg p-3">
+                <p className="text-xs font-bold text-primary mb-1">
                   Episode B: Choose the Leaving Variable
                 </p>
-                <p className="text-xs text-indigo-700 leading-relaxed">
+                <p className="text-xs text-primary leading-relaxed">
                   Divide RHS by the pivot column entry (only where the entry is positive).
                   The smallest ratio determines the leaving variable — it&apos;s the first constraint that would be violated.
                 </p>
-                <p className="text-xs text-indigo-600 mt-2 font-medium">
+                <p className="text-xs text-primary mt-2 font-medium">
                   Click a row in the highlighted blue column above.
                 </p>
               </div>
@@ -1486,9 +1486,9 @@ function SolvingScreen({
               {feedback && renderFeedback(feedback)}
 
               {attemptCount >= 4 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs font-bold text-blue-800 mb-1">Step-by-step reasoning:</p>
-                  <p className="text-xs text-blue-700 leading-relaxed whitespace-pre-line">
+                <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
+                  <p className="text-xs font-bold text-accent mb-1">Step-by-step reasoning:</p>
+                  <p className="text-xs text-accent leading-relaxed whitespace-pre-line">
                     1. Look at each row in the pivot column.{'\n'}
                     2. Skip rows with zero or negative entries.{'\n'}
                     3. For positive entries: compute RHS / entry.{'\n'}
@@ -1509,9 +1509,9 @@ function SolvingScreen({
           {phase === 'b4_reveal' && (
             <div className="space-y-3">
               {feedback && renderFeedback(feedback)}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin" />
-                <p className="text-xs text-blue-800">
+              <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
+                <p className="text-xs text-accent">
                   Ratios confirmed. Preparing pivot…
                 </p>
               </div>
@@ -1522,14 +1522,14 @@ function SolvingScreen({
           {phase === 'b5_apply' && (
             <div className="space-y-3">
               {feedback && renderFeedback(feedback)}
-              <div className="bg-green-50 border border-green-300 rounded-lg p-3">
-                <p className="text-xs text-green-800 leading-relaxed">
+              <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-3">
+                <p className="text-xs text-emerald-200 leading-relaxed">
                   Pivot selected. Click below to apply the row operations and advance to the next tableau.
                 </p>
               </div>
               <Button
                 onClick={guided.applyPivot}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
               >
                 <Play className="w-3.5 h-3.5 mr-1.5" />
                 Apply Pivot
@@ -1546,18 +1546,18 @@ function SolvingScreen({
   /** Render a feedback message with appropriate styling. */
   function renderFeedback(fb: NonNullable<typeof gs.feedback>) {
     const bgMap = {
-      invalid: 'bg-red-50 border-red-300 text-red-800',
-      suboptimal: 'bg-amber-50 border-amber-300 text-amber-800',
-      correct: 'bg-green-50 border-green-300 text-green-800',
-      hint: 'bg-blue-50 border-blue-300 text-blue-800',
-      reasoning: 'bg-blue-50 border-blue-300 text-blue-800',
+      invalid: 'bg-destructive/10 border-destructive/40 text-destructive',
+      suboptimal: 'bg-amber-500/10 border-amber-500/40 text-amber-200',
+      correct: 'bg-emerald-500/10 border-emerald-500/40 text-emerald-200',
+      hint: 'bg-accent/10 border-accent/40 text-accent',
+      reasoning: 'bg-accent/10 border-accent/40 text-accent',
     };
     const iconMap = {
-      invalid: <XCircle className="inline w-3.5 h-3.5 mr-1.5 text-red-500 flex-shrink-0" />,
-      suboptimal: <AlertTriangle className="inline w-3.5 h-3.5 mr-1.5 text-amber-600 flex-shrink-0" />,
-      correct: <CheckCircle className="inline w-3.5 h-3.5 mr-1.5 text-green-600 flex-shrink-0" />,
-      hint: <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-blue-600 flex-shrink-0" />,
-      reasoning: <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-blue-600 flex-shrink-0" />,
+      invalid: <XCircle className="inline w-3.5 h-3.5 mr-1.5 text-destructive flex-shrink-0" />,
+      suboptimal: <AlertTriangle className="inline w-3.5 h-3.5 mr-1.5 text-amber-400 flex-shrink-0" />,
+      correct: <CheckCircle className="inline w-3.5 h-3.5 mr-1.5 text-emerald-400 flex-shrink-0" />,
+      hint: <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-accent flex-shrink-0" />,
+      reasoning: <Lightbulb className="inline w-3.5 h-3.5 mr-1.5 text-accent flex-shrink-0" />,
     };
     return (
       <div className={`rounded-lg p-3 text-xs leading-relaxed border whitespace-pre-line ${bgMap[fb.type]}`}>
@@ -1570,7 +1570,7 @@ function SolvingScreen({
   // ── Sub-phase: loading ───────────────────────────────────────────────────────
   if (isLoading || solvingSubPhase === 'loading') {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
         <Loader2 className="w-6 h-6 animate-spin mr-2" />
         {isLoading ? 'Solving your LP…' : 'Preparing…'}
       </div>
@@ -1580,9 +1580,9 @@ function SolvingScreen({
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md text-center">
-          <p className="text-red-700 font-medium">Solver Error</p>
-          <p className="text-sm text-red-600 mt-1">{error}</p>
+        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-6 max-w-md text-center">
+          <p className="text-destructive font-medium">Solver Error</p>
+          <p className="text-sm text-destructive mt-1">{error}</p>
         </div>
       </div>
     );
@@ -1622,7 +1622,7 @@ function SolvingScreen({
     <div className="flex-1 flex flex-col overflow-hidden">
 
       {/* TOP: Tableau (60%) */}
-      <div className="h-3/5 border-b border-gray-300 bg-white overflow-auto">
+      <div className="h-3/5 border-b border-border bg-card overflow-auto">
         {currentStep ? (
           <TableauWorkspace
             tableau={currentStep.tableau}
@@ -1635,7 +1635,7 @@ function SolvingScreen({
             guidedPhase={needsInteraction ? tableauProps : undefined}
           />
         ) : (
-          <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
             Loading…
           </div>
         )}
@@ -1645,20 +1645,20 @@ function SolvingScreen({
       <div className="h-2/5 flex overflow-hidden">
 
         {/* Bottom-left: Guidance */}
-        <div className="w-1/2 border-r border-gray-300 overflow-hidden flex flex-col">
+        <div className="w-1/2 border-r border-border overflow-hidden flex flex-col">
 
           {/* Step header */}
           {currentStep && (
-            <div className="flex-shrink-0 px-4 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
+            <div className="flex-shrink-0 px-4 py-2 bg-primary/10 border-b border-primary/30 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="text-xs">
                   {STEP_LABEL[currentStep.stepType] ?? currentStep.stepType}
                 </Badge>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted-foreground">
                   Step {currentStepIndex + 1} of {steps.length}
                 </span>
               </div>
-              <span className="text-xs text-indigo-700 font-medium">
+              <span className="text-xs text-primary font-medium">
                 z = {currentStep.objectiveValue.toFixed(2)}
               </span>
             </div>
@@ -1668,19 +1668,19 @@ function SolvingScreen({
 
             {/* Special case banner */}
             {wordProblem?.specialCaseNote && (currentStep?.stepType === 'optimal' || currentStep?.stepType === 'infeasible' || currentStep?.stepType === 'unbounded' || currentStep?.stepType === 'alternative') && (
-              <div className="bg-rose-50 border border-rose-300 rounded-lg p-3 flex gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+              <div className="bg-destructive/10 border border-rose-300 rounded-lg p-3 flex gap-2">
+                <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-rose-800">{wordProblem.specialCaseNote}</p>
               </div>
             )}
 
             {/* Alternative / degenerate flags */}
             {currentStep?.hasAlternative && (
-              <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 flex gap-2">
-                <Info className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+              <div className="bg-primary/10 border border-primary/40 rounded-lg p-3 flex gap-2">
+                <Info className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-bold text-indigo-800">Alternative Optimal Solutions</p>
-                  <p className="text-xs text-indigo-700 mt-0.5">
+                  <p className="text-xs font-bold text-primary">Alternative Optimal Solutions</p>
+                  <p className="text-xs text-primary mt-0.5">
                     A nonbasic decision variable has a zero reduced cost. Infinitely many optimal
                     solutions exist along the edge between two optimal corners.
                   </p>
@@ -1688,11 +1688,11 @@ function SolvingScreen({
               </div>
             )}
             {currentStep?.isDegenerate && (
-              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 flex gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="bg-amber-500/10 border border-amber-500/40 rounded-lg p-3 flex gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-bold text-amber-800">Degenerate BFS</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
+                  <p className="text-xs font-bold text-amber-200">Degenerate BFS</p>
+                  <p className="text-xs text-amber-300 mt-0.5">
                     A basic variable equals zero. Bland's Rule is used to prevent cycling.
                   </p>
                 </div>
@@ -1707,20 +1707,20 @@ function SolvingScreen({
               <>
                 {/* Hint */}
                 {hint && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <Lightbulb className="w-3.5 h-3.5 text-blue-600" />
-                      <p className="text-xs font-bold text-blue-800">What's happening</p>
+                      <Lightbulb className="w-3.5 h-3.5 text-accent" />
+                      <p className="text-xs font-bold text-accent">What's happening</p>
                     </div>
-                    <p className="text-xs text-blue-900 leading-relaxed">{hint}</p>
+                    <p className="text-xs text-foreground leading-relaxed">{hint}</p>
                   </div>
                 )}
 
                 {/* Solver explanation */}
                 {currentStep?.explanation && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <p className="text-xs font-bold text-gray-500 mb-1">Solver</p>
-                    <p className="text-xs text-gray-700 font-mono leading-relaxed whitespace-pre-wrap">
+                  <div className="bg-muted/40 border border-border rounded-lg p-3">
+                    <p className="text-xs font-bold text-muted-foreground mb-1">Solver</p>
+                    <p className="text-xs text-foreground font-mono leading-relaxed whitespace-pre-wrap">
                       {currentStep.explanation}
                     </p>
                   </div>
@@ -1728,9 +1728,9 @@ function SolvingScreen({
 
                 {/* After-pivot: guidance (student navigated back here) */}
                 {stepType === 'after_pivot' && (
-                  <div className="bg-green-50 border border-green-300 rounded-lg p-3">
-                    <p className="text-xs text-green-800">
-                      <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-green-600" />
+                  <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-3">
+                    <p className="text-xs text-emerald-200">
+                      <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-emerald-400" />
                       Pivot complete. Use the row operation stepper above to review what happened.
                     </p>
                   </div>
@@ -1738,12 +1738,12 @@ function SolvingScreen({
 
                 {/* Optimal: celebration + summary */}
                 {stepType === 'optimal' && (
-                  <div className="bg-green-50 border border-green-300 rounded-lg p-4">
-                    <p className="text-sm font-bold text-green-800 flex items-center gap-1.5 mb-2">
+                  <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-4">
+                    <p className="text-sm font-bold text-emerald-200 flex items-center gap-1.5 mb-2">
                       <CheckCircle className="w-4 h-4" />
                       Optimal Solution Found!
                     </p>
-                    <p className="text-xs text-green-700 leading-relaxed">
+                    <p className="text-xs text-emerald-300 leading-relaxed">
                       All Z-row entries are non-negative. The simplex method has converged.
                       Read the basic variable values from the RHS column of the final tableau above.
                     </p>
@@ -1752,8 +1752,8 @@ function SolvingScreen({
 
                 {/* Infeasible / Unbounded */}
                 {(stepType === 'infeasible' || stepType === 'unbounded') && (
-                  <div className="bg-red-50 border border-red-300 rounded-lg p-4">
-                    <p className="text-sm font-bold text-red-800 flex items-center gap-1.5">
+                  <div className="bg-destructive/10 border border-destructive/40 rounded-lg p-4">
+                    <p className="text-sm font-bold text-destructive flex items-center gap-1.5">
                       <AlertTriangle className="w-4 h-4" />
                       {stepType === 'infeasible' ? 'No Feasible Solution' : 'Unbounded Solution'}
                     </p>
@@ -1762,8 +1762,8 @@ function SolvingScreen({
 
                 {/* Phase I complete: transition message */}
                 {stepType === 'phase1_complete' && (
-                  <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                    <p className="text-xs text-indigo-800">
+                  <div className="bg-primary/10 border border-primary/40 rounded-lg p-3">
+                    <p className="text-xs text-primary">
                       Phase I is complete. All artificial variables have been driven to zero.
                       The original objective will now be restored for Phase II.
                     </p>
@@ -1776,7 +1776,7 @@ function SolvingScreen({
         </div>
 
         {/* Bottom-right: Graph */}
-        <div className="w-1/2 bg-white overflow-hidden">
+        <div className="w-1/2 bg-card overflow-hidden">
           {problem.variables.length === 2 ? (
             <GraphView
               constraints={problem.constraints}
@@ -1789,8 +1789,8 @@ function SolvingScreen({
               guidedGraph={needsInteraction ? graphProps : undefined}
             />
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
                 <span className="text-2xl">📊</span>
               </div>
               <p className="text-sm font-medium">Graph not available</p>
@@ -1805,7 +1805,7 @@ function SolvingScreen({
 
       {/* Step timeline */}
       {steps.length > 0 && (
-        <div className="flex-shrink-0 bg-white border-t border-gray-200 px-4 py-2 flex items-center gap-2">
+        <div className="flex-shrink-0 bg-card border-t border-border px-4 py-2 flex items-center gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -1828,10 +1828,10 @@ function SolvingScreen({
                   disabled={!canJump}
                   className={`flex-shrink-0 w-2.5 h-2.5 rounded-full transition-colors ${
                     i === currentStepIndex
-                      ? 'bg-indigo-600 scale-125'
+                      ? 'bg-primary scale-125'
                       : i < currentStepIndex
-                      ? 'bg-indigo-300 hover:bg-indigo-400'
-                      : 'bg-gray-200'
+                      ? 'bg-primary/60 hover:bg-primary/80'
+                      : 'bg-muted/80'
                   } disabled:cursor-default`}
                   title={canJump ? `Step ${i + 1}: ${STEP_LABEL[s.stepType] ?? s.stepType}` : 'Complete the pivot to unlock'}
                 />
@@ -1952,7 +1952,7 @@ export default function PracticeMode() {
           if (target === 'navigate-home') navigate('/');
           else setPhase(target);
         }}
-        className="text-white hover:bg-white/20"
+        className="text-white hover:bg-card/20"
       >
         <ArrowLeft className="w-4 h-4 mr-1" />
         {target === 'home' ? 'Home' : target === 'navigate-home' ? 'Exit' : 'Back'}
@@ -1963,7 +1963,7 @@ export default function PracticeMode() {
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-muted overflow-hidden">
 
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-700 to-blue-600 text-white px-5 py-3.5
@@ -1973,7 +1973,7 @@ export default function PracticeMode() {
             variant="ghost"
             size="sm"
             onClick={() => navigate('/')}
-            className="text-white hover:bg-white/20"
+            className="text-white hover:bg-card/20"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
             Home
@@ -2014,7 +2014,7 @@ export default function PracticeMode() {
         {phase === 'read_problem' && selectedProblem && (
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-2xl mx-auto space-y-5">
-              <div className={`text-white rounded-2xl p-6 ${CATEGORY_COLOR[selectedProblem.category] ?? 'bg-gray-700'}`}>
+              <div className={`text-white rounded-2xl p-6 ${CATEGORY_COLOR[selectedProblem.category] ?? 'bg-muted'}`}>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xs font-bold uppercase tracking-wide opacity-80">
                     {selectedProblem.category}
@@ -2033,15 +2033,15 @@ export default function PracticeMode() {
                 </div>
               </div>
 
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wide mb-3">The Problem</h3>
-                <p className="text-base text-gray-800 leading-relaxed whitespace-pre-line">
+              <div className="bg-card border border-border rounded-xl p-6">
+                <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wide mb-3">The Problem</h3>
+                <p className="text-base text-foreground leading-relaxed whitespace-pre-line">
                   {selectedProblem.scenario}
                 </p>
               </div>
 
-              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-                <p className="text-xs text-indigo-700 leading-relaxed">
+              <div className="bg-primary/10 border border-primary/30 rounded-xl p-4">
+                <p className="text-xs text-primary leading-relaxed">
                   <strong>Your task:</strong> Read the problem carefully. In the next step, you'll identify
                   the decision variables (what we're deciding), write the objective function (what we're
                   optimizing), and set up each constraint. The system will check your work and give hints
@@ -2051,7 +2051,7 @@ export default function PracticeMode() {
 
               <Button
                 onClick={() => setPhase('formulate')}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 text-base"
+                className="w-full bg-primary hover:bg-primary text-white py-3 text-base"
               >
                 I've read it — Let's Formulate →
               </Button>
