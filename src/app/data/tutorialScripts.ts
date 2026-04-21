@@ -751,6 +751,44 @@ const TOY_FACTORY_PHASE5: Question[] = [
   },
 ];
 
+// ── Toy Factory — Phase 6: a taste of sensitivity analysis ──────────────────
+//
+// The student has the optimal answer. Real managers then ask "what if…"
+// questions: what if the truck profit drops? what if we get more
+// assembly hours? This phase plants those questions and points the student
+// to the interactive Sensitivity lens in the free workspace.
+
+const TOY_FACTORY_PHASE6: Question[] = [
+  {
+    kind: 'mc',
+    id: 'toy-s-concept',
+    phase: 6,
+    prompt: 'Managers rarely leave a solution alone — they ask: "what if the truck profit drops from $20 to $12? What if we could get 10 more assembly hours?" That\'s sensitivity analysis. What does it actually compute?',
+    options: [
+      { id: 'ranges', label: 'How much each parameter (profits, capacities) can change before the optimal MIX shifts.' },
+      { id: 'resolve', label: 'A completely new LP for every tiny change.' },
+      { id: 'nothing', label: 'Nothing — once an LP is solved it\'s fixed forever.' },
+    ],
+    correctId: 'ranges',
+    hint: 'The point of sensitivity: reuse the optimal tableau you just built to quickly answer "does the answer still hold if X changes?" — without re-solving.',
+    commit: { type: 'note', text: 'sensitivity-concept' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-s-shadow',
+    phase: 6,
+    prompt: 'The Z-row of your final tableau is (0, 0, 3.75, 2.5). Those last two numbers — 3.75 under s₁ and 2.5 under s₂ — are the SHADOW PRICES of the two constraints. What does 3.75 mean?',
+    options: [
+      { id: 'per-unit', label: 'If the assembly-hours limit rises by 1 (from 80 to 81), profit rises by $3.75.' },
+      { id: 'per-car', label: 'Each toy car costs $3.75 to make.' },
+      { id: 'slack', label: 'There are 3.75 unused assembly hours.' },
+    ],
+    correctId: 'per-unit',
+    hint: 'Shadow price = marginal value of a resource. One more hour of assembly is worth $3.75 in extra profit (within the allowable range).',
+    commit: { type: 'note', text: 'shadow-price-understood' },
+  },
+];
+
 export const TOY_FACTORY_SCRIPT: TutorialScript = {
   id: 'script-toy-factory-v1',
   problemId: 'wp-toy-factory',
@@ -761,6 +799,7 @@ export const TOY_FACTORY_SCRIPT: TutorialScript = {
     ...TOY_FACTORY_PHASE3,
     ...TOY_FACTORY_PHASE4,
     ...TOY_FACTORY_PHASE5,
+    ...TOY_FACTORY_PHASE6,
   ],
 };
 
