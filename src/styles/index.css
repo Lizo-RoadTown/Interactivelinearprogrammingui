@@ -59,3 +59,18 @@
 .animate-slide-in-right {
   animation: slide-in-right 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+
+/* Fly-in-from-left — applied to a tableau cell when its value first
+ * appears. The cell starts shifted left and transparent (as if it has
+ * just been carried in from the constraint equation on the Canvas) and
+ * settles into place. Pairs with an attention-pulse on the source
+ * coefficient in the Canvas so the student sees both ends of the copy. */
+@keyframes fly-in-from-left {
+  0%   { transform: translateX(-28px) scale(0.85); opacity: 0; }
+  60%  { transform: translateX(2px)   scale(1.06); opacity: 1; }
+  100% { transform: translateX(0)     scale(1);    opacity: 1; }
+}
+
+.animate-fly-in-from-left {
+  animation: fly-in-from-left 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}

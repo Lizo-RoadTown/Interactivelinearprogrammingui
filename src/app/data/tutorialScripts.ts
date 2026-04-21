@@ -31,7 +31,12 @@ export type QuestionHighlight =
   | { target: 'tableau-col'; col: number }                      // a tableau column
   | { target: 'tableau-z-row' }                                 // the Z-row specifically
   | { target: 'tableau-slack-columns' }                         // every slack column together
-  | { target: 'tableau-rhs-column' };                           // the RHS column
+  | { target: 'tableau-rhs-column' }                            // the RHS column
+  // Constraint-wide: lights up the same constraint everywhere at once —
+  // Canvas row card, the line on the graph, its inline meter, and its
+  // row in the tableau. Connects "this row of thing you see" across all
+  // three views of the same constraint.
+  | { target: 'constraint'; constraintIndex: number };
 
 
 /** Free-text answer, graded by normalized-string comparison against accepted forms. */
@@ -157,11 +162,29 @@ export type CommitPayload =
     }
   | { type: 'note'; text: string };  // free-form annotation on the canvas
 
+/**
+ * Per-phase narration — framing cards that bracket each phase of the
+ * walkthrough. intro appears above the first question of the phase
+ * ("here's what we're doing, why it matters, which tool shines"); wrap
+ * appears once the phase is complete ("what transformed, what to
+ * remember, how it connects to the next phase").
+ */
+export interface PhaseMeta {
+  phase: number;
+  title: string;           // short name shown as header
+  goal: string;            // what the step does, one line
+  why: string;             // why it matters, one line
+  tool: string;            // which tool shines in this phase
+  wrap: string;            // closing thought after phase is done
+}
+
 export interface TutorialScript {
   id: string;
   problemId: string;  // which WordProblem this script is for
   title: string;
   questions: Question[];
+  /** Optional phase narration; if absent, no intro/wrap cards are shown. */
+  phasesMeta?: PhaseMeta[];
 }
 
 // ── Toy Factory — formulation phase (Phase 1) ────────────────────────────────
@@ -835,6 +858,57 @@ const TOY_FACTORY_PHASE6: Question[] = [
   },
 ];
 
+const TOY_FACTORY_PHASES_META: PhaseMeta[] = [
+  {
+    phase: 1,
+    title: 'Locate the constraints',
+    goal: 'Turn the word problem into variables, an objective, and inequality constraints.',
+    why: 'Every later step depends on this — a wrong constraint here means we optimize the wrong problem.',
+    tool: 'The formulation canvas — the constraints you write here stay with you for the rest of the walkthrough.',
+    wrap: 'You now have the LP in inequality form. Every next phase is a transformation of these same constraints.',
+  },
+  {
+    phase: 2,
+    title: 'See the constraints as a region',
+    goal: 'Draw each constraint as a line and pick the feasible side; their intersection is the feasible region. Drag the objective to find where it touches the region last — that\'s the optimum.',
+    why: 'Geometry gives you intuition: "feasibility" becomes a region you can see, "optimum" becomes a corner you can point at.',
+    tool: 'The graph — powerful when the problem is 2D; in higher dimensions you can\'t draw it and need the tableau instead.',
+    wrap: 'You found the optimum geometrically. Next we\'ll get the same answer algebraically — and the same constraints are coming with us.',
+  },
+  {
+    phase: 3,
+    title: 'Pin ≤ to = by adding slack',
+    goal: 'Rewrite each inequality as an equation by adding a slack variable — the unused amount. Lay the coefficients out as the initial tableau.',
+    why: 'Algorithms need equations, not inequalities. Slack is the thing that absorbs the leftover space so the equation still holds at any feasible point.',
+    tool: 'The inline meter on each constraint — it grounds the equation in what each side means physically (used vs unused).',
+    wrap: 'Every tableau row you\'re about to see is one of these equations. When we pivot, we\'ll be moving through the feasible region using these rows.',
+  },
+  {
+    phase: 4,
+    title: 'Walk the vertices with pivots',
+    goal: 'Each pivot picks the most profitable non-basic variable, moves it into the basis, and pushes out the constraint that hits its limit first — you slide along one edge of the feasible region to the next vertex.',
+    why: 'This is deterministic. The simplex will always land on the optimum in a finite number of pivots.',
+    tool: 'The tableau — each pivot is just row operations on the grid; scales to any size problem.',
+    wrap: 'Two pivots carried us from (0,0) with z = 0 to (10,15) with z = 450 — the same point you found by dragging.',
+  },
+  {
+    phase: 5,
+    title: 'Read the answer off the final tableau',
+    goal: 'When no non-basic variable can improve z, we\'re at the optimum. The RHS column of each basic row IS the optimal value of that variable.',
+    why: 'Being able to stop and read the answer off the grid is the whole point of the algorithm.',
+    tool: 'The tableau — again. The final tableau carries both the answer (RHS column) and sensitivity info (Z-row slacks).',
+    wrap: 'You just solved the same LP two different ways and got the same answer. That\'s a good reality check.',
+  },
+  {
+    phase: 6,
+    title: 'Perturb and see',
+    goal: 'What if the assembly-hours limit rises? What if the truck profit drops? Sensitivity analysis tells you how much each parameter can change without changing the optimal MIX.',
+    why: 'Real-world numbers are estimates. The optimal mix is only useful if it\'s stable to the inputs being slightly wrong.',
+    tool: 'The final tableau\'s Z-row under each slack — those numbers are the shadow prices (marginal value of loosening a constraint).',
+    wrap: 'You now have the full toolkit: formulate, visualize, standardize, pivot, read, perturb.',
+  },
+];
+
 export const TOY_FACTORY_SCRIPT: TutorialScript = {
   id: 'script-toy-factory-v1',
   problemId: 'wp-toy-factory',
@@ -847,6 +921,7 @@ export const TOY_FACTORY_SCRIPT: TutorialScript = {
     ...TOY_FACTORY_PHASE5,
     ...TOY_FACTORY_PHASE6,
   ],
+  phasesMeta: TOY_FACTORY_PHASES_META,
 };
 
 export const TUTORIAL_SCRIPTS: TutorialScript[] = [

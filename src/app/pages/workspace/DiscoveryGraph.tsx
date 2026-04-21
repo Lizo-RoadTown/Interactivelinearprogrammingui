@@ -16,6 +16,7 @@
 import { useMemo } from 'react';
 import { LPDraft } from './guidedTypes';
 import { CONSTRAINT_COLORS, colorFor, colorForFill } from './constraintColors';
+import type { QuestionHighlight } from '../../data/tutorialScripts';
 
 interface Props {
   draft: LPDraft;
@@ -46,6 +47,8 @@ interface Props {
    * still shows the slack as a geometric distance.
    */
   slacksMode?: boolean;
+  /** Constraint-wide highlight — emphasize one constraint line, dim the rest. */
+  highlight?: QuestionHighlight | null;
 }
 
 // Dimensions
@@ -55,8 +58,10 @@ const PAD = 40;
 export default function DiscoveryGraph({
   draft, linesDrawn, sideDrawnFor, feasibleRegionRevealed,
   objectiveZ, optimumConfirmed, optimumTarget, bfsPoint,
-  slacksMode = false,
+  slacksMode = false, highlight,
 }: Props) {
+  const focusedConstraint =
+    highlight?.target === 'constraint' ? highlight.constraintIndex : -1;
   // Work out the axis extents from whatever constraints have coefficients +
   // RHS set so far. Fall back to a 0..20 window if nothing yet.
   const { maxX, maxY } = useMemo(() => {
@@ -258,12 +263,20 @@ export default function DiscoveryGraph({
         const length = Math.hypot(dx, dy);
         const constraint = draft.constraints[idx];
         const rhsLabel = constraint?.rhs != null ? fmt(constraint.rhs) : '?';
+        // Constraint-wide highlight: matching line boosts its stroke and
+        // stays full-opacity; non-matching lines dim to 35% so the student's
+        // eye goes to the one under discussion.
+        const focused = focusedConstraint === idx;
+        const dimmed = focusedConstraint !== -1 && !focused;
+        const baseWidth = slacksMode ? 4 : 3;
+        const strokeW = focused ? baseWidth + 2 : baseWidth;
+        const lineOpacity = dimmed ? 0.35 : 1;
         return (
-          <g key={`line-${idx}`}>
+          <g key={`line-${idx}`} style={{ opacity: lineOpacity, transition: 'opacity 300ms ease' }}>
             <line
               x1={scaleX(a.x)} y1={scaleY(a.y)} x2={scaleX(b.x)} y2={scaleY(b.y)}
               stroke={color}
-              strokeWidth={slacksMode ? 4 : 3}
+              strokeWidth={strokeW}
               strokeLinecap="round"
               strokeDasharray={length}
               strokeDashoffset={length}

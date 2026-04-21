@@ -115,7 +115,10 @@ export default function GuidedTableau({ draft, reveal, override, highlight }: Pr
   const pulseZRow = highlight?.target === 'tableau-z-row';
   const pulseSlackCols = highlight?.target === 'tableau-slack-columns';
   const pulseRhsCol = highlight?.target === 'tableau-rhs-column';
-  const pulseRow = highlight?.target === 'tableau-row' ? highlight.row : -1;
+  const pulseRow = highlight?.target === 'tableau-row' ? highlight.row :
+                   // Constraint-wide highlight lights up the matching
+                   // tableau row too, tying the three views together.
+                   highlight?.target === 'constraint' ? highlight.constraintIndex : -1;
   const pulseCol = highlight?.target === 'tableau-col' ? highlight.col : -1;
 
   return (
@@ -224,7 +227,7 @@ function TableauCell({
     <td className="px-2 py-1.5" style={tdStyle}>
       <div
         key={value}
-        className={`inline-flex items-center justify-center w-12 h-10 rounded-lg border-2 shadow-md font-mono text-base font-bold tabular-nums animate-fill-pop${pulseCls} ${
+        className={`inline-flex items-center justify-center w-12 h-10 rounded-lg border-2 shadow-md font-mono text-base font-bold tabular-nums animate-fly-in-from-left${pulseCls} ${
           isNeg
             ? 'bg-amber-500/20 border-amber-500/50 text-amber-100 shadow-amber-500/20'
             : 'bg-emerald-500/20 border-emerald-500/50 text-emerald-100 shadow-emerald-500/20'

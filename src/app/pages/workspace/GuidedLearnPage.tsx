@@ -19,14 +19,14 @@ import { Button } from '../../components/ui/button';
 import { WORD_PROBLEMS } from '../../data/wordProblems';
 import {
   getScript, Question, TextQuestion, NumberQuestion, MCQuestion, FieldsQuestion, DragQuestion,
-  CommitPayload, QuestionHighlight,
+  CommitPayload, QuestionHighlight, PhaseMeta,
 } from '../../data/tutorialScripts';
 import DiscoveryGraph from './DiscoveryGraph';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
 import ConstraintMeter from './ConstraintMeters';
 import { LPDraft } from './guidedTypes';
 import {
-  ArrowLeft, CheckCircle, Lightbulb, Eye, Sparkles,
+  ArrowLeft, CheckCircle, Lightbulb, Eye, Sparkles, Compass, Flag,
 } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -54,6 +54,15 @@ function pickWarm(list: string[], seed: number): string {
 function normText(s: string): string {
   return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
+
+/** Which extraction event just fired — drives a short pulse on the source
+ *  coefficients in the Canvas, paired with the fly-in on tableau cells. */
+type ExtractionPulseKind =
+  | null
+  | 'slack-identity'   // pulse each row's "+ 1 s_i"
+  | 'z-row-x'          // pulse the objective coefficients (they became Z-row)
+  | 'initial-basic'    // pulse each constraint's RHS
+  | 'initial-z';       // pulse the "z =" label (0 at origin)
 
 // ── Grading ──────────────────────────────────────────────────────────────────
 
@@ -176,6 +185,13 @@ export default function GuidedLearnPage() {
   const [fieldsAnswers, setFieldsAnswers] = useState<Record<string, Record<string, string>>>({});
   /** Live slider z value during a DragQuestion, feeds into the graph. */
   const [sliderZ, setSliderZ] = useState<number | null>(null);
+  /**
+   * Transient signal that fires when a tableau-populating commit just landed.
+   * Canvas reads it to pulse the source coefficients at the same moment
+   * the matching tableau cells fly in — so the student sees both ends of
+   * the extraction. Auto-clears after one animation cycle.
+   */
+  const [extractionPulse, setExtractionPulse] = useState<ExtractionPulseKind>(null);
 
   // Per-render warm phrase seed so feedback text varies a bit between wrongs
   const wrongSeedRef = useRef(0);
@@ -399,6 +415,17 @@ export default function GuidedLearnPage() {
     });
     if (ok) {
       correctSeedRef.current++;
+      // If this answer's commit populates tableau cells, flash the matching
+      // source coefficients in the Canvas so the extraction reads as a copy.
+      const kind: ExtractionPulseKind =
+        q.commit.type === 'slack-identity-revealed' ? 'slack-identity' :
+        q.commit.type === 'z-row-x-revealed' ? 'z-row-x' :
+        q.commit.type === 'initial-basic-values-revealed' ? 'initial-basic' :
+        q.commit.type === 'initial-z-revealed' ? 'initial-z' : null;
+      if (kind) {
+        setExtractionPulse(kind);
+        setTimeout(() => setExtractionPulse(null), 1100);
+      }
       // small delay so the correct confirmation registers before advancing
       setTimeout(() => setCurrentIdx(i => Math.min(i + 1, totalQ)), 900);
     } else {
@@ -469,6 +496,32 @@ export default function GuidedLearnPage() {
                 fieldsAnswers={fieldsAnswers}
               />
             )}
+
+            {/* Phase narration — wrap card for the phase we just finished,
+                intro card for the phase we're about to start. Both stack
+                above the current question, so the student sees what's
+                closing out and what's about to begin. */}
+            {(() => {
+              if (!currentQ) return null;
+              const meta = script.phasesMeta;
+              if (!meta) return null;
+              const prevQ = currentIdx > 0 ? script.questions[currentIdx - 1] : null;
+              const firstOfPhase = !prevQ || prevQ.phase !== currentQ.phase;
+              const cards: JSX.Element[] = [];
+              if (prevQ && prevQ.phase !== currentQ.phase) {
+                const prevMeta = meta.find(m => m.phase === prevQ.phase);
+                if (prevMeta) {
+                  cards.push(<PhaseWrapCard key={`wrap-${prevMeta.phase}`} meta={prevMeta} />);
+                }
+              }
+              if (firstOfPhase) {
+                const curMeta = meta.find(m => m.phase === currentQ.phase);
+                if (curMeta) {
+                  cards.push(<PhaseIntroCard key={`intro-${curMeta.phase}`} meta={curMeta} />);
+                }
+              }
+              return cards.length > 0 ? <div className="space-y-4">{cards}</div> : null;
+            })()}
 
             {/* Current question — scrolled into view when it changes */}
             {!isDone && currentQ && (
@@ -541,6 +594,7 @@ export default function GuidedLearnPage() {
                 highlight={activeHighlight}
                 slacksAdded={tableauReveal.slacksAdded}
                 bfs={currentBFS}
+                extractionPulse={extractionPulse}
               />
             </div>
 
@@ -562,6 +616,7 @@ export default function GuidedLearnPage() {
                       optimumTarget={latestPivot?.zValue ?? optimumCommit?.zValue ?? currentDragTarget}
                       bfsPoint={bfsPoint}
                       slacksMode={tableauReveal.slacksAdded}
+                      highlight={activeHighlight}
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground italic p-6 text-center">
@@ -969,22 +1024,22 @@ function DragInput({
 
 function Canvas({
   draft, variablesCount, constraintsCount, highlight,
-  slacksAdded = false, bfs,
+  slacksAdded = false, bfs, extractionPulse = null,
 }: {
   draft: LPDraft;
   variablesCount: number;
   constraintsCount: number;
   highlight?: QuestionHighlight | null;
-  /** Once slacks are added, each row switches from inequality to equation
-   *  form: "+ s_i" slides in, the operator morphs ≤→=, and an inline
-   *  meter appears under the row showing the two pieces of that equation. */
   slacksAdded?: boolean;
-  /** Current BFS for the inline meters. Defaults to origin when absent. */
   bfs?: Record<string, number>;
+  extractionPulse?: ExtractionPulseKind;
 }) {
   const pulseOperators = highlight?.target === 'constraint-operators';
-  const pulseRhs = highlight?.target === 'constraint-rhs';
-  const pulseObjCoefs = highlight?.target === 'objective-coefficients';
+  const pulseRhs = highlight?.target === 'constraint-rhs' ||
+                   extractionPulse === 'initial-basic';
+  const pulseObjCoefs = highlight?.target === 'objective-coefficients' ||
+                        extractionPulse === 'z-row-x';
+  const pulseSlackTerms = extractionPulse === 'slack-identity';
   const metersReady =
     slacksAdded && draft.constraints.every(c =>
       c.started && c.rhs != null && c.coefficients.every(v => v != null),
@@ -1034,14 +1089,15 @@ function Canvas({
             const c = draft.constraints[ci];
             const allCoefSet = c?.coefficients.every(v => v != null) ?? false;
             const readyForMeter = slacksAdded && allCoefSet && c?.rhs != null;
-            // After slacks are added, the operator is pinned to '=' regardless
-            // of what the student originally wrote (the script only supports
-            // '≤' problems today); when the first slack-added commit fires
-            // the row morphs from inequality to equation.
             const displayOp: '<=' | '>=' | '=' | null =
               slacksAdded && c?.operator === '<=' ? '=' : (c?.operator ?? null);
+            const constraintHighlighted =
+              highlight?.target === 'constraint' && highlight.constraintIndex === ci;
             return (
-              <div key={ci} className="bg-card/40 border border-border rounded-xl p-4 space-y-3">
+              <div
+                key={ci}
+                className={`bg-card/40 border border-border rounded-xl p-4 space-y-3${constraintHighlighted ? ' animate-attention-pulse' : ''}`}
+              >
                 <div className="flex items-baseline gap-2">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                     C{ci + 1}
@@ -1071,7 +1127,7 @@ function Canvas({
                   {slacksAdded && (
                     <div className="flex items-center gap-2 animate-slide-in-right">
                       <span className="text-2xl text-muted-foreground">+</span>
-                      <SlotNumber value={1} />
+                      <SlotNumber value={1} pulse={pulseSlackTerms} />
                       <VarChip label={`s${ci + 1}`} size="sm" />
                     </div>
                   )}
@@ -1213,6 +1269,50 @@ function OperatorSlot({ op, pulse = false }: { op: '<=' | '>=' | '=' | null; pul
     >
       {sym}
     </span>
+  );
+}
+
+// ── Phase intro / wrap cards ────────────────────────────────────────────────
+// Short narration pieces that frame each phase — they act like chapter
+// openings and closings so the student always knows what this step is
+// doing, why it matters, and which tool is doing the heavy lifting.
+
+function PhaseIntroCard({ meta }: { meta: PhaseMeta }) {
+  return (
+    <div className="bg-gradient-to-br from-primary/12 via-card/80 to-card border-2 border-primary/40 rounded-xl p-4 shadow-lg shadow-primary/10 space-y-2 animate-fill-pop">
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 rounded-lg bg-primary/20 border border-primary/60 flex items-center justify-center">
+          <Compass className="w-4 h-4 text-primary" />
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-primary font-bold">
+            Step {meta.phase} · starting
+          </p>
+          <p className="text-sm text-foreground font-semibold leading-tight">{meta.title}</p>
+        </div>
+      </div>
+      <div className="text-[11px] text-foreground/90 leading-relaxed space-y-1 pl-9">
+        <p><span className="text-muted-foreground font-semibold uppercase text-[9px] tracking-wider mr-1">what:</span>{meta.goal}</p>
+        <p><span className="text-muted-foreground font-semibold uppercase text-[9px] tracking-wider mr-1">why:</span>{meta.why}</p>
+        <p><span className="text-muted-foreground font-semibold uppercase text-[9px] tracking-wider mr-1">tool:</span>{meta.tool}</p>
+      </div>
+    </div>
+  );
+}
+
+function PhaseWrapCard({ meta }: { meta: PhaseMeta }) {
+  return (
+    <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-xl p-3 space-y-1 animate-fill-pop">
+      <div className="flex items-center gap-2">
+        <Flag className="w-4 h-4 text-emerald-400" />
+        <p className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">
+          Step {meta.phase} · complete — {meta.title}
+        </p>
+      </div>
+      <p className="text-[11px] text-emerald-100/90 leading-relaxed pl-6">
+        {meta.wrap}
+      </p>
+    </div>
   );
 }
 

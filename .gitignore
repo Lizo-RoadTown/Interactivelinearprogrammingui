@@ -31,3 +31,4 @@ Instructions/
 .DS_Store
 Thumbs.db
 *.swp
+.tmp-commit-msg
