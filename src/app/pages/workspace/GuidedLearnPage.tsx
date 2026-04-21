@@ -24,6 +24,7 @@ import {
 import DiscoveryGraph, { FeasibleVertex } from './DiscoveryGraph';
 import VertexBasisPanel from './VertexBasisPanel';
 import BuildBPanel from './BuildBPanel';
+import InverseBPanel from './InverseBPanel';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
 import ConstraintMeter from './ConstraintMeters';
 import SensitivityControls from './SensitivityControls';
@@ -223,6 +224,18 @@ export default function GuidedLearnPage() {
    * data so downstream panels can name the basis.
    */
   const [selectedVertex, setSelectedVertex] = useState<FeasibleVertex | null>(null);
+  /** Once the student has pulled every basic column into B, we keep B
+   *  and its basis labels here so downstream panels (B⁻¹, the four
+   *  formulas) can use them. */
+  const [builtB, setBuiltB] = useState<{ B: number[][]; basisLabels: string[] } | null>(null);
+  /** B⁻¹ once computed; used by the four-formula panel later. */
+  const [builtBinv, setBuiltBinv] = useState<number[][] | null>(null);
+
+  // Reset the B / B⁻¹ state when the student picks a different vertex
+  useEffect(() => {
+    setBuiltB(null);
+    setBuiltBinv(null);
+  }, [selectedVertex?.x, selectedVertex?.y]);
 
   // Per-render warm phrase seed so feedback text varies a bit between wrongs
   const wrongSeedRef = useRef(0);
@@ -716,6 +729,14 @@ export default function GuidedLearnPage() {
                         draft={sensitivityActive ? liveDraft : draft}
                         vertex={selectedVertex}
                         nDecVars={problem.numVars}
+                        onBComplete={(B, basisLabels) => setBuiltB({ B, basisLabels })}
+                      />
+                    )}
+                    {selectedVertex && builtB && (
+                      <InverseBPanel
+                        B={builtB.B}
+                        basisLabels={builtB.basisLabels}
+                        onInverseComplete={(Binv) => setBuiltBinv(Binv)}
                       />
                     )}
                   </div>
