@@ -1,26 +1,27 @@
 /**
- * BuildBPanel — the student assembles the basis matrix B by clicking
- * the basic-variable columns in the original constraint matrix.
+ * BuildBPanel — the B-matrix gameboard for Phase 6.
  *
- * Visual layout:
- *   ┌─ Original constraint matrix (A) ──┐   ┌─ B ─┐
- *   │  x₁  x₂  s₁  s₂                    │   │     │
- *   │   2   4   1   0                    │ → │ 2 4 │
- *   │   3   2   0   1                    │   │ 3 2 │
- *   └────────────────────────────────────┘   └─────┘
+ * Every cell of B starts as a dashed "?" slot. The script fires a
+ * click-matrix-column question that asks the student to click one
+ * specific column of A; the matching column of A gets an attention
+ * pulse (principle 8). Clicking the right column commits
+ * { s-reveal, key: 'b-col-N' } which unlocks B's N-th column. Wrong
+ * clicks produce warm feedback through the normal answer pipeline.
  *
- * Basic-variable columns (from the selected vertex's basis) are
- * highlighted with an orange ring and a cursor-pointer; clicking one
- * "pulls" that column into the next empty slot of B. Non-basic columns
- * stay dimmed and non-interactive — this makes the meaning of B
- * literal: "it's the columns of the variables that are basic at the
- * chosen vertex."
- *
- * The reward is that when B is complete, the matrix on the right IS
- * the B used in every sensitivity formula later. The student built it.
+ * Principles met:
+ *   1  Empty ? slots until earned
+ *   2  Per-column fine-grained reveals (b-col-0, b-col-1, ...)
+ *   3  Principle-first prompts (authored in the script)
+ *   4  Click IS the answer (no typing)
+ *   7  Pop animation on reveal (fly-in-from-left)
+ *   8  Attention pulse on the target column in A
+ *   9  Color-binding: slack columns keep their signature color
+ *  10  Transforms prior work (uses constraints student built in Phase 1)
+ *  11  Clues, not answers (which variables are basic is a clue from
+ *      the VertexBasisPanel above)
+ *  12  Cross-reference: clicking a column fills B in place (one panel)
  */
 
-import { useState, useEffect } from 'react';
 import { LPDraft } from './guidedTypes';
 import { FeasibleVertex } from './DiscoveryGraph';
 import { colorFor, colorForFill } from './constraintColors';
@@ -29,18 +30,20 @@ interface Props {
   draft: LPDraft;
   vertex: FeasibleVertex;
   nDecVars: number;
-  /** Called once B is complete (all basic columns pulled). Receives the
-   *  assembled B matrix in row-major form plus the ordered basic
-   *  variable labels. */
-  onBComplete?: (B: number[][], basisLabels: string[]) => void;
+  reveals: Set<string>;
+  /** When a click-matrix-column question is active, the column in A at
+   *  this index gets the attention pulse. null = no active question. */
+  activeTargetColumn?: number | null;
+  /** Called whenever any column is clicked (right or wrong). */
+  onColumnClick?: (columnIdx: number) => void;
 }
 
 interface ColumnInfo {
-  idx: number;           // position in the combined A = [A_dec | I] matrix
-  label: string;         // 'x1' | 'x2' | 's1' | 's2' | ...
-  values: number[];      // column of length m (one per constraint)
+  idx: number;
+  label: string;
+  values: number[];
   isDecisionVar: boolean;
-  slackIdx: number;      // -1 if not a slack
+  slackIdx: number;
 }
 
 function fmt(v: number): string {
@@ -49,12 +52,9 @@ function fmt(v: number): string {
   return v.toFixed(2).replace(/\.?0+$/, '');
 }
 
-/**
- * Build the ordered list of basic variable names at a vertex. Order
- * convention: decision variables first (in index order), then slacks
- * (in constraint-index order). This is consistent with how every
- * sensitivity formula later indexes into B.
- */
+/** Canonical basis order: decision vars first (by index), then slacks
+ *  (by constraint index). Used to decide which A-column belongs in each
+ *  B-slot, so the script can author b-col-0, b-col-1, ... consistently. */
 export function basisLabelsAtVertex(vertex: FeasibleVertex, nDecVars: number, nConstraints: number): string[] {
   const basicDec: string[] = [];
   for (let i = 0; i < nDecVars; i++) {
@@ -67,10 +67,14 @@ export function basisLabelsAtVertex(vertex: FeasibleVertex, nDecVars: number, nC
   return [...basicDec, ...basicSlack];
 }
 
-export default function BuildBPanel({ draft, vertex, nDecVars, onBComplete }: Props) {
+export default function BuildBPanel({
+  draft, vertex, nDecVars, reveals, activeTargetColumn = null, onColumnClick,
+}: Props) {
   const nConstraints = draft.constraints.length;
+  const basisSize = nConstraints;
+  const basisLabels = basisLabelsAtVertex(vertex, nDecVars, nConstraints);
 
-  // Build the A = [A_dec | I_m] column list
+  // A's column list
   const columns: ColumnInfo[] = [];
   for (let v = 0; v < nDecVars; v++) {
     columns.push({
@@ -91,69 +95,36 @@ export default function BuildBPanel({ draft, vertex, nDecVars, onBComplete }: Pr
     });
   }
 
-  // Which column indices are basic at this vertex?
-  const basicIndices = new Set<number>();
-  for (let i = 0; i < nDecVars; i++) {
-    if (!vertex.zeroDecisionVars.includes(i)) basicIndices.add(i);
-  }
-  for (let i = 0; i < nConstraints; i++) {
-    if (!vertex.tightConstraints.includes(i)) basicIndices.add(nDecVars + i);
-  }
-
-  // Expected basis labels (ordered). The student pulls columns in this
-  // order — deviations are accepted but we recommend the canonical order.
-  const orderedBasisLabels = basisLabelsAtVertex(vertex, nDecVars, nConstraints);
-
-  // Local state: which columns have been pulled into B so far (in click order)
-  const [pulled, setPulled] = useState<number[]>([]);
-  // Reset when vertex changes
-  useEffect(() => { setPulled([]); }, [vertex.x, vertex.y]);
-
-  const allPulled = pulled.length === basicIndices.size;
-
-  // Fire completion callback once all basic columns are pulled.
-  // Using a memo-less check — pulled identity changes each time.
-  useEffect(() => {
-    if (allPulled && onBComplete) {
-      const B = columns[0].values.map((_, rowIdx) =>
-        pulled.map(colIdx => columns[colIdx].values[rowIdx]),
-      );
-      const labels = pulled.map(colIdx => columns[colIdx].label);
-      onBComplete(B, labels);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPulled, pulled.join(',')]);
-
-  const handlePull = (colIdx: number) => {
-    if (pulled.includes(colIdx)) return;
-    if (!basicIndices.has(colIdx)) return;
-    setPulled(p => [...p, colIdx]);
+  // Map basis label → A column index (so we know which column fills each slot)
+  const labelToAIdx = (label: string): number => {
+    if (label.startsWith('x')) return parseInt(label.slice(1), 10) - 1;
+    return nDecVars + (parseInt(label.slice(1), 10) - 1);
   };
+  const slotSourceCol = (slotIdx: number): number => labelToAIdx(basisLabels[slotIdx]);
 
-  const reset = () => setPulled([]);
+  // Which slots have been revealed?
+  const revealedSlots: boolean[] = Array.from(
+    { length: basisSize },
+    (_, i) => reveals.has(`b-col-${i}`),
+  );
+  // Derived: which A columns have been "used"? Gray them out.
+  const usedAColumns = new Set(
+    revealedSlots
+      .map((rev, i) => (rev ? slotSourceCol(i) : -1))
+      .filter(x => x >= 0),
+  );
 
   return (
     <div className="bg-card/40 border-2 border-primary/40 rounded-xl p-4 space-y-4 animate-fill-pop">
-      <div className="flex items-baseline justify-between">
-        <p className="text-[10px] uppercase tracking-wider text-primary font-bold">
-          Build B — the basis matrix
-        </p>
-        {pulled.length > 0 && !allPulled && (
-          <button
-            type="button"
-            onClick={reset}
-            className="text-[10px] text-muted-foreground hover:text-foreground underline decoration-dotted"
-          >
-            start over
-          </button>
-        )}
-      </div>
+      <p className="text-[10px] uppercase tracking-wider text-primary font-bold">
+        Build B — pull each basic column out of A
+      </p>
       <p className="text-[11px] text-foreground/90 leading-relaxed">
-        The matrix <span className="font-mono font-bold text-primary">B</span> is just
-        the columns of the original constraints that correspond to the variables
-        that are <span className="font-semibold">basic</span> at this vertex.
-        Click each <span className="text-orange-300 font-semibold">highlighted</span> column on the
-        left to pull it into <span className="font-mono font-bold text-primary">B</span> on the right.
+        <span className="font-mono font-bold text-primary">B</span> is the matrix of
+        columns of the <span className="font-semibold">basic</span> variables from A
+        (which you identified above). Each slot of B takes one column. When a question
+        asks for a specific column, the target column below will pulse — click it to
+        fill the next slot of B.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-4 items-start">
@@ -161,27 +132,28 @@ export default function BuildBPanel({ draft, vertex, nDecVars, onBComplete }: Pr
         {/* ── A matrix ──────────────────────────────────────────────── */}
         <div>
           <p className="text-[10px] text-muted-foreground mb-1 font-semibold">
-            Original constraint matrix{' '}
-            <span className="font-mono text-foreground">A</span> = [A<sub>dec</sub> | I]
+            Original constraint matrix <span className="font-mono text-foreground">A</span>
+            {' '}= [A<sub>dec</sub> | I]
           </p>
           <table className="border-collapse font-mono text-sm">
             <thead>
               <tr>
                 <th className="px-1 text-[10px] text-muted-foreground"></th>
                 {columns.map(col => {
-                  const highlight = basicIndices.has(col.idx) && !pulled.includes(col.idx);
-                  const done = pulled.includes(col.idx);
+                  const isTarget = activeTargetColumn === col.idx;
+                  const isUsed = usedAColumns.has(col.idx);
                   const slackColor = col.slackIdx >= 0 ? colorFor(col.slackIdx) : null;
+                  const cls = isUsed
+                    ? 'text-muted-foreground/40 line-through'
+                    : isTarget
+                      ? 'cursor-pointer text-orange-300'
+                      : 'cursor-pointer text-muted-foreground hover:text-foreground';
                   return (
                     <th
                       key={col.idx}
-                      onClick={() => handlePull(col.idx)}
-                      className={`px-2 py-1 text-center text-xs font-semibold select-none ${
-                        highlight ? 'cursor-pointer text-orange-300' :
-                        done ? 'text-muted-foreground/50 line-through' :
-                        'text-muted-foreground'
-                      }`}
-                      style={slackColor && !done ? { color: slackColor } : undefined}
+                      onClick={isUsed ? undefined : () => onColumnClick?.(col.idx)}
+                      className={`px-2 py-1 text-center text-xs font-semibold select-none ${cls}`}
+                      style={slackColor && !isUsed ? { color: slackColor } : undefined}
                     >
                       {col.label}
                     </th>
@@ -196,23 +168,23 @@ export default function BuildBPanel({ draft, vertex, nDecVars, onBComplete }: Pr
                     C{rowIdx + 1}
                   </td>
                   {columns.map(col => {
-                    const highlight = basicIndices.has(col.idx) && !pulled.includes(col.idx);
-                    const done = pulled.includes(col.idx);
+                    const isTarget = activeTargetColumn === col.idx;
+                    const isUsed = usedAColumns.has(col.idx);
                     const slackColor = col.slackIdx >= 0 ? colorFor(col.slackIdx) : null;
-                    const baseBg = done
+                    const cellClass = isUsed
                       ? 'bg-muted/10 border-border/40 text-muted-foreground/40'
-                      : highlight
-                        ? 'bg-orange-500/10 border-orange-400/60 text-orange-100 cursor-pointer hover:scale-105 ring-2 ring-orange-400/60 animate-attention-pulse'
-                        : 'bg-muted/40 border-border/60 text-foreground/70';
+                      : isTarget
+                        ? 'bg-orange-500/15 border-orange-400/70 text-orange-100 cursor-pointer ring-2 ring-orange-400/70 animate-attention-pulse'
+                        : 'bg-muted/40 border-border/60 text-foreground/80 cursor-pointer hover:brightness-125';
                     return (
                       <td
                         key={col.idx}
-                        onClick={() => handlePull(col.idx)}
+                        onClick={isUsed ? undefined : () => onColumnClick?.(col.idx)}
                         className="p-0.5"
                       >
                         <div
-                          className={`w-10 h-9 flex items-center justify-center rounded border text-sm font-bold tabular-nums transition-transform ${baseBg}`}
-                          style={slackColor && highlight ? { borderColor: slackColor } : undefined}
+                          className={`w-10 h-9 flex items-center justify-center rounded border-2 text-sm font-bold tabular-nums transition-transform ${cellClass}`}
+                          style={slackColor && isTarget ? { borderColor: slackColor } : undefined}
                         >
                           {fmt(col.values[rowIdx])}
                         </div>
@@ -225,38 +197,36 @@ export default function BuildBPanel({ draft, vertex, nDecVars, onBComplete }: Pr
           </table>
         </div>
 
-        {/* ── Arrow ─────────────────────────────────────────────────── */}
+        {/* ── arrow ─────────────────────────────────────────────────── */}
         <div className="flex items-center justify-center pt-6 text-muted-foreground/80 text-2xl">
           →
         </div>
 
-        {/* ── B matrix (being assembled) ──────────────────────────── */}
+        {/* ── B gameboard ──────────────────────────────────────────── */}
         <div>
           <p className="text-[10px] text-muted-foreground mb-1 font-semibold">
             <span className="font-mono text-primary font-bold">B</span>
-            {allPulled && <span className="text-emerald-300 ml-1">✓ complete</span>}
+            {revealedSlots.every(Boolean) && <span className="text-emerald-300 ml-1">✓ complete</span>}
           </p>
           <table className="border-collapse font-mono text-sm">
             <thead>
               <tr>
                 <th className="px-1 text-[10px]"></th>
-                {Array.from({ length: basicIndices.size }, (_, slotIdx) => {
-                  const filled = pulled[slotIdx];
-                  const expectedLabel = orderedBasisLabels[slotIdx];
-                  const actualLabel = filled != null ? columns[filled].label : null;
-                  const col = filled != null ? columns[filled] : null;
-                  const slackColor = col?.slackIdx != null && col.slackIdx >= 0 ? colorFor(col.slackIdx) : null;
+                {Array.from({ length: basisSize }, (_, slotIdx) => {
+                  const label = basisLabels[slotIdx];
+                  const filled = revealedSlots[slotIdx];
+                  const aIdx = slotSourceCol(slotIdx);
+                  const col = columns[aIdx];
+                  const slackColor = col?.slackIdx >= 0 ? colorFor(col.slackIdx) : null;
                   return (
                     <th
                       key={slotIdx}
                       className="px-2 py-1 text-center text-xs font-semibold"
-                      style={slackColor ? { color: slackColor } : undefined}
+                      style={slackColor && filled ? { color: slackColor } : undefined}
                     >
-                      {actualLabel ?? (
-                        <span className="text-muted-foreground/50 italic">
-                          ({expectedLabel})
-                        </span>
-                      )}
+                      {filled
+                        ? <span>{label}</span>
+                        : <span className="text-muted-foreground/50 italic">(slot {slotIdx + 1})</span>}
                     </th>
                   );
                 })}
@@ -268,22 +238,22 @@ export default function BuildBPanel({ draft, vertex, nDecVars, onBComplete }: Pr
                   <td className="pr-2 text-[10px] text-muted-foreground tabular-nums font-semibold">
                     C{rowIdx + 1}
                   </td>
-                  {Array.from({ length: basicIndices.size }, (_, slotIdx) => {
-                    const filled = pulled[slotIdx];
-                    const col = filled != null ? columns[filled] : null;
-                    const v = col?.values[rowIdx];
-                    const slackColor = col?.slackIdx != null && col.slackIdx >= 0 ? colorFor(col.slackIdx) : null;
+                  {Array.from({ length: basisSize }, (_, slotIdx) => {
+                    const filled = revealedSlots[slotIdx];
+                    const aIdx = slotSourceCol(slotIdx);
+                    const col = columns[aIdx];
+                    const slackColor = col?.slackIdx >= 0 ? colorFor(col.slackIdx) : null;
                     return (
                       <td key={slotIdx} className="p-0.5">
-                        {v != null ? (
+                        {filled ? (
                           <div
                             className="w-10 h-9 flex items-center justify-center rounded border-2 border-primary/60 bg-primary/15 text-primary text-sm font-bold tabular-nums animate-fly-in-from-left"
-                            style={slackColor ? { borderColor: colorForFill(col!.slackIdx, 0.6), color: slackColor } : undefined}
+                            style={slackColor ? { borderColor: colorForFill(col.slackIdx, 0.6), color: slackColor } : undefined}
                           >
-                            {fmt(v)}
+                            {fmt(col.values[rowIdx])}
                           </div>
                         ) : (
-                          <div className="w-10 h-9 flex items-center justify-center rounded border-2 border-dashed border-border/50 bg-muted/10 text-muted-foreground/40 text-sm">
+                          <div className="w-10 h-9 flex items-center justify-center rounded border-2 border-dashed border-border/50 bg-muted/20 text-muted-foreground/50 text-sm font-mono">
                             ?
                           </div>
                         )}
@@ -297,20 +267,16 @@ export default function BuildBPanel({ draft, vertex, nDecVars, onBComplete }: Pr
         </div>
       </div>
 
-      {/* Status / next-step callout */}
-      {!allPulled && (
+      {!revealedSlots.every(Boolean) && activeTargetColumn == null && (
         <p className="text-[10px] text-muted-foreground italic">
-          {pulled.length} / {basicIndices.size} basic columns pulled.
-          Recommended order: {orderedBasisLabels.join(', ')}
+          {revealedSlots.filter(Boolean).length} / {basisSize} columns pulled. Waiting for the next question.
         </p>
       )}
-      {allPulled && (
+      {revealedSlots.every(Boolean) && (
         <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg px-3 py-2 text-[11px] text-emerald-100 leading-relaxed animate-fill-pop">
-          You&apos;ve built <span className="font-mono font-bold">B</span>. This matrix
-          is the <span className="font-semibold">single object</span> that the entire
-          sensitivity chapter revolves around — the shadow price, the allowable
-          ranges, the reduced costs all come from operations involving{' '}
-          <span className="font-mono font-bold">B⁻¹</span>. Next step: invert it.
+          You&apos;ve built <span className="font-mono font-bold">B</span>. Next step: compute{' '}
+          <span className="font-mono font-bold">B⁻¹</span> — the single object every sensitivity
+          formula uses.
         </div>
       )}
     </div>

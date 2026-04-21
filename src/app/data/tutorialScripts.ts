@@ -922,6 +922,284 @@ const TOY_FACTORY_PHASE6: Question[] = [
     hint: 'Tight constraint → no leftover capacity → slack is 0 → non-basic. Both constraints are tight here.',
     commit: { type: 's-reveal', key: 'basis-nonbasic-10,15' },
   },
+
+  // ── Piece 2: build B by clicking basic columns in A ─────────────────────
+  {
+    kind: 'click-matrix-column',
+    id: 'toy-s-b-col-0',
+    phase: 6,
+    prompt: 'PRINCIPLE: B is just the columns of A that correspond to the basic variables. Your basis is { x₁, x₂ }. Slot 1 of B takes the x₁ column from the original constraints. CLICK the x₁ column in the A matrix to pull it in.',
+    targetColumn: 0,
+    hint: 'x₁ is the first column of A. Its entries are the coefficients of x₁ in C1 and C2 — the 2 and the 3.',
+    commit: { type: 's-reveal', key: 'b-col-0' },
+  },
+  {
+    kind: 'click-matrix-column',
+    id: 'toy-s-b-col-1',
+    phase: 6,
+    prompt: 'Slot 2 of B takes the x₂ column. CLICK the x₂ column in A.',
+    targetColumn: 1,
+    hint: 'x₂ is the second column of A. Entries: the 4 (C1) and the 2 (C2).',
+    commit: { type: 's-reveal', key: 'b-col-1' },
+  },
+
+  // ── Piece 3: compute B⁻¹ one cell at a time ────────────────────────────
+  // B = [[2, 4], [3, 2]]
+  // det(B) = 2·2 − 4·3 = −8
+  // adj(B) = [[d, -b], [-c, a]] = [[2, -4], [-3, 2]]
+  // B⁻¹ = adj / det = [[-0.25, 0.5], [0.375, -0.25]]
+  {
+    kind: 'number',
+    id: 'toy-s-det',
+    phase: 6,
+    prompt: 'PRINCIPLE: for a 2×2 matrix B = [[a, b], [c, d]], det(B) = a·d − b·c. Your B = [[2, 4], [3, 2]]. Compute det(B).',
+    placeholder: 'e.g. -8',
+    correct: -8,
+    hint: '2·2 − 4·3 = 4 − 12 = −8.',
+    commit: { type: 's-reveal', key: 's-det' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-adj-0-0',
+    phase: 6,
+    prompt: 'The adjugate swaps the diagonal and negates the off-diagonal. adj(B) top-left = d. What\'s d?',
+    placeholder: 'e.g. 2',
+    correct: 2,
+    hint: 'd is B\'s bottom-right entry, which is 2.',
+    commit: { type: 's-reveal', key: 's-adj-0-0' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-adj-0-1',
+    phase: 6,
+    prompt: 'adj(B) top-right = −b. What\'s −b?',
+    placeholder: 'e.g. -4',
+    correct: -4,
+    hint: 'b is B\'s top-right (4). Negate it → −4.',
+    commit: { type: 's-reveal', key: 's-adj-0-1' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-adj-1-0',
+    phase: 6,
+    prompt: 'adj(B) bottom-left = −c. What\'s −c?',
+    placeholder: 'e.g. -3',
+    correct: -3,
+    hint: 'c is B\'s bottom-left (3). Negate → −3.',
+    commit: { type: 's-reveal', key: 's-adj-1-0' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-adj-1-1',
+    phase: 6,
+    prompt: 'adj(B) bottom-right = a. What\'s a?',
+    placeholder: 'e.g. 2',
+    correct: 2,
+    hint: 'a is B\'s top-left, which is 2.',
+    commit: { type: 's-reveal', key: 's-adj-1-1' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-binv-0-0',
+    phase: 6,
+    prompt: 'PRINCIPLE: B⁻¹ = adj(B) / det(B). Top-left of adj is 2; det is −8. Compute B⁻¹ top-left = 2 / (−8).',
+    placeholder: 'e.g. -0.25',
+    correct: -0.25,
+    tolerance: 0.01,
+    hint: '2 / (−8) = −0.25 (or −1/4).',
+    commit: { type: 's-reveal', key: 's-binv-0-0' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-binv-0-1',
+    phase: 6,
+    prompt: 'B⁻¹ top-right = −4 / (−8). What is it?',
+    placeholder: 'e.g. 0.5',
+    correct: 0.5,
+    tolerance: 0.01,
+    hint: '−4 / (−8) = 0.5.',
+    commit: { type: 's-reveal', key: 's-binv-0-1' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-binv-1-0',
+    phase: 6,
+    prompt: 'B⁻¹ bottom-left = −3 / (−8). What is it?',
+    placeholder: 'e.g. 0.375',
+    correct: 0.375,
+    tolerance: 0.01,
+    hint: '−3 / (−8) = 3/8 = 0.375.',
+    commit: { type: 's-reveal', key: 's-binv-1-0' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-binv-1-1',
+    phase: 6,
+    prompt: 'B⁻¹ bottom-right = 2 / (−8). What is it?',
+    placeholder: 'e.g. -0.25',
+    correct: -0.25,
+    tolerance: 0.01,
+    hint: '2 / (−8) = −0.25.',
+    commit: { type: 's-reveal', key: 's-binv-1-1' },
+  },
+
+  // ── Piece 4: apply the four formulas, one cell at a time ───────────────
+  // B⁻¹ = [[-0.25, 0.5], [0.375, -0.25]]
+  // N = [[1, 0], [0, 1]]  (non-basic s₁, s₂ columns; identity)
+  // B⁻¹N = B⁻¹
+  //   (0,0) = -0.25, (0,1) = 0.5
+  //   (1,0) = 0.375, (1,1) = -0.25
+  {
+    kind: 'number',
+    id: 'toy-s-binvN-0-0',
+    phase: 6,
+    prompt: 'PRINCIPLE: the non-basic columns of the optimal tableau are B⁻¹·N. N is the columns of the non-basic variables (s₁ and s₂) from A — both are identity columns. So B⁻¹·N = B⁻¹·I = B⁻¹. What\'s entry (1, 1) of B⁻¹·N — the s₁ entry in the first basic row?',
+    placeholder: 'e.g. -0.25',
+    correct: -0.25,
+    tolerance: 0.01,
+    hint: 'Since N is the identity, B⁻¹N = B⁻¹. Row 1, column 1 of B⁻¹ is −0.25.',
+    commit: { type: 's-reveal', key: 's-binvN-0-0' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-binvN-0-1',
+    phase: 6,
+    prompt: 'Entry (1, 2) of B⁻¹·N — row 1, column s₂.',
+    placeholder: 'e.g. 0.5',
+    correct: 0.5,
+    tolerance: 0.01,
+    hint: 'Row 1, column 2 of B⁻¹ = 0.5.',
+    commit: { type: 's-reveal', key: 's-binvN-0-1' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-binvN-1-0',
+    phase: 6,
+    prompt: 'Entry (2, 1) of B⁻¹·N — row 2, column s₁.',
+    placeholder: 'e.g. 0.375',
+    correct: 0.375,
+    tolerance: 0.01,
+    hint: 'Row 2, column 1 of B⁻¹ = 0.375.',
+    commit: { type: 's-reveal', key: 's-binvN-1-0' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-binvN-1-1',
+    phase: 6,
+    prompt: 'Entry (2, 2) of B⁻¹·N — row 2, column s₂.',
+    placeholder: 'e.g. -0.25',
+    correct: -0.25,
+    tolerance: 0.01,
+    hint: 'Row 2, column 2 of B⁻¹ = −0.25.',
+    commit: { type: 's-reveal', key: 's-binvN-1-1' },
+  },
+
+  // B⁻¹·b gives the basic-variable values. b = [80, 60].
+  //   Row 1: -0.25*80 + 0.5*60 = -20 + 30 = 10   → x₁*
+  //   Row 2:  0.375*80 + (-0.25)*60 = 30 - 15 = 15 → x₂*
+  {
+    kind: 'number',
+    id: 'toy-s-binvb-0',
+    phase: 6,
+    prompt: 'PRINCIPLE: B⁻¹·b gives the values of the basic variables at this vertex. b = (80, 60). Row 1 of B⁻¹·b = (−0.25)·80 + (0.5)·60. Compute it — this should equal x₁*.',
+    placeholder: 'e.g. 10',
+    correct: 10,
+    tolerance: 0.01,
+    hint: '−0.25·80 = −20. 0.5·60 = 30. Sum = 10. (And x₁* = 10 — matches the vertex coord.)',
+    commit: { type: 's-reveal', key: 's-binvb-0' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-binvb-1',
+    phase: 6,
+    prompt: 'Row 2 of B⁻¹·b = (0.375)·80 + (−0.25)·60. Compute it — this should equal x₂*.',
+    placeholder: 'e.g. 15',
+    correct: 15,
+    tolerance: 0.01,
+    hint: '0.375·80 = 30. −0.25·60 = −15. Sum = 15. (x₂* = 15.)',
+    commit: { type: 's-reveal', key: 's-binvb-1' },
+  },
+
+  // C_B·B⁻¹N − C_N gives the Z-row non-basic entries.
+  // C_B = [15, 20], C_N = [0, 0].
+  // col s₁ of B⁻¹N = (−0.25, 0.375) → 15·(−0.25) + 20·(0.375) = −3.75 + 7.5 = 3.75
+  // col s₂ of B⁻¹N = (0.5, −0.25) → 15·0.5 + 20·(−0.25) = 7.5 − 5 = 2.5
+  {
+    kind: 'number',
+    id: 'toy-s-zrow-0',
+    phase: 6,
+    prompt: 'PRINCIPLE: the Z-row non-basic entry under s₁ is C_B · (column s₁ of B⁻¹N) − C_N[s₁]. C_B = (15, 20). Column s₁ of B⁻¹N = (−0.25, 0.375). Compute the Z-row entry under s₁ — this IS the shadow price of C1.',
+    placeholder: 'e.g. 3.75',
+    correct: 3.75,
+    tolerance: 0.01,
+    hint: '15·(−0.25) + 20·(0.375) = −3.75 + 7.5 = 3.75. Subtract C_N[s₁] = 0 → 3.75.',
+    commit: { type: 's-reveal', key: 's-zrow-0' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-zrow-1',
+    phase: 6,
+    prompt: 'Same formula for s₂. Column s₂ of B⁻¹N = (0.5, −0.25). Compute the Z-row entry under s₂.',
+    placeholder: 'e.g. 2.5',
+    correct: 2.5,
+    tolerance: 0.01,
+    hint: '15·0.5 + 20·(−0.25) = 7.5 − 5 = 2.5. This is the shadow price of C2.',
+    commit: { type: 's-reveal', key: 's-zrow-1' },
+  },
+
+  // z* = C_B · B⁻¹b = 15·10 + 20·15 = 150 + 300 = 450
+  {
+    kind: 'number',
+    id: 'toy-s-zstar',
+    phase: 6,
+    prompt: 'PRINCIPLE: z* = C_B · B⁻¹b. C_B = (15, 20); B⁻¹b = (10, 15). Compute z*.',
+    placeholder: 'e.g. 450',
+    correct: 450,
+    tolerance: 0.01,
+    hint: '15·10 + 20·15 = 150 + 300 = 450. This matches the z* you found in Phase 5.',
+    commit: { type: 's-reveal', key: 's-zstar' },
+  },
+
+  // ── Piece 5: verification + apply the shadow price to a scenario ───────
+  {
+    kind: 'mc',
+    id: 'toy-s-matches',
+    phase: 6,
+    prompt: 'The Reconstructed optimal tableau below the four formulas should now be complete. Compare it to the tableau you built by pivoting in Phase 4 — do the numbers match?',
+    options: [
+      { id: 'yes', label: 'Yes — same x₁*, x₂*, z*, same Z-row shadow prices. Two paths, one answer.' },
+      { id: 'no', label: 'No — they\'re different.' },
+      { id: 'sort-of', label: 'Some numbers match, others don\'t.' },
+    ],
+    correctId: 'yes',
+    hint: 'That\'s the whole point of Chapter 8: the optimal tableau is a position in (B, B⁻¹, N, b, c) space. Matrix algebra reconstructs it directly.',
+    commit: { type: 'note', text: 's-tableaus-match' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-s-scenario',
+    phase: 6,
+    prompt: 'NOW the manager\'s question. You know the shadow price of C1 is 3.75 (the Z-row entry under s₁). If we bumped b₁ from 80 to 85 (5 extra assembly hours), what\'s the new z* — assuming we stay inside the allowable range?',
+    placeholder: 'e.g. 468.75',
+    correct: 468.75,
+    tolerance: 0.01,
+    hint: 'z_new = z_old + shadow_price · Δb = 450 + 3.75·5 = 450 + 18.75 = 468.75.',
+    commit: { type: 'note', text: 's-shadow-applied' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-s-range-wrap',
+    phase: 6,
+    prompt: '3.75 only holds WITHIN the allowable range. If you pushed b₁ far enough that the optimal vertex jumped to a new corner, what would change?',
+    options: [
+      { id: 'basis-change', label: 'The basis would change. A different set of variables would be basic. The old B⁻¹ wouldn\'t apply; we\'d need to form a new B and invert it.' },
+      { id: 'infeasible', label: 'The problem becomes infeasible.' },
+      { id: 'stays-same', label: 'Nothing changes — the rate is always 3.75.' },
+    ],
+    correctId: 'basis-change',
+    hint: 'Outside the allowable range, a different vertex becomes optimal. Different vertex → different basis → different B → different B⁻¹ → different shadow price.',
+    commit: { type: 'note', text: 's-range-understood' },
+  },
 ];
 
 const TOY_FACTORY_PHASES_META: PhaseMeta[] = [

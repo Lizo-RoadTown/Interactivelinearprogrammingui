@@ -24,7 +24,7 @@ import {
 } from '../../data/tutorialScripts';
 import DiscoveryGraph, { FeasibleVertex } from './DiscoveryGraph';
 import VertexBasisPanel from './VertexBasisPanel';
-import BuildBPanel from './BuildBPanel';
+import BuildBPanel, { basisLabelsAtVertex } from './BuildBPanel';
 import InverseBPanel from './InverseBPanel';
 import FormulasPanel from './FormulasPanel';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
@@ -532,6 +532,15 @@ export default function GuidedLearnPage() {
     handleAnswer(q, ok, idx);
   };
 
+  // Click-matrix-column handler (Phase 6 BuildB): grades the student's
+  // click of a column in the A matrix.
+  const handleMatrixColumnClick = (colIdx: number) => {
+    if (currentQ_pre?.kind !== 'click-matrix-column') return;
+    const q = currentQ_pre;
+    const ok = gradeClickMatrixColumnAnswer(q, colIdx);
+    handleAnswer(q, ok, colIdx);
+  };
+
   const handleShowMe = (q: Question) => {
     // Reveal the answer, apply its commit, advance after a moment
     setAnswers(prev => ({
@@ -752,12 +761,82 @@ export default function GuidedLearnPage() {
                       nDecVars={problem.numVars}
                       reveals={sensitivityReveals}
                     />
-                    {/* Pieces 2-4 (Build B, Invert B, Four formulas) are
-                        pending a gameboard-pedagogy rebuild — removed from
-                        render until rebuilt as earn-each-slot panels.
-                        The components (BuildBPanel, InverseBPanel,
-                        FormulasPanel) still exist in the codebase; they
-                        just aren't rendered here. */}
+                    {/* Piece 2: Build B gameboard. Appears once the student
+                        has revealed the basis at the currently-selected
+                        vertex (both basic and non-basic sides). */}
+                    {selectedVertex && (() => {
+                      const keyBase = `${Math.round(selectedVertex.x * 100) / 100},${Math.round(selectedVertex.y * 100) / 100}`;
+                      const basisReady = sensitivityReveals.has(`basis-basic-${keyBase}`)
+                        && sensitivityReveals.has(`basis-nonbasic-${keyBase}`);
+                      if (!basisReady) return null;
+                      // Derive B deterministically from the selected vertex.
+                      // BuildBPanel reveals slots driven by s-reveal b-col-N keys.
+                      const effectiveDraft = sensitivityActive ? liveDraft : draft;
+                      const nConstraints = effectiveDraft.constraints.length;
+                      const basisLabels = basisLabelsAtVertex(selectedVertex, problem.numVars, nConstraints);
+                      const labelToCol = (label: string): number[] => {
+                        if (label.startsWith('x')) {
+                          const i = parseInt(label.slice(1), 10) - 1;
+                          return effectiveDraft.constraints.map(c => c.coefficients[i] ?? 0);
+                        }
+                        const i = parseInt(label.slice(1), 10) - 1;
+                        return effectiveDraft.constraints.map((_, r) => (r === i ? 1 : 0));
+                      };
+                      const cols = basisLabels.map(labelToCol);
+                      const B = cols[0].map((_, r) => cols.map(col => col[r]));
+                      // Check whether every slot of B is revealed — controls
+                      // whether InverseBPanel is unlocked.
+                      const allBRevealed = basisLabels.every((_, i) =>
+                        sensitivityReveals.has(`b-col-${i}`),
+                      );
+                      return (
+                        <>
+                          <BuildBPanel
+                            draft={effectiveDraft}
+                            vertex={selectedVertex}
+                            nDecVars={problem.numVars}
+                            reveals={sensitivityReveals}
+                            activeTargetColumn={currentQ_pre?.kind === 'click-matrix-column'
+                              ? currentQ_pre.targetColumn : null}
+                            onColumnClick={handleMatrixColumnClick}
+                          />
+                          {allBRevealed && (() => {
+                            // Derive B⁻¹ for FormulasPanel. It's only needed
+                            // once every B⁻¹ cell has been revealed.
+                            const a = B[0][0], bb = B[0][1], cc = B[1][0], dd = B[1][1];
+                            const det = a * dd - bb * cc;
+                            const Binv: number[][] = det === 0
+                              ? [[NaN, NaN], [NaN, NaN]]
+                              : [[dd / det, -bb / det], [-cc / det, a / det]];
+                            const allBinvRevealed =
+                              sensitivityReveals.has('s-binv-0-0') &&
+                              sensitivityReveals.has('s-binv-0-1') &&
+                              sensitivityReveals.has('s-binv-1-0') &&
+                              sensitivityReveals.has('s-binv-1-1');
+                            return (
+                              <>
+                                <InverseBPanel
+                                  B={B}
+                                  basisLabels={basisLabels}
+                                  reveals={sensitivityReveals}
+                                />
+                                {allBinvRevealed && (
+                                  <FormulasPanel
+                                    draft={effectiveDraft}
+                                    vertex={selectedVertex}
+                                    B={B}
+                                    Binv={Binv}
+                                    basisLabels={basisLabels}
+                                    nDecVars={problem.numVars}
+                                    reveals={sensitivityReveals}
+                                  />
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
