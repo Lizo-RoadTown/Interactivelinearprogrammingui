@@ -49,6 +49,30 @@ interface Props {
   slacksMode?: boolean;
   /** Constraint-wide highlight — emphasize one constraint line, dim the rest. */
   highlight?: QuestionHighlight | null;
+
+  // ── Vertex-selection props (Phase 6: basis = vertex) ──────────────────
+  /** When true, the corners of the feasible polygon become clickable dots. */
+  vertexSelectable?: boolean;
+  /** Currently selected vertex — matched by coords. */
+  selectedVertex?: FeasibleVertex | null;
+  /** Called with a vertex descriptor when the student clicks a corner. */
+  onVertexSelect?: (v: FeasibleVertex) => void;
+}
+
+/**
+ * One corner of the feasible polygon, with the algebraic information the
+ * Phase 6 walkthrough needs: which constraints are tight at this corner
+ * (their slacks are 0, i.e. non-basic) and which decision variables are
+ * zero (also non-basic). The basis at this vertex is everything NOT in
+ * those lists.
+ */
+export interface FeasibleVertex {
+  x: number;
+  y: number;
+  /** Indices of constraints that are tight (ax+by = rhs) at this corner. */
+  tightConstraints: number[];
+  /** Decision-variable indices (0-based) that equal zero at this corner. */
+  zeroDecisionVars: number[];
 }
 
 // Dimensions
@@ -59,6 +83,7 @@ export default function DiscoveryGraph({
   draft, linesDrawn, sideDrawnFor, feasibleRegionRevealed,
   objectiveZ, optimumConfirmed, optimumTarget, bfsPoint,
   slacksMode = false, highlight,
+  vertexSelectable = false, selectedVertex = null, onVertexSelect,
 }: Props) {
   const focusedConstraint =
     highlight?.target === 'constraint' ? highlight.constraintIndex : -1;
@@ -148,10 +173,14 @@ export default function DiscoveryGraph({
     return out.map(p => `${scaleX(p.x)},${scaleY(p.y)}`).join(' ');
   };
 
-  // Intersection of all half-planes → the feasible region polygon
-  const feasiblePolygon = useMemo(() => {
+  // Intersection of all half-planes → the feasible region polygon.
+  // Returns both a scaled-string for the SVG polygon AND the raw corner
+  // list in problem coordinates, annotated with which constraints are
+  // tight and which decision vars are zero at each corner. The corner
+  // list is what Phase 6 uses to make vertices clickable and to show
+  // "the basis at this vertex is X".
+  const feasibleData = useMemo(() => {
     if (!feasibleRegionRevealed) return null;
-    // Start with non-negative quadrant rectangle
     let poly: { x: number; y: number }[] = [
       { x: 0, y: 0 }, { x: maxX, y: 0 }, { x: maxX, y: maxY }, { x: 0, y: maxY },
     ];
@@ -161,7 +190,6 @@ export default function DiscoveryGraph({
       const [a, b] = c.coefficients;
       if (a == null || b == null) return null;
       const rhs = c.rhs;
-      // Clip poly to ax + by ≤ rhs (the student chose "below" for these toy factory constraints)
       const evalSigned = (p: { x: number; y: number }) => a * p.x + b * p.y - rhs;
       const inside = (p: { x: number; y: number }) => evalSigned(p) <= 1e-9;
       const next: { x: number; y: number }[] = [];
@@ -179,8 +207,39 @@ export default function DiscoveryGraph({
       poly = next;
       if (poly.length === 0) return null;
     }
-    return poly.map(p => `${scaleX(p.x)},${scaleY(p.y)}`).join(' ');
+
+    // Deduplicate near-identical corners (clipping can produce them).
+    const unique: { x: number; y: number }[] = [];
+    for (const p of poly) {
+      if (!unique.some(q => Math.abs(q.x - p.x) < 1e-6 && Math.abs(q.y - p.y) < 1e-6)) {
+        unique.push(p);
+      }
+    }
+
+    // For each corner, identify which constraints are tight and which
+    // decision vars are zero — that's the non-basic set at that vertex.
+    const vertices: FeasibleVertex[] = unique.map(p => {
+      const tightConstraints: number[] = [];
+      draft.constraints.forEach((c, i) => {
+        if (c.rhs == null) return;
+        const a = c.coefficients[0], b = c.coefficients[1];
+        if (a == null || b == null) return;
+        if (Math.abs(a * p.x + b * p.y - c.rhs) < 1e-6) tightConstraints.push(i);
+      });
+      const zeroDecisionVars: number[] = [];
+      if (Math.abs(p.x) < 1e-6) zeroDecisionVars.push(0);
+      if (Math.abs(p.y) < 1e-6) zeroDecisionVars.push(1);
+      return { x: p.x, y: p.y, tightConstraints, zeroDecisionVars };
+    });
+
+    return {
+      pointsStr: unique.map(p => `${scaleX(p.x)},${scaleY(p.y)}`).join(' '),
+      vertices,
+    };
   }, [draft, feasibleRegionRevealed, maxX, maxY]);
+
+  const feasiblePolygon = feasibleData?.pointsStr ?? null;
+  const feasibleVertices = feasibleData?.vertices ?? [];
 
   // Tick marks
   const xStep = maxX <= 15 ? 2 : maxX <= 40 ? 5 : 10;
@@ -490,6 +549,44 @@ export default function DiscoveryGraph({
           </g>
         );
       })()}
+
+      {/* ── Clickable feasible-polygon vertices (Phase 6) ─────────────────
+          Every corner of the feasible polygon IS a basis. Clicking one
+          tells the sidebar what variables are basic at that vertex, which
+          is the starting point for reconstructing the tableau via B⁻¹. */}
+      {vertexSelectable && feasibleVertices.map((v, i) => {
+        const isSelected = !!selectedVertex &&
+          Math.abs(selectedVertex.x - v.x) < 1e-4 &&
+          Math.abs(selectedVertex.y - v.y) < 1e-4;
+        return (
+          <g
+            key={`vx-${i}`}
+            style={{ cursor: onVertexSelect ? 'pointer' : 'default' }}
+            onClick={() => onVertexSelect?.(v)}
+          >
+            {/* Outer halo for click target (transparent but large) */}
+            <circle
+              cx={scaleX(v.x)} cy={scaleY(v.y)} r="14"
+              fill="transparent"
+            />
+            {/* Selection ring */}
+            {isSelected && (
+              <circle
+                cx={scaleX(v.x)} cy={scaleY(v.y)} r="11"
+                fill="none" stroke="#fb923c" strokeWidth="3"
+                className="animate-attention-pulse"
+              />
+            )}
+            {/* Dot itself */}
+            <circle
+              cx={scaleX(v.x)} cy={scaleY(v.y)} r={isSelected ? 7 : 5}
+              fill={isSelected ? '#fb923c' : '#f8fafc'}
+              stroke="#0f172a" strokeWidth="2"
+              style={{ transition: 'r 200ms ease, fill 200ms ease' }}
+            />
+          </g>
+        );
+      })}
     </svg>
   );
 }

@@ -21,9 +21,12 @@ import {
   getScript, Question, TextQuestion, NumberQuestion, MCQuestion, FieldsQuestion, DragQuestion,
   ClickTableauQuestion, CommitPayload, QuestionHighlight, PhaseMeta,
 } from '../../data/tutorialScripts';
-import DiscoveryGraph from './DiscoveryGraph';
+import DiscoveryGraph, { FeasibleVertex } from './DiscoveryGraph';
+import VertexBasisPanel from './VertexBasisPanel';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
 import ConstraintMeter from './ConstraintMeters';
+import SensitivityControls from './SensitivityControls';
+import { solveLP2D, applyPerturbation } from './lpSolve';
 import { LPDraft } from './guidedTypes';
 import {
   ArrowLeft, CheckCircle, Lightbulb, Eye, Sparkles, Compass, Flag,
@@ -205,6 +208,20 @@ export default function GuidedLearnPage() {
   const [pivotPick, setPivotPick] = useState<{ col: number | null; row: number | null }>({
     col: null, row: null,
   });
+  /**
+   * Sensitivity playground perturbations — per-constraint RHS deltas
+   * and per-variable objective deltas. Entered by Phase 6; empty (all
+   * zeros) before then so nothing changes for earlier phases.
+   */
+  const [rhsDelta, setRhsDelta] = useState<number[]>([]);
+  const [objDelta, setObjDelta] = useState<number[]>([]);
+  /**
+   * Phase 6: the vertex of the feasible polygon the student has clicked.
+   * The index refers to the corner list DiscoveryGraph computes; the
+   * vertex descriptor carries its tight-constraints + zero-decision-vars
+   * data so downstream panels can name the basis.
+   */
+  const [selectedVertex, setSelectedVertex] = useState<FeasibleVertex | null>(null);
 
   // Per-render warm phrase seed so feedback text varies a bit between wrongs
   const wrongSeedRef = useRef(0);
@@ -337,6 +354,26 @@ export default function GuidedLearnPage() {
   const currentQAnswered = currentQ_pre ? answers[currentQ_pre.id]?.correct === true : false;
   const activeHighlight: QuestionHighlight | null =
     currentQ_pre && !currentQAnswered ? (currentQ_pre.highlight ?? null) : null;
+
+  // Sensitivity mode: during Phase 6 (and after the walkthrough is done),
+  // the graph and formulation show the PERTURBED draft so sliders in
+  // the sensitivity panel update everything live. Before Phase 6 the
+  // deltas are all zero and liveDraft === draft.
+  const sensitivityActive = (currentQ_pre?.phase ?? 1) >= 6 || isDone;
+  const liveDraft = useMemo(() => {
+    if (!sensitivityActive) return draft;
+    const rd = Array.from({ length: draft.constraints.length }, (_, i) => rhsDelta[i] ?? 0);
+    const od = Array.from({ length: draft.variables.length || 2 }, (_, i) => objDelta[i] ?? 0);
+    return applyPerturbation(draft, rd, od);
+  }, [sensitivityActive, draft, rhsDelta, objDelta]);
+  const baselineSolution = useMemo(
+    () => (sensitivityActive ? solveLP2D(draft, draft.objectiveType ?? 'max') : null),
+    [sensitivityActive, draft],
+  );
+  const liveSolution = useMemo(
+    () => (sensitivityActive ? solveLP2D(liveDraft, liveDraft.objectiveType ?? 'max') : null),
+    [sensitivityActive, liveDraft],
+  );
 
   // Reset slider when arriving at a new drag question
   useEffect(() => {
@@ -619,12 +656,14 @@ export default function GuidedLearnPage() {
                 Your LP formulation — grows as you answer
               </p>
               <Canvas
-                draft={draft}
+                draft={sensitivityActive ? liveDraft : draft}
                 variablesCount={problem.numVars}
                 constraintsCount={problem.constraints.length}
                 highlight={activeHighlight}
                 slacksAdded={tableauReveal.slacksAdded}
-                bfs={currentBFS}
+                bfs={sensitivityActive && liveSolution
+                  ? { x1: liveSolution.x1, x2: liveSolution.x2 }
+                  : currentBFS}
                 extractionPulse={extractionPulse}
               />
             </div>
@@ -638,16 +677,21 @@ export default function GuidedLearnPage() {
                 <div className="bg-card/40 border border-border rounded-xl p-3">
                   {problem.numVars === 2 ? (
                     <DiscoveryGraph
-                      draft={draft}
+                      draft={sensitivityActive ? liveDraft : draft}
                       linesDrawn={linesDrawn}
                       sideDrawnFor={sideDrawnFor}
                       feasibleRegionRevealed={feasibleRevealed}
                       objectiveZ={latestPivot ? latestPivot.zValue : sliderZ}
                       optimumConfirmed={!!optimumCommit || !!latestPivot}
                       optimumTarget={latestPivot?.zValue ?? optimumCommit?.zValue ?? currentDragTarget}
-                      bfsPoint={bfsPoint}
+                      bfsPoint={sensitivityActive && liveSolution
+                        ? { x: liveSolution.x1, y: liveSolution.x2 }
+                        : bfsPoint}
                       slacksMode={tableauReveal.slacksAdded}
                       highlight={activeHighlight}
+                      vertexSelectable={sensitivityActive}
+                      selectedVertex={selectedVertex}
+                      onVertexSelect={(v) => setSelectedVertex(v)}
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground italic p-6 text-center">
@@ -655,6 +699,17 @@ export default function GuidedLearnPage() {
                     </p>
                   )}
                 </div>
+                {/* Phase 6: clicking any corner on the graph above lights
+                    up its basis here. This is the "basis = vertex" aha. */}
+                {sensitivityActive && (
+                  <div className="mt-3">
+                    <VertexBasisPanel
+                      draft={sensitivityActive ? liveDraft : draft}
+                      vertex={selectedVertex}
+                      nDecVars={problem.numVars}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
