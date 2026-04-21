@@ -20,6 +20,7 @@ import LensRail, { LENSES } from './LensRail';
 import LensDrawer from './LensDrawer';
 import FormulationLens from './lenses/FormulationLens';
 import SolutionLens from './lenses/SolutionLens';
+import SensitivityLens from './lenses/SensitivityLens';
 import { useLPWorkspace, LensId } from '../../hooks/useLPWorkspace';
 import { WORD_PROBLEMS, WordProblem } from '../../data/wordProblems';
 import { LPProblem } from '../../types';
@@ -249,7 +250,15 @@ export default function WorkspacePage() {
           >
             {activeLens === 'formulation' && <FormulationLens problem={ws.problem} />}
             {activeLens === 'solution'    && <SolutionLens response={solverResponse} isLoading={isLoading} />}
-            {activeLens !== 'formulation' && activeLens !== 'solution' && (
+            {activeLens === 'sensitivity' && (
+              <SensitivityLens
+                problem={ws.problem}
+                response={solverResponse}
+                isLoading={isLoading}
+                method={ws.method}
+              />
+            )}
+            {activeLens !== 'formulation' && activeLens !== 'solution' && activeLens !== 'sensitivity' && (
               <div className="text-sm text-muted-foreground italic">
                 The <strong className="text-foreground">{activeLensDef.label}</strong> lens is coming in Phase {activeLensDef.phase ?? '?'}.
               </div>

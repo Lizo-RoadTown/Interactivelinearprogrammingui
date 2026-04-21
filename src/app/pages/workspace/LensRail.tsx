@@ -27,7 +27,7 @@ interface LensDef {
 const LENSES: LensDef[] = [
   { id: 'formulation', label: 'Formulation', icon: FileText,    description: 'Edit objective & constraints',                              phase: 'B' },
   { id: 'solution',    label: 'Solution',    icon: Target,      description: 'x*, z*, basis — plain-English answer',                     phase: 'B' },
-  { id: 'sensitivity', label: 'Sensitivity', icon: Sliders,     description: 'Drag sliders for each coefficient / RHS; watch LP react', phase: 'D' },
+  { id: 'sensitivity', label: 'Sensitivity', icon: Sliders,     description: 'Drag sliders for each coefficient / RHS; watch LP react', phase: 'B' },
   { id: 'matrix',      label: 'Matrix form', icon: Grid3x3,     description: 'B, B⁻¹, N, C_B, C_N at the current iteration',             phase: 'E' },
   { id: 'shadow',      label: 'Shadow',      icon: TrendingUp,  description: 'Dual prices — marginal value of each constraint',          phase: 'E' },
   { id: 'dual',        label: 'Dual LP',     icon: GitCompare,  description: 'View the dual problem and its solution',                   phase: 'E' },

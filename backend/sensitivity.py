@@ -115,6 +115,19 @@ def extract_matrix_form(solver) -> dict[str, Any]:
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+def _finite_or_none(v: Any) -> float | None:
+    """Coerce numpy scalars to Python floats; map NaN/Inf/None to None."""
+    if v is None:
+        return None
+    try:
+        f = float(v)
+        if not np.isfinite(f):
+            return None
+        return f
+    except (TypeError, ValueError):
+        return None
+
+
 def _fmt(x: float, places: int = 4) -> str:
     """Format a scalar for display: drop trailing zeros, show fractions prettily."""
     if abs(x) < 1e-10:
@@ -459,6 +472,124 @@ def shadow_prices(solver) -> dict[str, Any]:
             'worth expanding (or restricting). Zero shadow price ⇒ slack in that '
             'constraint ⇒ no value in adding more of that resource.'
         ),
+    }
+
+
+def sensitivity_summary(solver) -> dict[str, Any]:
+    """
+    Aggregated single-call summary for the interactive Sensitivity lens.
+
+    Returns matrix form + all coefficient ranges + all RHS ranges + shadow
+    prices in one flat structure, so the frontend can build a full slider
+    panel without making N separate API calls.
+
+    Output shape (all arrays serialized as lists):
+      {
+        'sense': 'max' | 'min',
+        'basis_vars':  [...],     # lowercase names in basis order
+        'nonbasic_vars': [...],   # lowercase names in nonbasic order
+        'decision_vars': [...],   # original decision variable names (lowercase)
+        'B_inv': [[...]],
+        'xB': [...],
+        'z_star': float,
+        'shadow_prices': [float, ...],   # length m, in constraint order
+        'coefficient_ranges': [          # one entry per decision variable
+          {
+            'variable': 'x1',
+            'current_value': float,
+            'is_basic': bool,
+            'delta_min': float | None,
+            'delta_max': float | None,
+            'value_min': float | None,
+            'value_max': float | None,
+          }, ...
+        ],
+        'rhs_ranges': [                  # one entry per original constraint
+          {
+            'constraint_index': int (1-based),
+            'current_rhs': float,
+            'delta_min': float | None,
+            'delta_max': float | None,
+            'value_min': float | None,
+            'value_max': float | None,
+            'shadow_price': float,
+          }, ...
+        ],
+      }
+    """
+    mf = extract_matrix_form(solver)
+    basis = mf['basis']
+    all_vars = mf['all_vars']
+    col_types = mf['col_types']
+
+    basis_var_names = [all_vars[j] for j in basis]
+    nonbasic_var_names = [all_vars[j] for j in mf['nonbasic']]
+    decision_var_names = [all_vars[j] for j, t in enumerate(col_types) if t == 'decision']
+
+    # Shadow prices y = C_B · B⁻¹
+    y = mf['CB'] @ mf['B_inv']
+
+    # Coefficient ranges for every decision variable (basic or nonbasic)
+    coeff_ranges = []
+    for v in decision_var_names:
+        col = _find_col(mf, v)
+        is_basic = col in basis
+        try:
+            if is_basic:
+                res = of_coeff_range_basic(solver, v)['result']
+            else:
+                res = of_coeff_range_nonbasic(solver, v)['result']
+            coeff_ranges.append({
+                'variable': v,
+                'current_value': float(mf['c'][col]),
+                'is_basic': bool(is_basic),
+                'delta_min': _finite_or_none(res.get('delta_min')),
+                'delta_max': _finite_or_none(res.get('delta_max')),
+                'value_min': _finite_or_none(res.get('new_coefficient_range', {}).get('min')),
+                'value_max': _finite_or_none(res.get('new_coefficient_range', {}).get('max')),
+            })
+        except Exception as e:
+            coeff_ranges.append({
+                'variable': v, 'current_value': float(mf['c'][col]), 'is_basic': bool(is_basic),
+                'delta_min': None, 'delta_max': None, 'value_min': None, 'value_max': None,
+                'error': str(e),
+            })
+
+    # RHS ranges for each original constraint
+    rhs_ranges_list = []
+    for i in range(mf['m']):
+        try:
+            res = rhs_range(solver, i)['result']
+            rhs_ranges_list.append({
+                'constraint_index': i + 1,
+                'current_rhs': float(mf['b'][i]),
+                'delta_min': _finite_or_none(res.get('delta_min')),
+                'delta_max': _finite_or_none(res.get('delta_max')),
+                'value_min': _finite_or_none(res.get('new_rhs_range', {}).get('min')),
+                'value_max': _finite_or_none(res.get('new_rhs_range', {}).get('max')),
+                'shadow_price': float(y[i]),
+            })
+        except Exception as e:
+            rhs_ranges_list.append({
+                'constraint_index': i + 1,
+                'current_rhs': float(mf['b'][i]),
+                'delta_min': None, 'delta_max': None,
+                'value_min': None, 'value_max': None,
+                'shadow_price': float(y[i]),
+                'error': str(e),
+            })
+
+    return {
+        'sense': mf['sense'],
+        'basis_vars': basis_var_names,
+        'nonbasic_vars': nonbasic_var_names,
+        'decision_vars': decision_var_names,
+        'B_inv': mf['B_inv'].tolist(),
+        'xB': mf['xB'].tolist(),
+        'z_star': mf['z_star'],
+        'shadow_prices': y.tolist(),
+        'coefficient_ranges': coeff_ranges,
+        'rhs_ranges': rhs_ranges_list,
     }
 
 

@@ -470,6 +470,26 @@ def sensitivity_analysis(req: SensitivityRequest):
     try:
         op = req.operation
 
+        if op == 'summary':
+            # Aggregated single-call summary for the interactive Sensitivity lens.
+            # Returns all coefficient ranges, RHS ranges, shadow prices, and the
+            # matrix-form pieces the frontend needs to compute x* / z* locally
+            # as a slider moves within the allowable range.
+            summary = sa.sensitivity_summary(solver)
+            return SensitivityResponse(
+                operation='§8.2 + §8.3 — sensitivity summary',
+                formula='All allowable ranges + shadow prices + matrix form',
+                steps=[
+                    f"Optimal basis: {summary['basis_vars']}",
+                    f"Nonbasic:       {summary['nonbasic_vars']}",
+                    f"z* = {summary['z_star']}",
+                    f"Shadow prices y = {summary['shadow_prices']}",
+                ],
+                result=summary,
+                conclusion='Sensitivity slider panel ready. Drag sliders within the '
+                           'highlighted range and the basis stays optimal.',
+            )
+
         if op == 'matrix_form':
             mf_dict = _matrix_form_result(solver)
             # Render B, B⁻¹ visually in steps
