@@ -286,6 +286,28 @@ export default function GuidedLearnPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQ_pre?.id]);
 
+  // Refs for the right-column panels so we can scroll the relevant one into
+  // view whenever the student moves to a new phase. Keeps questions visually
+  // paired with the thing they're acting on (graph, tableau, etc.) without
+  // hiding the earlier artifacts.
+  const canvasPanelRef = useRef<HTMLDivElement | null>(null);
+  const graphPanelRef = useRef<HTMLDivElement | null>(null);
+  const tableauPanelRef = useRef<HTMLDivElement | null>(null);
+
+  const currentPhase = currentQ_pre?.phase;
+  useEffect(() => {
+    if (currentPhase == null) return;
+    let target: HTMLElement | null = null;
+    if (currentPhase === 1) target = canvasPanelRef.current;
+    else if (currentPhase === 2) target = graphPanelRef.current;
+    else if (currentPhase >= 3) {
+      target = tableauPanelRef.current ?? graphPanelRef.current ?? canvasPanelRef.current;
+    }
+    target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    // Re-run when the matching panel first mounts (e.g. tableau appears
+    // mid-phase) so the scroll catches up.
+  }, [currentPhase, tableauReveal.slacksAdded, anyGraphContent]);
+
   // Handlers
   const handleAnswer = (q: Question, ok: boolean, studentAnswer: unknown) => {
     setAnswers(prev => {
@@ -433,7 +455,7 @@ export default function GuidedLearnPage() {
         {/* RIGHT: LP canvas + graph (both fill in as answers accumulate) */}
         <section className="overflow-y-auto bg-card/20">
           <div className="p-6 space-y-6 max-w-2xl mx-auto">
-            <div>
+            <div ref={canvasPanelRef} className="scroll-mt-6">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
                 Your LP formulation — grows as you answer
               </p>
@@ -442,7 +464,7 @@ export default function GuidedLearnPage() {
 
             {/* Graph section — appears as soon as the student starts earning graph content */}
             {(anyGraphContent || problem.numVars === 2) && (
-              <div>
+              <div ref={graphPanelRef} className="scroll-mt-6">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
                   Your graph — fills in as you answer
                 </p>
@@ -473,7 +495,7 @@ export default function GuidedLearnPage() {
               // the script is done.
               const atOptimal = isDone || (currentQ && currentQ.phase >= 5);
               return (
-                <div>
+                <div ref={tableauPanelRef} className="scroll-mt-6">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
                     {atOptimal
                       ? `Optimal tableau — z* = ${latestPivot?.zValue ?? '?'}`
