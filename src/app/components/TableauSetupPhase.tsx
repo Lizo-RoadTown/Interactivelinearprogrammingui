@@ -187,12 +187,12 @@ function buildQuestions(problem: LPProblem, method: string): MCQuestion[] {
 // ── Sub-component: colour band for column type ────────────────────────────────
 
 function colHeaderClass(colType: string | undefined, varName: string): string {
-  if (varName === 'RHS') return 'bg-blue-50 text-blue-800 border-blue-200';
+  if (varName === 'RHS') return 'bg-accent/10 text-accent border-accent/30';
   switch (colType) {
     case 'artificial': return 'bg-rose-50 text-rose-800 border-rose-200';
     case 'surplus':    return 'bg-orange-50 text-orange-800 border-orange-200';
     case 'slack':      return 'bg-emerald-50 text-emerald-800 border-emerald-200';
-    default:           return 'bg-gray-50 text-gray-800 border-gray-200';
+    default:           return 'bg-muted/40 text-foreground border-border';
   }
 }
 
@@ -246,13 +246,13 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
     <div className="flex-1 flex overflow-hidden">
 
       {/* LEFT: Questions panel */}
-      <div className="w-1/2 border-r border-gray-300 flex flex-col overflow-hidden">
+      <div className="w-1/2 border-r border-border flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="flex-shrink-0 px-4 py-2.5 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
-          <p className="text-xs font-bold text-indigo-800">Setting Up the Tableau</p>
+        <div className="flex-shrink-0 px-4 py-2.5 bg-primary/10 border-b border-primary/30 flex items-center justify-between">
+          <p className="text-xs font-bold text-primary">Setting Up the Tableau</p>
           {!allDone && (
-            <span className="text-xs text-indigo-600">
+            <span className="text-xs text-primary">
               Question {qIdx + 1} / {questions.length}
             </span>
           )}
@@ -264,9 +264,9 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
             <div
               key={i}
               className={`h-1.5 rounded-full flex-1 transition-colors duration-300 ${
-                i <  qIdx    ? 'bg-green-500' :
-                i === qIdx   ? 'bg-indigo-500' :
-                               'bg-gray-200'
+                i <  qIdx    ? 'bg-emerald-500/100' :
+                i === qIdx   ? 'bg-primary/100' :
+                               'bg-muted/80'
               }`}
             />
           ))}
@@ -276,8 +276,8 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
 
           {!allDone ? (
             /* ── Active question ── */
-            <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-medium text-gray-800 leading-relaxed">
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+              <p className="text-sm font-medium text-foreground leading-relaxed">
                 {current.question}
               </p>
 
@@ -287,13 +287,13 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
                   let cls =
                     'w-full text-left border-2 rounded-lg px-3 py-2.5 text-sm transition-all ';
                   if (selected === null) {
-                    cls += 'border-gray-200 bg-white hover:border-indigo-400 hover:bg-indigo-50 cursor-pointer';
+                    cls += 'border-border bg-card hover:border-primary/60 hover:bg-primary/10 cursor-pointer';
                   } else if (i === current.correctIndex) {
-                    cls += 'border-green-400 bg-green-50 text-green-800 font-medium';
+                    cls += 'border-green-400 bg-emerald-500/10 text-emerald-200 font-medium';
                   } else if (i === selected) {
-                    cls += 'border-red-400 bg-red-50 text-red-800';
+                    cls += 'border-red-400 bg-destructive/10 text-red-800';
                   } else {
-                    cls += 'border-gray-200 bg-white opacity-40 cursor-default';
+                    cls += 'border-border bg-card opacity-40 cursor-default';
                   }
                   return (
                     <button
@@ -302,12 +302,12 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
                       disabled={selected !== null}
                       className={cls}
                     >
-                      <span className="font-bold text-gray-500 mr-2">
+                      <span className="font-bold text-muted-foreground mr-2">
                         {String.fromCharCode(65 + i)}.
                       </span>
                       {opt}
                       {selected !== null && i === current.correctIndex && (
-                        <CheckCircle className="inline w-4 h-4 ml-2 text-green-600" />
+                        <CheckCircle className="inline w-4 h-4 ml-2 text-emerald-400" />
                       )}
                       {selected !== null && i === selected && i !== current.correctIndex && (
                         <XCircle className="inline w-4 h-4 ml-2 text-red-500" />
@@ -321,12 +321,12 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
               {feedback && (
                 <div className={`rounded-lg p-3 text-xs leading-relaxed ${
                   feedback.correct
-                    ? 'bg-green-50 border border-green-300 text-green-800'
-                    : 'bg-amber-50 border border-amber-300 text-amber-800'
+                    ? 'bg-emerald-500/10 border border-green-300 text-emerald-200'
+                    : 'bg-amber-500/10 border border-amber-300 text-amber-200'
                 }`}>
                   {feedback.correct
-                    ? <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-green-600" />
-                    : <XCircle className="inline w-3.5 h-3.5 mr-1 text-amber-600" />}
+                    ? <CheckCircle className="inline w-3.5 h-3.5 mr-1 text-emerald-400" />
+                    : <XCircle className="inline w-3.5 h-3.5 mr-1 text-amber-400" />}
                   {feedback.msg}
                 </div>
               )}
@@ -335,7 +335,7 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
               {selected !== null && (
                 <Button
                   onClick={handleNext}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="w-full bg-primary hover:bg-primary text-white"
                 >
                   {qIdx + 1 >= questions.length ? (
                     <>
@@ -354,12 +354,12 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
           ) : (
             /* ── All done ── */
             <div className="space-y-3">
-              <div className="bg-green-50 border border-green-300 rounded-xl p-4 space-y-1">
-                <p className="font-bold text-green-800 flex items-center gap-2">
+              <div className="bg-emerald-500/10 border border-green-300 rounded-xl p-4 space-y-1">
+                <p className="font-bold text-emerald-200 flex items-center gap-2">
                   <CheckCircle className="w-5 h-5" />
                   Tableau structure unlocked!
                 </p>
-                <p className="text-sm text-green-700">
+                <p className="text-sm text-emerald-300">
                   The initial tableau has been filled in automatically — your reward
                   for identifying the structure correctly.
                   Now let's step through the simplex iterations.
@@ -368,7 +368,7 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
 
               <Button
                 onClick={onDone}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="w-full bg-primary hover:bg-primary text-white"
               >
                 Start Solving →
               </Button>
@@ -382,12 +382,12 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
       <div className="w-1/2 flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="flex-shrink-0 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
-          <p className="text-xs font-bold text-gray-600">
+        <div className="flex-shrink-0 px-4 py-2.5 bg-muted/40 border-b border-border">
+          <p className="text-xs font-bold text-muted-foreground">
             {allDone ? 'Initial Tableau' : 'Tableau Structure Preview'}
           </p>
           {!allDone && (
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               Answer all questions to reveal the values.
             </p>
           )}
@@ -400,7 +400,7 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
             <table className="text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 text-xs font-bold text-gray-500 border border-gray-200 bg-gray-50 whitespace-nowrap">
+                  <th className="px-3 py-2 text-xs font-bold text-muted-foreground border border-border bg-muted/40 whitespace-nowrap">
                     Basis
                   </th>
                   {allVars.map((v, i) => (
@@ -418,14 +418,14 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
                   const basisLabel = ri < basis.length ? basis[ri] : 'Z';
                   const isZRow     = ri === rows.length - 1;
                   return (
-                    <tr key={ri} className={isZRow ? 'bg-purple-50' : 'bg-white'}>
-                      <td className="px-3 py-2 text-xs font-bold border border-gray-200 text-center text-gray-700">
+                    <tr key={ri} className={isZRow ? 'bg-primary/10' : 'bg-card'}>
+                      <td className="px-3 py-2 text-xs font-bold border border-border text-center text-foreground">
                         {basisLabel}
                       </td>
                       {row.map((cell, ci) => (
                         <td
                           key={ci}
-                          className={`px-3 py-2 text-xs text-center border border-gray-200 transition-all duration-500 ${
+                          className={`px-3 py-2 text-xs text-center border border-border transition-all duration-500 ${
                             allDone ? 'opacity-100' : 'opacity-0'
                           }`}
                         >
@@ -460,9 +460,9 @@ export default function TableauSetupPhase({ problem, method, initialStep, onDone
                   <p className="text-rose-600 mt-0.5">Temporary · −M penalty drives to zero</p>
                 </div>
               )}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-2">
-                <span className="font-bold text-gray-700">Decision (x)</span>
-                <p className="text-gray-600 mt-0.5">Start at 0 in basis · to be optimised</p>
+              <div className="bg-muted/40 border border-border rounded-lg p-2">
+                <span className="font-bold text-foreground">Decision (x)</span>
+                <p className="text-muted-foreground mt-0.5">Start at 0 in basis · to be optimised</p>
               </div>
             </div>
           )}

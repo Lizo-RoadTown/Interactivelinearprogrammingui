@@ -279,13 +279,13 @@ export default function GraphBuildPhase({
         {options.map((opt, i) => {
           let cls = 'w-full text-left text-sm px-4 py-2.5 rounded-lg border-2 transition-colors ';
           if (selected === null) {
-            cls += 'bg-white border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 cursor-pointer';
+            cls += 'bg-card border-border hover:border-primary/60 hover:bg-primary/10 cursor-pointer';
           } else if (opt.value === correctValue) {
-            cls += 'bg-green-50 border-green-500 text-green-800 font-medium';
+            cls += 'bg-emerald-500/10 border-green-500 text-emerald-200 font-medium';
           } else if (opt.value === selected) {
-            cls += 'bg-red-50 border-red-400 text-red-800';
+            cls += 'bg-destructive/10 border-red-400 text-red-800';
           } else {
-            cls += 'bg-gray-50 border-gray-200 text-gray-400';
+            cls += 'bg-muted/40 border-border text-muted-foreground';
           }
           return (
             <button
@@ -296,7 +296,7 @@ export default function GraphBuildPhase({
               <span className="font-bold mr-2">{String.fromCharCode(65 + i)})</span>
               {opt.label}
               {selected !== null && opt.value === correctValue && (
-                <CheckCircle className="inline w-4 h-4 ml-2 text-green-600" />
+                <CheckCircle className="inline w-4 h-4 ml-2 text-emerald-400" />
               )}
               {selected !== null && opt.value === selected && opt.value !== correctValue && (
                 <XCircle className="inline w-4 h-4 ml-2 text-red-500" />
@@ -314,31 +314,31 @@ export default function GraphBuildPhase({
   const showFeasible      = phase === 'objective_intro' || phase === 'objective_slider' || phase === 'wrap_up';
   const showObjectiveLine = phase === 'objective_slider' || phase === 'wrap_up';
 
-  const constraintColors = ['text-red-600', 'text-emerald-600', 'text-amber-600', 'text-purple-600'];
+  const constraintColors = ['text-destructive', 'text-emerald-600', 'text-amber-400', 'text-primary'];
 
   return (
     <div className="flex-1 flex overflow-hidden">
 
       {/* LEFT: Questions */}
-      <div className="w-2/5 flex flex-col border-r border-gray-300 overflow-hidden">
+      <div className="w-2/5 flex flex-col border-r border-border overflow-hidden">
 
         {/* Progress header */}
-        <div className="flex-shrink-0 px-4 py-2.5 bg-indigo-50 border-b border-indigo-200">
+        <div className="flex-shrink-0 px-4 py-2.5 bg-primary/10 border-b border-primary/30">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-indigo-800">Graph Building</p>
+            <p className="text-xs font-bold text-primary">Graph Building</p>
             <div className="flex gap-1">
               {constraints.map((_, i) => (
                 <div
                   key={i}
                   className={`w-2.5 h-2.5 rounded-full ${
-                    i < confirmed ? 'bg-indigo-600' :
+                    i < confirmed ? 'bg-primary' :
                     i === cIdx && (phase === 'constraint_intercepts' || phase === 'constraint_direction') ? 'bg-indigo-300' :
-                    'bg-gray-200'
+                    'bg-muted/80'
                   }`}
                 />
               ))}
               <div className={`w-2.5 h-2.5 rounded-full ${
-                phase === 'objective_slider' || phase === 'wrap_up' ? 'bg-green-500' : 'bg-gray-200'
+                phase === 'objective_slider' || phase === 'wrap_up' ? 'bg-emerald-500/100' : 'bg-muted/80'
               }`} />
             </div>
           </div>
@@ -350,12 +350,12 @@ export default function GraphBuildPhase({
           {confirmed > 0 && (
             <div className="space-y-1">
               {constraints.slice(0, confirmed).map((con, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-gray-50 rounded px-2 py-1">
+                <div key={i} className="flex items-center gap-2 text-xs bg-muted/40 rounded px-2 py-1">
                   <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
                   <span className={`font-mono font-medium ${constraintColors[i % constraintColors.length]}`}>
                     {constraintLabel(con, i)}
                   </span>
-                  <span className="text-gray-400 ml-auto">plotted ✓</span>
+                  <span className="text-muted-foreground ml-auto">plotted ✓</span>
                 </div>
               ))}
             </div>
@@ -364,18 +364,18 @@ export default function GraphBuildPhase({
           {/* ── CONSTRAINT INTERCEPTS ──────────────────────────────── */}
           {phase === 'constraint_intercepts' && (
             <div className="space-y-3">
-              <div className={`rounded-xl p-3 border-2 ${constraintColors[cIdx % constraintColors.length].replace('text', 'border').replace('600', '200')} bg-white`}>
-                <p className="text-xs font-bold text-gray-500 mb-1">Constraint {cIdx + 1} of {nc}</p>
+              <div className={`rounded-xl p-3 border-2 ${constraintColors[cIdx % constraintColors.length].replace('text', 'border').replace('600', '200')} bg-card`}>
+                <p className="text-xs font-bold text-muted-foreground mb-1">Constraint {cIdx + 1} of {nc}</p>
                 <p className={`text-sm font-mono font-bold ${constraintColors[cIdx % constraintColors.length]}`}>
                   {constraintLabel(c, cIdx)}
                 </p>
               </div>
 
               <div>
-                <p className="text-sm font-semibold text-gray-800 mb-3">
+                <p className="text-sm font-semibold text-foreground mb-3">
                   Where does this line cross the axes?
                 </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 mb-3 text-xs text-blue-800">
+                <div className="bg-accent/10 border border-accent/30 rounded-lg p-2.5 mb-3 text-xs text-accent">
                   <Lightbulb className="inline w-3.5 h-3.5 mr-1 text-blue-500" />
                   To find the x₁-intercept, set x₂ = 0 and solve. To find x₂-intercept, set x₁ = 0.
                 </div>
@@ -389,9 +389,9 @@ export default function GraphBuildPhase({
               </div>
 
               {feedback && (
-                <div className={`rounded-lg p-3 text-sm flex items-start gap-2 ${feedback.correct ? 'bg-green-50 border border-green-300 text-green-800' : 'bg-red-50 border border-red-300 text-red-800'}`}>
+                <div className={`rounded-lg p-3 text-sm flex items-start gap-2 ${feedback.correct ? 'bg-emerald-500/10 border border-green-300 text-emerald-200' : 'bg-destructive/10 border border-red-300 text-red-800'}`}>
                   {feedback.correct
-                    ? <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
+                    ? <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-400" />
                     : <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
                   }
                   <span>{feedback.msg}</span>
@@ -399,7 +399,7 @@ export default function GraphBuildPhase({
               )}
 
               {feedback?.correct && (
-                <Button onClick={advanceIntercept} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button onClick={advanceIntercept} className="w-full bg-primary hover:bg-primary text-white">
                   Line plotted — which side is feasible? <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               )}
@@ -414,18 +414,18 @@ export default function GraphBuildPhase({
           {/* ── CONSTRAINT DIRECTION ──────────────────────────────── */}
           {phase === 'constraint_direction' && (
             <div className="space-y-3">
-              <div className={`rounded-xl p-3 border-2 ${constraintColors[cIdx % constraintColors.length].replace('text', 'border').replace('600', '200')} bg-white`}>
-                <p className="text-xs font-bold text-gray-500 mb-1">Constraint {cIdx + 1} — Feasible Region</p>
+              <div className={`rounded-xl p-3 border-2 ${constraintColors[cIdx % constraintColors.length].replace('text', 'border').replace('600', '200')} bg-card`}>
+                <p className="text-xs font-bold text-muted-foreground mb-1">Constraint {cIdx + 1} — Feasible Region</p>
                 <p className={`text-sm font-mono font-bold ${constraintColors[cIdx % constraintColors.length]}`}>
                   {constraintLabel(c, cIdx)}
                 </p>
               </div>
 
               <div>
-                <p className="text-sm font-semibold text-gray-800 mb-3">
+                <p className="text-sm font-semibold text-foreground mb-3">
                   Which side of this line satisfies the constraint?
                 </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 mb-3 text-xs text-blue-800">
+                <div className="bg-accent/10 border border-accent/30 rounded-lg p-2.5 mb-3 text-xs text-accent">
                   <Lightbulb className="inline w-3.5 h-3.5 mr-1 text-blue-500" />
                   Substitute the origin (0, 0) into the constraint. Does it satisfy it?
                 </div>
@@ -439,9 +439,9 @@ export default function GraphBuildPhase({
               </div>
 
               {feedback && (
-                <div className={`rounded-lg p-3 text-sm flex items-start gap-2 ${feedback.correct ? 'bg-green-50 border border-green-300 text-green-800' : 'bg-red-50 border border-red-300 text-red-800'}`}>
+                <div className={`rounded-lg p-3 text-sm flex items-start gap-2 ${feedback.correct ? 'bg-emerald-500/10 border border-green-300 text-emerald-200' : 'bg-destructive/10 border border-red-300 text-red-800'}`}>
                   {feedback.correct
-                    ? <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
+                    ? <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-400" />
                     : <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
                   }
                   <span>{feedback.msg}</span>
@@ -449,7 +449,7 @@ export default function GraphBuildPhase({
               )}
 
               {feedback?.correct && (
-                <Button onClick={advanceDirection} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button onClick={advanceDirection} className="w-full bg-primary hover:bg-primary text-white">
                   {cIdx + 1 < nc ? `Great — add constraint ${cIdx + 2}` : 'All constraints plotted!'}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
@@ -463,28 +463,28 @@ export default function GraphBuildPhase({
           {/* ── OBJECTIVE INTRO ──────────────────────────────────────── */}
           {phase === 'objective_intro' && (
             <div className="space-y-3">
-              <div className="bg-green-50 border border-green-300 rounded-xl p-4">
-                <p className="text-sm font-bold text-green-800 flex items-center gap-2">
+              <div className="bg-emerald-500/10 border border-green-300 rounded-xl p-4">
+                <p className="text-sm font-bold text-emerald-200 flex items-center gap-2">
                   <CheckCircle className="w-4 h-4" />
                   Feasible region complete!
                 </p>
-                <p className="text-xs text-green-700 mt-1 leading-relaxed">
+                <p className="text-xs text-emerald-300 mt-1 leading-relaxed">
                   The shaded area on the graph is every combination of x₁ and x₂ that satisfies
                   ALL constraints simultaneously. Any point inside (or on the boundary) is a valid solution.
                 </p>
               </div>
 
-              <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-2">
+              <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 space-y-2">
                 <p className="text-sm font-bold text-purple-800">Now: the Objective Function</p>
-                <p className="text-xs text-purple-700 leading-relaxed">
+                <p className="text-xs text-primary leading-relaxed">
                   The objective is to <strong>{objectiveType === 'max' ? 'MAXIMIZE' : 'MINIMIZE'}</strong>{' '}
                   z = {objectiveCoefficients.map((c, i) => `${c}x${i + 1}`).join(' + ')}.
                 </p>
-                <p className="text-xs text-purple-700 leading-relaxed">
+                <p className="text-xs text-primary leading-relaxed">
                   The objective function is a <strong>family of parallel lines</strong> — each line
                   corresponds to a different value of z. As z changes, the line slides across the graph.
                 </p>
-                <p className="text-xs text-purple-700 leading-relaxed">
+                <p className="text-xs text-primary leading-relaxed">
                   {objectiveType === 'max'
                     ? '→ We want to push the line as FAR from the origin as possible while still touching the feasible region.'
                     : '→ We want to bring the line as CLOSE to the origin as possible while still touching the feasible region.'
@@ -494,7 +494,7 @@ export default function GraphBuildPhase({
 
               <Button
                 onClick={() => { setPhase('objective_slider'); setZValue(0); }}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                className="w-full bg-primary hover:bg-purple-700 text-white"
               >
                 Try the slider →
               </Button>
@@ -504,20 +504,20 @@ export default function GraphBuildPhase({
           {/* ── OBJECTIVE SLIDER ─────────────────────────────────────── */}
           {phase === 'objective_slider' && (
             <div className="space-y-3">
-              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                <p className="text-sm font-bold text-gray-800">
+              <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+                <p className="text-sm font-bold text-foreground">
                   Slide the objective line to {objectiveType === 'max' ? 'maximize' : 'minimize'} z
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   Move the slider and watch the dashed purple line on the graph.
                 </p>
 
                 {/* z value display */}
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-700 font-mono">
+                  <div className="text-3xl font-bold text-primary font-mono">
                     z = {zValue}
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <div className="text-xs text-muted-foreground mt-0.5">
                     {objectiveCoefficients.map((c, i) => `${c}x${i + 1}`).join(' + ')} = {zValue}
                   </div>
                 </div>
@@ -532,16 +532,16 @@ export default function GraphBuildPhase({
                   onChange={e => setZValue(Number(e.target.value))}
                   className="w-full accent-purple-600"
                 />
-                <div className="flex justify-between text-xs text-gray-400">
+                <div className="flex justify-between text-xs text-muted-foreground">
                   <span>z = 0</span>
                   <span>z = {sliderMax}</span>
                 </div>
 
                 {/* Status indicator */}
                 <div className={`rounded-lg p-2.5 text-xs font-medium text-center ${
-                  zStatus === 'optimal' ? 'bg-green-100 text-green-800 border border-green-300' :
-                  zStatus === 'over'    ? 'bg-red-100 text-red-800 border border-red-300' :
-                                         'bg-blue-100 text-blue-800 border border-blue-300'
+                  zStatus === 'optimal' ? 'bg-emerald-500/20 text-emerald-200 border border-green-300' :
+                  zStatus === 'over'    ? 'bg-destructive/20 text-red-800 border border-red-300' :
+                                         'bg-accent/20 text-accent border border-accent/40'
                 }`}>
                   {zStatus === 'optimal'
                     ? `✓ The line is touching the boundary at a corner! This is the ${objectiveType === 'max' ? 'maximum' : 'minimum'} feasible z.`
@@ -557,11 +557,11 @@ export default function GraphBuildPhase({
               </div>
 
               {zStatus === 'optimal' && (
-                <div className="bg-green-50 border border-green-300 rounded-xl p-4 space-y-2">
-                  <p className="text-sm font-bold text-green-800">
+                <div className="bg-emerald-500/10 border border-green-300 rounded-xl p-4 space-y-2">
+                  <p className="text-sm font-bold text-emerald-200">
                     You found it! z* = {optimalZ}
                   </p>
-                  <p className="text-xs text-green-700 leading-relaxed">
+                  <p className="text-xs text-emerald-300 leading-relaxed">
                     The optimal solution is at the <strong>corner</strong> where the objective line
                     last touches the feasible region. This is always a vertex — this is why the
                     Simplex Method moves from corner to corner!
@@ -575,7 +575,7 @@ export default function GraphBuildPhase({
                 className={`w-full text-white ${
                   zStatus === 'optimal'
                     ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-indigo-600 hover:bg-indigo-700'
+                    : 'bg-primary hover:bg-primary'
                 }`}
               >
                 {zStatus === 'optimal'
@@ -589,26 +589,26 @@ export default function GraphBuildPhase({
           {/* ── WRAP UP ──────────────────────────────────────────────── */}
           {phase === 'wrap_up' && (
             <div className="space-y-3">
-              <div className="bg-indigo-50 border border-indigo-300 rounded-xl p-4 space-y-2">
-                <p className="text-sm font-bold text-indigo-800">Graph complete ✓</p>
-                <ul className="space-y-1 text-xs text-indigo-700">
+              <div className="bg-primary/10 border border-primary/40 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-bold text-primary">Graph complete ✓</p>
+                <ul className="space-y-1 text-xs text-primary">
                   <li>✓ {nc} constraint line{nc > 1 ? 's' : ''} plotted</li>
                   <li>✓ Feasible region identified (shaded)</li>
                   <li>✓ Optimal corner found graphically: z* ≈ {optimalZ}</li>
                 </ul>
-                <p className="text-xs text-indigo-600 mt-2 leading-relaxed">
+                <p className="text-xs text-primary mt-2 leading-relaxed">
                   Now we'll build the <strong>simplex tableau</strong> — the algebraic way to find
                   this same solution systematically, even for problems with more than 2 variables
                   where we can't graph.
                 </p>
               </div>
 
-              <p className="text-xs text-center text-gray-400">Step 2 of 3 — next up: Tableau Setup</p>
+              <p className="text-xs text-center text-muted-foreground">Step 2 of 3 — next up: Tableau Setup</p>
 
               <Button
                 onClick={onDone}
                 size="lg"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3"
+                className="w-full bg-primary hover:bg-primary text-white font-semibold py-3"
               >
                 Build the Simplex Tableau →
               </Button>
@@ -619,7 +619,7 @@ export default function GraphBuildPhase({
       </div>
 
       {/* RIGHT: Graph */}
-      <div className="flex-1 bg-white overflow-hidden">
+      <div className="flex-1 bg-card overflow-hidden">
         <GraphView
           constraints={constraints}
           cornerPoints={showFeasible ? cornerPoints : []}

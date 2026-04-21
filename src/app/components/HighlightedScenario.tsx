@@ -26,14 +26,14 @@ interface Props {
 // Constraint colors cycle through these
 const CONSTRAINT_COLORS = [
   'bg-emerald-200 text-emerald-900',  // C1
-  'bg-amber-200 text-amber-900',      // C2
+  'bg-amber-500/30 text-amber-900',      // C2
   'bg-rose-200 text-rose-900',        // C3
   'bg-sky-200 text-sky-900',          // C4
   'bg-violet-200 text-violet-900',    // C5
 ];
 
 const VARS_COLOR = 'bg-indigo-200 text-indigo-900';
-const OBJ_COLOR = 'bg-purple-200 text-purple-900';
+const OBJ_COLOR = 'bg-primary/30 text-purple-900';
 
 interface Span {
   start: number;
@@ -45,7 +45,7 @@ interface Span {
 export default function HighlightedScenario({ scenario, highlights, active }: Props) {
   if (!highlights) {
     // No highlights defined — render plain text
-    return <p className="text-sm text-gray-800 leading-relaxed">{scenario}</p>;
+    return <p className="text-sm text-foreground leading-relaxed">{scenario}</p>;
   }
 
   // Collect all active spans
@@ -123,7 +123,7 @@ export default function HighlightedScenario({ scenario, highlights, active }: Pr
     elements.push(scenario.slice(pos));
   }
 
-  return <p className="text-sm text-gray-800 leading-relaxed">{elements}</p>;
+  return <p className="text-sm text-foreground leading-relaxed">{elements}</p>;
 }
 
 /** Find all occurrences of `sub` in `text` (case-sensitive). */
