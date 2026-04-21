@@ -288,18 +288,23 @@ export default function MainWorkspace() {
   useEffect(() => { if (solverResponse) setShowSolver(true); }, [solverResponse]);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
+    <div className="h-screen flex flex-col bg-slate-950">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-purple-700 to-blue-600 text-white px-6 py-4 flex items-center justify-between shrink-0">
-        <div className="cursor-pointer" onClick={() => setShowSolver(false)}>
-          <h1 className="text-xl font-bold tracking-tight">Linear Programming Simulator</h1>
-          <p className="text-xs text-purple-200 mt-0.5">Interactive Simplex Method Learning Tool</p>
+      <div className="bg-slate-900/60 backdrop-blur border-b border-slate-800 text-white px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="cursor-pointer flex items-center gap-3" onClick={() => setShowSolver(false)}>
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-fuchsia-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
+            <span className="text-white font-bold text-sm">LP</span>
+          </div>
+          <div>
+            <h1 className="text-base font-semibold tracking-tight text-slate-100">Linear Programming Simulator</h1>
+            <p className="text-[11px] text-slate-400 mt-0.5">Interactive Simplex Method Learning Tool</p>
+          </div>
         </div>
         {showSolver && (
           <Button
             onClick={() => navigate('/practice')}
-            className="bg-white text-indigo-700 hover:bg-indigo-50 font-bold px-5 py-2 text-sm rounded-lg shadow"
+            className="bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:from-fuchsia-400 hover:to-purple-500 text-white font-medium px-5 py-2 text-sm rounded-lg shadow-lg shadow-fuchsia-500/20 border-0"
           >
             <BookOpen className="w-4 h-4 mr-2" />
             Practice Mode
@@ -309,62 +314,76 @@ export default function MainWorkspace() {
 
       {/* ── HERO: Practice Mode front and center ─────────────────────── */}
       {!showSolver && (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-950 relative overflow-hidden">
+          {/* Background gradient accents */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-0 left-1/4 w-[600px] h-[600px] rounded-full bg-fuchsia-600/10 blur-3xl"></div>
+            <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-3xl"></div>
+          </div>
+
           {/* Practice Mode — the star */}
           <div
             onClick={() => navigate('/practice')}
-            className="group cursor-pointer w-full max-w-2xl bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-10 shadow-2xl hover:shadow-3xl hover:scale-[1.02] transition-all duration-200 mb-8"
+            className="group relative cursor-pointer w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-10 shadow-2xl hover:border-fuchsia-500/40 hover:shadow-fuchsia-500/20 transition-all duration-200 mb-6 overflow-hidden"
           >
-            <div className="flex items-center gap-4 mb-4">
-              <div className="bg-white/20 rounded-xl p-3">
-                <BookOpen className="w-10 h-10 text-white" />
+            {/* Gradient border accent */}
+            <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-600/20 via-purple-600/10 to-transparent opacity-60 pointer-events-none"></div>
+            <div className="relative">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="bg-gradient-to-br from-fuchsia-500 to-purple-600 rounded-xl p-3 shadow-lg shadow-fuchsia-500/30">
+                  <BookOpen className="w-10 h-10 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white">Practice Mode</h2>
+                  <p className="text-fuchsia-300/80 text-base mt-1">Learn by doing</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-3xl font-bold text-white">Practice Mode</h2>
-                <p className="text-indigo-200 text-lg mt-1">Learn by doing</p>
+              <p className="text-slate-300 text-base leading-relaxed mb-6">
+                Work through real word problems step by step. Build formulations from scratch,
+                identify constraints, choose pivot variables by clicking directly on the tableau,
+                and get immediate feedback on your reasoning.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {['Beginner', 'Intermediate', 'Advanced'].map(level => (
+                  <span key={level} className="bg-slate-800/80 border border-slate-700 text-slate-200 text-xs px-3 py-1 rounded-full">
+                    {level} problems
+                  </span>
+                ))}
               </div>
-            </div>
-            <p className="text-white/90 text-base leading-relaxed mb-6">
-              Work through real word problems step by step. Build formulations from scratch,
-              identify constraints, choose pivot variables by clicking directly on the tableau,
-              and get immediate feedback on your reasoning.
-            </p>
-            <div className="flex flex-wrap gap-3 mb-6">
-              {['Beginner', 'Intermediate', 'Advanced'].map(level => (
-                <span key={level} className="bg-white/20 text-white text-sm px-3 py-1 rounded-full">
-                  {level} problems
-                </span>
-              ))}
-            </div>
-            <div className="flex items-center gap-2 text-white font-semibold text-lg group-hover:gap-3 transition-all">
-              Start Practicing <span className="text-2xl">→</span>
+              <div className="flex items-center gap-2 text-fuchsia-300 font-semibold text-base group-hover:gap-3 transition-all">
+                Start Practicing <span className="text-xl">→</span>
+              </div>
             </div>
           </div>
 
           {/* Secondary options */}
-          <div className="w-full max-w-2xl space-y-3">
+          <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-3 relative">
             <div
               onClick={() => setShowSolver(true)}
-              className="cursor-pointer bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:scale-[1.01] transition-all border border-gray-200"
+              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-cyan-500/40 hover:bg-slate-900/80 transition-all"
             >
-              <div className="flex items-center gap-3 mb-2">
-                <Zap className="w-6 h-6 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-800">Free-form Solver</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-cyan-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-slate-100">Free-form Solver</h3>
               </div>
-              <p className="text-gray-500 text-sm">
+              <p className="text-slate-400 text-xs leading-relaxed">
                 Enter any LP problem and explore the full simplex solution with interactive tableaus and graphs.
               </p>
             </div>
 
             <div
               onClick={() => navigate('/sensitivity')}
-              className="cursor-pointer bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:scale-[1.01] transition-all border border-gray-200"
+              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-fuchsia-500/40 hover:bg-slate-900/80 transition-all"
             >
-              <div className="flex items-center gap-3 mb-2">
-                <BookOpen className="w-6 h-6 text-indigo-600" />
-                <h3 className="text-lg font-semibold text-gray-800">Sensitivity Analysis <span className="text-xs text-gray-400 font-normal">(Chapter 8)</span></h3>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-fuchsia-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-slate-100">Sensitivity Analysis <span className="text-[10px] text-slate-500 font-normal">(Ch. 8)</span></h3>
               </div>
-              <p className="text-gray-500 text-sm">
+              <p className="text-slate-400 text-xs leading-relaxed">
                 Post-optimality "what-if" analysis: matrix form, allowable ranges, shadow prices,
                 add/modify variables and constraints.
               </p>
