@@ -1,22 +1,22 @@
 /**
- * ConstraintMeters — each constraint as a "bucket" of resource.
+ * ConstraintMeters — each constraint drawn as two contrasting segments.
  *
- * For every constraint the student has built so far, we draw a
- * horizontal capacity bar. The filled portion is the resource USED by
- * the current (x₁, x₂) choice. The tail is the UNUSED portion — that
- * unused amount IS the slack variable sᵢ.
+ *   ┌──────────────┬──────────────────────────────────────┐
+ *   │ used  0      │    unused  (s₁)  80                  │
+ *   └──────────────┴──────────────────────────────────────┘
+ *   0 ─────────────────────────────────── capacity 80
  *
- * The point of this panel is to make the slack variable concrete
- * before it appears as an abstract identity column in the tableau.
- * When the student later sees "in row C1, the coefficients (s₁, s₂)
- * are (1, 0)", they have already seen that s₁ lives inside C1's
- * capacity bucket and that s₂ is the unused tail of a DIFFERENT
- * bucket — the identity pattern becomes a visible fact, not a rule.
+ * The point is that BOTH segments are visible and labeled with their
+ * number, so the student can read "how much used vs how much unused"
+ * off the bar at a glance. At the origin the used segment is a thin
+ * anchor on the left and the unused segment fills the rest with "80"
+ * printed inside it — so slack is not a stripe, it's the thing that
+ * occupies most of the bar with its own value on display.
  *
- * The meter also shows s₁ = 0 when C1's bucket is completely filled
- * (constraint is tight / binding). That matches what the student
- * will see on the graph: the current point landing ON a constraint
- * line means its slack is zero.
+ * When production grows, the divider moves right, the bright "used"
+ * segment gets bigger, and the dim "unused (slack)" segment shrinks
+ * proportionally. When a constraint becomes binding, the slack side
+ * disappears and the whole bar lights up with "binding — s_i = 0".
  */
 
 import { LPDraft } from './guidedTypes';
@@ -25,13 +25,7 @@ import type { QuestionHighlight } from '../../data/tutorialScripts';
 
 interface Props {
   draft: LPDraft;
-  /**
-   * Current basic feasible point. For the initial tableau this is the
-   * origin {x1:0, x2:0}; after each pivot it becomes the new BFS.
-   * Keys are variable names ("x1", "x2", "s1", ...).
-   */
   bfs: Record<string, number>;
-  /** When set, pulse-glow the matching meter / slack tail. */
   highlight?: QuestionHighlight | null;
 }
 
@@ -45,7 +39,6 @@ export default function ConstraintMeters({ draft, bfs, highlight }: Props) {
   const x1 = bfs['x1'] ?? 0;
   const x2 = bfs['x2'] ?? 0;
 
-  // Only render meters for constraints that have all their pieces set
   const ready = draft.constraints
     .map((c, idx) => ({ c, idx }))
     .filter(({ c }) =>
@@ -67,11 +60,24 @@ export default function ConstraintMeters({ draft, bfs, highlight }: Props) {
         const slackFrac = 1 - usedFrac;
         const color = colorFor(idx);
         const binding = Math.abs(slack) < 1e-6;
+        const empty = used < 1e-9;
+
         const pulseMeter =
           highlight?.target === 'meter' && highlight.constraintIndex === idx;
         const pulseTail =
           (highlight?.target === 'meter-tail' && highlight.constraintIndex === idx) ||
           highlight?.target === 'meter-tails-all';
+
+        // Two segments so each has its own label visible inside it; the
+        // widths track used/slack. Text fades when segment is too narrow.
+        const usedSegmentStyle = {
+          width: `${usedFrac * 100}%`,
+          backgroundColor: color,
+        };
+        const slackSegmentStyle = {
+          width: `${slackFrac * 100}%`,
+          backgroundColor: colorForFill(idx, 0.22),
+        };
 
         return (
           <div
@@ -79,6 +85,7 @@ export default function ConstraintMeters({ draft, bfs, highlight }: Props) {
             className={`bg-card/40 border rounded-xl p-3 space-y-2${pulseMeter ? ' animate-attention-pulse' : ''}`}
             style={{ borderColor: colorForFill(idx, 0.45) }}
           >
+            {/* Header */}
             <div className="flex items-baseline justify-between gap-2">
               <div className="flex items-baseline gap-2">
                 <span
@@ -92,71 +99,88 @@ export default function ConstraintMeters({ draft, bfs, highlight }: Props) {
                 )}
               </div>
               <span className="text-[10px] text-muted-foreground tabular-nums">
-                capacity {fmt(rhs)}
+                total capacity <span className="text-foreground font-semibold">{fmt(rhs)}</span>
               </span>
             </div>
 
-            {/* The bucket bar */}
-            <div className="relative h-7 rounded-md overflow-hidden border border-border/60 bg-muted/40">
-              {/* Used portion */}
+            {/* The two-segment bar */}
+            <div className="relative h-10 rounded-md overflow-hidden border border-border/60 flex">
+              {/* Used segment — bright solid color, value printed inside */}
               <div
-                className="absolute top-0 bottom-0 left-0 transition-all duration-500"
-                style={{
-                  width: `${usedFrac * 100}%`,
-                  backgroundColor: color,
-                  opacity: 0.85,
-                }}
-              />
-              {/* Slack portion — hatched / subtler so it reads as "empty" */}
+                className="relative flex items-center justify-center transition-all duration-500"
+                style={usedSegmentStyle}
+                aria-label={`used ${fmt(used)} of ${fmt(rhs)}`}
+              >
+                {usedFrac > 0.12 && (
+                  <span className="text-[11px] font-bold text-white tabular-nums drop-shadow">
+                    used {fmt(used)}
+                  </span>
+                )}
+              </div>
+
+              {/* Unused (slack) segment — muted same-hue color, value printed inside */}
               <div
-                className={`absolute top-0 bottom-0 transition-all duration-500${pulseTail ? ' animate-attention-pulse' : ''}`}
-                style={{
-                  left: `${usedFrac * 100}%`,
-                  width: `${slackFrac * 100}%`,
-                  backgroundImage:
-                    `repeating-linear-gradient(135deg, ${colorForFill(idx, 0.22)} 0, ${colorForFill(idx, 0.22)} 4px, transparent 4px, transparent 8px)`,
-                }}
-              />
-              {/* Divider line between used and slack */}
-              {!binding && slackFrac > 0 && (
+                className={`relative flex items-center justify-center transition-all duration-500${pulseTail ? ' animate-attention-pulse' : ''}`}
+                style={slackSegmentStyle}
+                aria-label={`unused (slack s${idx + 1}) ${fmt(slack)}`}
+              >
+                {slackFrac > 0.18 && (
+                  <span
+                    className="text-[11px] font-bold tabular-nums"
+                    style={{ color }}
+                  >
+                    unused (s{idx + 1}) = {fmt(slack)}
+                  </span>
+                )}
+              </div>
+
+              {/* Divider marker between used and slack */}
+              {!binding && !empty && (
                 <div
-                  className="absolute top-0 bottom-0 w-px bg-foreground/40"
+                  className="absolute top-0 bottom-0 w-0.5 bg-foreground/60 pointer-events-none"
                   style={{ left: `${usedFrac * 100}%` }}
                 />
               )}
             </div>
 
-            {/* Caption: what's used, what's left over (=slack) */}
-            <div className="flex items-center justify-between gap-2 text-[11px] tabular-nums">
+            {/* Scale row (0 ─── capacity) + current numeric readout */}
+            <div className="flex items-baseline justify-between gap-2 text-[11px] tabular-nums">
+              <span className="text-muted-foreground">0</span>
               <span className="text-muted-foreground">
-                used: <span className="text-foreground font-semibold">{fmt(used)}</span>
                 {a !== 0 || b !== 0 ? (
-                  <span className="text-muted-foreground/70">
-                    {' '}= {fmt(a)}·x₁ + {fmt(b)}·x₂ = {fmt(a * x1)} + {fmt(b * x2)}
+                  <span>
+                    <span className="text-foreground/80">used = </span>
+                    {fmt(a)}·x₁ + {fmt(b)}·x₂ = {fmt(a * x1)} + {fmt(b * x2)} ={' '}
+                    <span className="text-foreground font-semibold">{fmt(used)}</span>
                   </span>
                 ) : null}
               </span>
-              <span
-                className={`px-2 py-0.5 rounded font-bold ${binding ? 'animate-fill-pop' : ''}${pulseTail ? ' animate-attention-pulse' : ''}`}
+              <span className="text-muted-foreground">{fmt(rhs)}</span>
+            </div>
+
+            {/* Binding badge when the constraint is tight */}
+            {binding && (
+              <div
+                className={`text-center text-[11px] font-bold py-1 rounded animate-fill-pop${pulseTail ? ' animate-attention-pulse' : ''}`}
                 style={{
-                  color: binding ? '#10b981' : color,
-                  backgroundColor: binding ? 'rgba(16, 185, 129, 0.15)' : colorForFill(idx, 0.15),
-                  border: `1px solid ${binding ? 'rgba(16, 185, 129, 0.45)' : colorForFill(idx, 0.45)}`,
+                  color: '#10b981',
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.45)',
                 }}
               >
-                s{idx + 1} = {fmt(slack)}
-                {binding && <span className="ml-1 text-[9px] uppercase tracking-wider">binding</span>}
-              </span>
-            </div>
+                BINDING — s{idx + 1} = 0 (all {fmt(rhs)} hours used)
+              </div>
+            )}
           </div>
         );
       })}
 
       <p className="text-[10px] text-muted-foreground/80 italic leading-relaxed pt-1">
-        The striped tail of each bar is the <span className="font-semibold not-italic">unused</span> capacity —
-        that tail is the slack variable s<span className="align-sub text-[8px]">i</span>. When a bar fills
-        completely the constraint is <span className="font-semibold not-italic">binding</span> and
-        s<span className="align-sub text-[8px]">i</span> = 0.
+        Each bar has two pieces: the bright side is what&apos;s being
+        <span className="font-semibold not-italic"> used</span>, the muted side is what&apos;s left
+        <span className="font-semibold not-italic"> unused</span>. The unused side is the slack
+        variable s<span className="align-sub text-[8px]">i</span>. Together they always add to
+        the total capacity.
       </p>
     </div>
   );
