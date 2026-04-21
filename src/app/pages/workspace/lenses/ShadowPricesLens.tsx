@@ -126,10 +126,22 @@ export default function ShadowPricesLens({ problem, response, isLoading, method 
 
       <div className="bg-primary/10 border border-primary/30 rounded-lg p-3 text-xs text-muted-foreground leading-relaxed">
         <p className="text-foreground font-semibold mb-1">Shadow price (§8.3.3.1)</p>
-        <p>
-          How much does z* change if we add 1 unit to a constraint's right-hand side?
-          Computed as <code className="font-mono text-foreground">y = C_B · B⁻¹</code>.
-          Non-binding constraints have shadow price 0 — adding resources is wasted.
+        <p className="mb-2">
+          How much does <code className="font-mono text-foreground">z*</code> change if we add 1 unit to a constraint&apos;s RHS?
+        </p>
+        <p className="font-mono text-[11px] bg-card/60 border border-border rounded px-2 py-1 text-foreground">
+          y = C_B · B⁻¹
+        </p>
+        <p className="mt-2">
+          That is: take the OF coefficients of the basic variables, right-multiply by{' '}
+          <code className="font-mono text-foreground">B⁻¹</code> (which is the Matrix form lens&apos;s
+          step 5). Each entry of the resulting vector is the shadow price of one constraint.
+          <strong className="text-foreground"> On the graph: </strong> a binding constraint&apos;s
+          line touches the optimal vertex — relaxing it by 1 unit shifts that line outward,
+          and the vertex slides to a new (better) position. The shadow price is exactly how
+          much the objective gains from that slide. Non-binding constraints have 0 shadow
+          price because their line is already away from the vertex; moving it further
+          doesn&apos;t change the optimum.
         </p>
       </div>
 

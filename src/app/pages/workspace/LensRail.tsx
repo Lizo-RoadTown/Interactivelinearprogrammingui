@@ -23,14 +23,17 @@ interface LensDef {
   phase: 'B' | 'D' | 'E';
 }
 
-// Order matters — this is the visual stack in the rail
+// Order matters — this is the visual stack in the rail. Pedagogical order:
+// Formulation → Solution → Matrix form → Shadow → Sensitivity → Dual → History.
+// Matrix form comes BEFORE Sensitivity because the student needs to understand
+// where B, B⁻¹, N come from before those quantities can usefully drive sliders.
 const LENSES: LensDef[] = [
-  { id: 'formulation', label: 'Formulation', icon: FileText,    description: 'Edit objective & constraints',                              phase: 'B' },
+  { id: 'formulation', label: 'Formulation', icon: FileText,    description: 'The LP in textbook form',                                  phase: 'B' },
   { id: 'solution',    label: 'Solution',    icon: Target,      description: 'x*, z*, basis — plain-English answer',                     phase: 'B' },
-  { id: 'sensitivity', label: 'Sensitivity', icon: Sliders,     description: 'Drag sliders for each coefficient / RHS; watch LP react', phase: 'B' },
-  { id: 'matrix',      label: 'Matrix form', icon: Grid3x3,     description: 'B, B⁻¹, N, C_B, C_N at the current iteration',             phase: 'B' },
-  { id: 'shadow',      label: 'Shadow',      icon: TrendingUp,  description: 'Dual prices — marginal value of each constraint',          phase: 'B' },
-  { id: 'dual',        label: 'Dual LP',     icon: GitCompare,  description: 'View the dual problem and its solution',                   phase: 'E' },
+  { id: 'matrix',      label: 'Matrix form', icon: Grid3x3,     description: '§8.2 — how B, B⁻¹, N, C_B, C_N are built from this LP',    phase: 'B' },
+  { id: 'shadow',      label: 'Shadow',      icon: TrendingUp,  description: '§8.3.3.1 — marginal value of each constraint',             phase: 'B' },
+  { id: 'sensitivity', label: 'Sensitivity', icon: Sliders,     description: '§8.3.1–§8.3.6 — drag sliders, watch the LP react',         phase: 'B' },
+  { id: 'dual',        label: 'Dual LP',     icon: GitCompare,  description: 'The dual problem and its solution',                        phase: 'E' },
   { id: 'history',     label: 'History',     icon: Clock,       description: 'Every change you made to this workspace',                  phase: 'E' },
 ];
 
