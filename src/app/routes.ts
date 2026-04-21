@@ -3,6 +3,7 @@ import MainWorkspace from "./pages/MainWorkspace";
 import PracticeMode from "./pages/PracticeMode";
 import SensitivityMode from "./pages/SensitivityMode";
 import WorkspacePage from "./pages/workspace/WorkspacePage";
+import GuidedLearnPage from "./pages/workspace/GuidedLearnPage";
 
 export const router = createBrowserRouter([
   {
@@ -10,9 +11,14 @@ export const router = createBrowserRouter([
     Component: MainWorkspace,
   },
   {
-    // New unified workspace — the future home of all guided learning.
-    // Phase C will redirect /practice → /workspace?tutorial=simplex.
-    // Phase D will redirect /sensitivity → /workspace?tutorial=sensitivity.
+    // Guided homework-style walkthrough — the main learning experience.
+    // Blank canvas + word problem + one question at a time; the LP builds
+    // up as the student answers.
+    path: "/learn/:problemId",
+    Component: GuidedLearnPage,
+  },
+  {
+    // Free-exploration workspace (advanced / post-learning review).
     path: "/workspace",
     Component: WorkspacePage,
   },

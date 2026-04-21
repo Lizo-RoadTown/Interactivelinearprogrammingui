@@ -321,9 +321,9 @@ export default function MainWorkspace() {
             <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-3xl"></div>
           </div>
 
-          {/* LP Workspace — guided walkthrough by default */}
+          {/* Guided walkthrough — the primary learning path */}
           <div
-            onClick={() => navigate('/workspace?tutorial=simplex')}
+            onClick={() => navigate('/learn/wp-toy-factory')}
             className="group relative cursor-pointer w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-10 shadow-2xl hover:border-fuchsia-500/40 hover:shadow-fuchsia-500/20 transition-all duration-200 mb-6 overflow-hidden"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-600/20 via-purple-600/10 to-transparent opacity-60 pointer-events-none"></div>
