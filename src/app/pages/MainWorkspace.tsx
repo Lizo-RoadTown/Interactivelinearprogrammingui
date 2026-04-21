@@ -357,7 +357,22 @@ export default function MainWorkspace() {
           </div>
 
           {/* Secondary options */}
-          <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-3 relative">
+          <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 relative">
+            <div
+              onClick={() => navigate('/workspace')}
+              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-primary/40 hover:bg-slate-900/80 transition-all"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-primary" />
+                </div>
+                <h3 className="text-sm font-semibold text-slate-100">LP Workspace <span className="text-[10px] text-slate-500 font-normal">(new)</span></h3>
+              </div>
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Unified environment: tableau + graph + every lens you need. Solve, explore, manipulate — all in one place.
+              </p>
+            </div>
+
             <div
               onClick={() => setShowSolver(true)}
               className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-cyan-500/40 hover:bg-slate-900/80 transition-all"
@@ -375,17 +390,17 @@ export default function MainWorkspace() {
 
             <div
               onClick={() => navigate('/sensitivity')}
-              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-fuchsia-500/40 hover:bg-slate-900/80 transition-all"
+              className="cursor-pointer bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-fuchsia-500/40 hover:bg-slate-900/80 transition-all opacity-75"
+              title="Being rebuilt as the Sensitivity lens inside the LP Workspace"
             >
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30 flex items-center justify-center">
                   <BookOpen className="w-4 h-4 text-fuchsia-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-100">Sensitivity Analysis <span className="text-[10px] text-slate-500 font-normal">(Ch. 8)</span></h3>
+                <h3 className="text-sm font-semibold text-slate-100">Sensitivity <span className="text-[10px] text-slate-500 font-normal">(Ch. 8)</span></h3>
               </div>
               <p className="text-slate-400 text-xs leading-relaxed">
-                Post-optimality "what-if" analysis: matrix form, allowable ranges, shadow prices,
-                add/modify variables and constraints.
+                Legacy — rebuilding inside the LP Workspace (Phase D).
               </p>
             </div>
           </div>
