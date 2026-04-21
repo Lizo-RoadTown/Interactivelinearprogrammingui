@@ -146,10 +146,10 @@ export default function MainWorkspace() {
     if (!currentStep) return null;
 
     if (stepType === 'initial') return (
-      <div className="space-y-2 text-xs text-gray-700">
-        <p className="font-semibold text-gray-800">Standard Form Setup</p>
+      <div className="space-y-2 text-xs text-foreground">
+        <p className="font-semibold text-foreground">Standard Form Setup</p>
         <p>Slack variables have been added to convert each ≤ constraint into an equality. All original variables start at 0 (non-basic); slack variables form the initial basis.</p>
-        <p className="text-gray-500">Use <span className="font-mono">→</span> to step through the simplex iterations.</p>
+        <p className="text-muted-foreground">Use <span className="font-mono">→</span> to step through the simplex iterations.</p>
       </div>
     );
 
@@ -163,23 +163,23 @@ export default function MainWorkspace() {
       const ratio = pivotVal && rhs !== undefined ? rhs / pivotVal : undefined;
       return (
         <div className="space-y-3 text-xs">
-          <p className="font-semibold text-gray-800">Pivot Selection</p>
+          <p className="font-semibold text-foreground">Pivot Selection</p>
           {enteringVar && zVal !== undefined && (
-            <div className="p-2 bg-blue-50 border border-blue-200 rounded">
-              <p className="font-medium text-blue-800 mb-1">Entering variable: {enteringVar}</p>
-              <p className="text-blue-700">Z-row value = {fmt(zVal)} (most negative). Each unit of {enteringVar} added improves the objective by {fmt(Math.abs(zVal))}.</p>
+            <div className="p-2 bg-accent/10 border border-accent/30 rounded">
+              <p className="font-medium text-accent mb-1">Entering variable: {enteringVar}</p>
+              <p className="text-accent">Z-row value = {fmt(zVal)} (most negative). Each unit of {enteringVar} added improves the objective by {fmt(Math.abs(zVal))}.</p>
             </div>
           )}
           {leavingVar && ratio !== undefined && (
-            <div className="p-2 bg-amber-50 border border-amber-200 rounded">
-              <p className="font-medium text-amber-800 mb-1">Leaving variable: {leavingVar}</p>
-              <p className="text-amber-700">Min ratio = {rhs !== undefined ? fmt(rhs) : '?'} ÷ {pivotVal !== undefined ? fmt(pivotVal) : '?'} = {fmt(ratio)}. The smallest positive ratio determines which basic variable hits zero first — this keeps the solution feasible.</p>
+            <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded">
+              <p className="font-medium text-amber-200 mb-1">Leaving variable: {leavingVar}</p>
+              <p className="text-amber-300">Min ratio = {rhs !== undefined ? fmt(rhs) : '?'} ÷ {pivotVal !== undefined ? fmt(pivotVal) : '?'} = {fmt(ratio)}. The smallest positive ratio determines which basic variable hits zero first — this keeps the solution feasible.</p>
             </div>
           )}
           {pivotRow >= 0 && pivotCol >= 0 && pivotVal !== undefined && (
-            <div className="p-2 bg-gray-50 border border-gray-200 rounded">
-              <p className="font-medium text-gray-700">Pivot element</p>
-              <p className="text-gray-600">Row {pivotRow + 1}, column {headers[pivotCol]} = {fmt(pivotVal)}. This cell will become 1 after row scaling.</p>
+            <div className="p-2 bg-muted/40 border border-border rounded">
+              <p className="font-medium text-foreground">Pivot element</p>
+              <p className="text-muted-foreground">Row {pivotRow + 1}, column {headers[pivotCol]} = {fmt(pivotVal)}. This cell will become 1 after row scaling.</p>
             </div>
           )}
         </div>
@@ -193,17 +193,17 @@ export default function MainWorkspace() {
       if (activeRow < 0) {
         const isAtEnd = afterStep === totalRows + 1;
         return (
-          <div className="space-y-2 text-xs text-gray-700">
-            <p className="font-semibold text-gray-800">{isAtEnd ? 'Pivot complete' : 'Before pivot'}</p>
+          <div className="space-y-2 text-xs text-foreground">
+            <p className="font-semibold text-foreground">{isAtEnd ? 'Pivot complete' : 'Before pivot'}</p>
             {isAtEnd
-              ? <><p><span className="font-medium">{enteringVar}</span> entered the basis, <span className="font-medium">{leavingVar}</span> left.</p><p className="text-gray-500">Use ← to step back through each row operation.</p></>
-              : <><p>About to apply pivot: <span className="font-medium">{enteringVar}</span> enters, <span className="font-medium">{leavingVar}</span> leaves.</p><p className="text-gray-500">Use → to step through each row operation one at a time.</p></>
+              ? <><p><span className="font-medium">{enteringVar}</span> entered the basis, <span className="font-medium">{leavingVar}</span> left.</p><p className="text-muted-foreground">Use ← to step back through each row operation.</p></>
+              : <><p>About to apply pivot: <span className="font-medium">{enteringVar}</span> enters, <span className="font-medium">{leavingVar}</span> leaves.</p><p className="text-muted-foreground">Use → to step through each row operation one at a time.</p></>
             }
             {rowOps.length > 0 && (
               <div className="mt-2">
-                <p className="font-medium text-gray-600 mb-1">All row operations:</p>
+                <p className="font-medium text-muted-foreground mb-1">All row operations:</p>
                 <ol className="space-y-1">
-                  {rowOps.map((op, i) => <li key={i} className="font-mono bg-gray-50 border border-gray-200 px-2 py-1 rounded">{op}</li>)}
+                  {rowOps.map((op, i) => <li key={i} className="font-mono bg-muted/40 border border-border px-2 py-1 rounded">{op}</li>)}
                 </ol>
               </div>
             )}
@@ -217,24 +217,24 @@ export default function MainWorkspace() {
       const beforeColVal = prevTableau?.rows[activeRow]?.[pivotCol]?.value ?? 0;
       const isPivotRowHere = activeRow === pivotRow;
 
-      let title = ''; let why = ''; let color = 'bg-blue-50 border-blue-200 text-blue-900';
+      let title = ''; let why = ''; let color = 'bg-accent/10 border-accent/30 text-foreground';
       if (isPivotRowHere) {
         const pv = prevTableau?.rows[activeRow]?.[pivotCol]?.value ?? 1;
         title = 'Scale the pivot row';
         why = `Divide every entry in this row by the pivot element (${fmt(pv)}) so the ${enteringVar} column becomes 1. All other rows use this scaled row to eliminate ${enteringVar}.`;
-        color = 'bg-amber-50 border-amber-200 text-amber-900';
+        color = 'bg-amber-500/10 border-amber-500/30 text-amber-100';
       } else if (isZRow) {
         if (Math.abs(beforeColVal) < 1e-9) {
-          title = 'Z-row — no change'; why = `The objective coefficient for ${enteringVar} is already 0 — no update needed.`; color = 'bg-gray-50 border-gray-200 text-gray-600';
+          title = 'Z-row — no change'; why = `The objective coefficient for ${enteringVar} is already 0 — no update needed.`; color = 'bg-muted/40 border-border text-muted-foreground';
         } else {
           title = 'Update the objective (Z-row)';
           why = `The Z-row had ${fmt(beforeColVal)} in the ${enteringVar} column. Subtract ${fmt(beforeColVal)} × (scaled pivot row) to zero it out. This reflects that ${enteringVar} is now basic — its reduced cost becomes 0 and z updates.`;
-          color = 'bg-purple-50 border-purple-200 text-purple-900';
+          color = 'bg-primary/10 border-primary/30 text-primary';
         }
       } else if (Math.abs(beforeColVal) < 1e-9) {
         title = `Row ${activeRow + 1} — no change`;
         why = `This row's entry in the ${enteringVar} column is already 0 — nothing to eliminate.`;
-        color = 'bg-gray-50 border-gray-200 text-gray-600';
+        color = 'bg-muted/40 border-border text-muted-foreground';
       } else {
         title = `Eliminate ${enteringVar} from Row ${activeRow + 1}`;
         why = `Row ${activeRow + 1} has ${fmt(beforeColVal)} in the ${enteringVar} column. Subtract ${fmt(beforeColVal)} × (scaled pivot row) to zero it out. After the pivot, ${enteringVar} should only appear in the pivot row.`;
@@ -247,7 +247,7 @@ export default function MainWorkspace() {
             {op && <p className="font-mono mb-1">{op}</p>}
             <p className="leading-relaxed">{why}</p>
           </div>
-          <p className="text-gray-400">Step {afterStep}/{totalRows} — use ← → in the table to step through rows.</p>
+          <p className="text-muted-foreground">Step {afterStep}/{totalRows} — use ← → in the table to step through rows.</p>
         </div>
       );
     }
@@ -261,16 +261,16 @@ export default function MainWorkspace() {
       (headers.slice(0, -1)).forEach(v => { if (!(v in sol)) sol[v] = 0; });
       return (
         <div className="space-y-2 text-xs">
-          <p className="font-semibold text-green-800">Optimal Solution Found</p>
-          <p className="text-gray-600">All Z-row coefficients are non-negative — no further improvement is possible.</p>
+          <p className="font-semibold text-emerald-200">Optimal Solution Found</p>
+          <p className="text-muted-foreground">All Z-row coefficients are non-negative — no further improvement is possible.</p>
           {currentStep.objectiveValue !== undefined && (
-            <div className="p-2 bg-green-50 border border-green-300 rounded">
-              <p className="font-bold text-green-800 text-sm">z* = {fmt(currentStep.objectiveValue)}</p>
+            <div className="p-2 bg-emerald-500/10 border border-emerald-500/40 rounded">
+              <p className="font-bold text-emerald-200 text-sm">z* = {fmt(currentStep.objectiveValue)}</p>
             </div>
           )}
           <div className="grid grid-cols-2 gap-1 mt-2">
             {Object.entries(sol).map(([v, val]) => (
-              <div key={v} className={`px-2 py-1 rounded border text-xs flex justify-between ${val !== 0 ? 'bg-green-100 border-green-300 font-semibold text-green-900' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+              <div key={v} className={`px-2 py-1 rounded border text-xs flex justify-between ${val !== 0 ? 'bg-emerald-500/20 border-emerald-500/40 font-semibold text-emerald-100' : 'bg-muted/40 border-border text-muted-foreground'}`}>
                 <span>{v}</span><span>{fmt(val)}</span>
               </div>
             ))}
@@ -279,7 +279,7 @@ export default function MainWorkspace() {
       );
     }
 
-    return <p className="text-xs text-gray-500">{currentStep.explanation}</p>;
+    return <p className="text-xs text-muted-foreground">{currentStep.explanation}</p>;
   })();
 
   const [showSolver, setShowSolver] = useState(false);
@@ -412,12 +412,12 @@ export default function MainWorkspace() {
 
       {/* Banners */}
       {isLoading && (
-        <div className="flex items-center gap-2 bg-blue-50 border-b border-blue-200 px-4 py-1.5 text-xs text-blue-700 shrink-0">
+        <div className="flex items-center gap-2 bg-accent/10 border-b border-accent/30 px-4 py-1.5 text-xs text-accent shrink-0">
           <Loader2 className="w-3 h-3 animate-spin" />Solving...
         </div>
       )}
       {error && (
-        <div className="flex items-center gap-2 bg-red-50 border-b border-red-200 px-4 py-1.5 text-xs text-red-700 shrink-0">
+        <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/30 px-4 py-1.5 text-xs text-destructive shrink-0">
           <AlertCircle className="w-3 h-3" />{error}
         </div>
       )}
@@ -426,7 +426,7 @@ export default function MainWorkspace() {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* ── TOP HALF: Tableau spans full width ─────────────────────── */}
-        <div className="h-3/5 border-b border-gray-300 bg-white overflow-auto">
+        <div className="h-3/5 border-b border-border bg-card overflow-auto">
           {displayTableau ? (
             <TableauWorkspace
               tableau={displayTableau}
@@ -440,7 +440,7 @@ export default function MainWorkspace() {
               onAfterStepChange={setAfterStep}
             />
           ) : (
-            <div className="h-full flex items-center justify-center text-gray-400">
+            <div className="h-full flex items-center justify-center text-muted-foreground">
               <div className="text-center">
                 <p className="text-base font-medium">No problem solved yet</p>
                 <p className="text-sm mt-1">Enter constraints below, then click Solve.</p>
@@ -453,11 +453,11 @@ export default function MainWorkspace() {
         <div className="h-2/5 flex overflow-hidden">
 
           {/* Bottom-left: constraints + narrative */}
-          <div className="w-1/2 flex flex-col border-r border-gray-300 overflow-hidden">
+          <div className="w-1/2 flex flex-col border-r border-border overflow-hidden">
 
             {/* Constraints */}
-            <div className="shrink-0 border-b border-gray-200 bg-white p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Constraints</p>
+            <div className="shrink-0 border-b border-border bg-card p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Constraints</p>
               <div className="space-y-2">
                 {problem.constraints.map((c, ci) => (
                   <div key={c.id} className="flex items-center gap-1.5">
@@ -465,7 +465,7 @@ export default function MainWorkspace() {
                       <span key={vi} className="flex items-center gap-1">
                         <Input className="w-12 h-7 text-center text-sm px-1" value={coeff}
                           onChange={e => updateCoeff(ci, vi, e.target.value)} />
-                        <span className="text-sm text-gray-500 font-medium">
+                        <span className="text-sm text-muted-foreground font-medium">
                           {problem.variables[vi] ?? `x${vi + 1}`}{vi < c.coefficients.length - 1 ? ' +' : ''}
                         </span>
                       </span>
@@ -480,7 +480,7 @@ export default function MainWorkspace() {
                     </Select>
                     <Input className="w-12 h-7 text-center text-sm px-1" value={c.rhs}
                       onChange={e => updateRhs(ci, e.target.value)} />
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-300 hover:text-red-500"
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                       onClick={() => removeConstraint(ci)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -491,12 +491,12 @@ export default function MainWorkspace() {
                 <Plus className="w-3 h-3 mr-1" />Add Constraint
               </Button>
               {/* Variable sign constraints (Chapter 4: negative / URS variables) */}
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Variable Sign Constraints</p>
+              <div className="mt-3 pt-3 border-t border-border">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Variable Sign Constraints</p>
                 <div className="flex flex-wrap gap-2">
                   {problem.variables.map((v, vi) => (
                     <div key={vi} className="flex items-center gap-1">
-                      <span className="text-xs font-medium text-gray-600">{v}:</span>
+                      <span className="text-xs font-medium text-muted-foreground">{v}:</span>
                       <Select
                         value={(problem.variableSigns ?? [])[vi] ?? 'nonneg'}
                         onValueChange={s => updateVariableSign(vi, s as VariableSign)}
@@ -515,12 +515,12 @@ export default function MainWorkspace() {
             </div>
 
             {/* Narrative / explanations */}
-            <div className="flex-1 min-h-0 bg-white overflow-y-auto p-4">
+            <div className="flex-1 min-h-0 bg-card overflow-y-auto p-4">
               {narrative ? (
                 <>
                   {narrative}
                   {cellExplanation && (
-                    <div className="mt-3 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-900">
+                    <div className="mt-3 p-2 bg-primary/10 border border-primary/30 rounded text-xs text-primary">
                       <div className="flex items-center gap-1 mb-1">
                         <Info className="w-3 h-3" /><span className="font-semibold">Cell</span>
                       </div>
@@ -529,13 +529,13 @@ export default function MainWorkspace() {
                   )}
                 </>
               ) : (
-                <p className="text-xs text-gray-400">Solve a problem to see step-by-step explanations here.</p>
+                <p className="text-xs text-muted-foreground">Solve a problem to see step-by-step explanations here.</p>
               )}
             </div>
           </div>
 
           {/* Bottom-right: graph fills the quadrant */}
-          <div className="w-1/2 bg-white overflow-hidden">
+          <div className="w-1/2 bg-card overflow-hidden">
             <GraphView
               constraints={problem.constraints}
               cornerPoints={solverResponse?.cornerPoints ?? []}
