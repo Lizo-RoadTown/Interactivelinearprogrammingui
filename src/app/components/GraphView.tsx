@@ -111,7 +111,7 @@ export default function GraphView({
   const objectiveLine = getObjectiveLine();
 
   return (
-    <div className="h-full bg-white flex flex-col overflow-hidden">
+    <div className="h-full bg-card flex flex-col overflow-hidden">
       <TooltipProvider>
         <svg
           viewBox={`0 0 ${width} ${height}`}
@@ -127,8 +127,8 @@ export default function GraphView({
             const yLines = Array.from({ length: Math.floor(maxY / step) + 1 }, (_, i) => i * step);
             return (
               <>
-                {xLines.map(i => <line key={`gx-${i}`} x1={scaleX(i)} y1={scaleY(0)} x2={scaleX(i)} y2={scaleY(maxY)} stroke="#f0f0f0" strokeWidth="1" />)}
-                {yLines.map(i => <line key={`gy-${i}`} x1={scaleX(0)} y1={scaleY(i)} x2={scaleX(maxX)} y2={scaleY(i)} stroke="#f0f0f0" strokeWidth="1" />)}
+                {xLines.map(i => <line key={`gx-${i}`} x1={scaleX(i)} y1={scaleY(0)} x2={scaleX(i)} y2={scaleY(maxY)} stroke="#1e293b" strokeWidth="1" />)}
+                {yLines.map(i => <line key={`gy-${i}`} x1={scaleX(0)} y1={scaleY(i)} x2={scaleX(maxX)} y2={scaleY(i)} stroke="#1e293b" strokeWidth="1" />)}
               </>
             );
           })()}
@@ -139,7 +139,7 @@ export default function GraphView({
             y1={scaleY(0)}
             x2={scaleX(maxX)}
             y2={scaleY(0)}
-            stroke="#000"
+            stroke="#64748b"
             strokeWidth="2"
           />
           <line
@@ -147,7 +147,7 @@ export default function GraphView({
             y1={scaleY(0)}
             x2={scaleX(0)}
             y2={scaleY(maxY)}
-            stroke="#000"
+            stroke="#64748b"
             strokeWidth="2"
           />
 
@@ -167,10 +167,10 @@ export default function GraphView({
             return (
               <>
                 {xTicks.map(i => (
-                  <text key={`xt-${i}`} x={scaleX(i)} y={scaleY(0) + 20} fontSize="14" textAnchor="middle" fill="#666">{i}</text>
+                  <text key={`xt-${i}`} x={scaleX(i)} y={scaleY(0) + 20} fontSize="14" textAnchor="middle" fill="#94a3b8">{i}</text>
                 ))}
                 {yTicks.map(i => (
-                  <text key={`yt-${i}`} x={scaleX(0) - 20} y={scaleY(i) + 5} fontSize="14" textAnchor="middle" fill="#666">{i}</text>
+                  <text key={`yt-${i}`} x={scaleX(0) - 20} y={scaleY(i) + 5} fontSize="14" textAnchor="middle" fill="#94a3b8">{i}</text>
                 ))}
               </>
             );
@@ -179,8 +179,8 @@ export default function GraphView({
           {/* Feasible region */}
           <polygon
             points={feasiblePath}
-            fill="#3b82f6"
-            fillOpacity="0.15"
+            fill="#06b6d4"
+            fillOpacity="0.18"
             stroke="none"
           />
 
@@ -210,7 +210,7 @@ export default function GraphView({
                   <TooltipContent>
                     <div className="text-sm">
                       <div className="font-semibold">{c.label}</div>
-                      <div className="text-xs text-gray-500">Constraint {idx + 1}</div>
+                      <div className="text-xs text-muted-foreground">Constraint {idx + 1}</div>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -235,7 +235,7 @@ export default function GraphView({
               y1={scaleY(objectiveLine.y1)}
               x2={scaleX(objectiveLine.x2)}
               y2={scaleY(objectiveLine.y2)}
-              stroke="#8b5cf6"
+              stroke="#d946ef"
               strokeWidth="2"
               strokeDasharray="8,4"
             />
@@ -246,7 +246,7 @@ export default function GraphView({
             <polyline
               points={simplexPath.map(p => `${scaleX(p.x)},${scaleY(p.y)}`).join(' ')}
               fill="none"
-              stroke="#8b5cf6"
+              stroke="#d946ef"
               strokeWidth="3"
               strokeDasharray="none"
               markerEnd="url(#arrowhead)"
@@ -263,7 +263,7 @@ export default function GraphView({
               refY="3"
               orient="auto"
             >
-              <polygon points="0 0, 10 3, 0 6" fill="#8b5cf6" />
+              <polygon points="0 0, 10 3, 0 6" fill="#d946ef" />
             </marker>
             <marker
               id="direction-arrow"
@@ -350,7 +350,7 @@ export default function GraphView({
                         <div className="text-xs">z = {point.z}</div>
                       )}
                       {isCurrent && (
-                        <div className="text-xs text-purple-600 font-medium">Current solution</div>
+                        <div className="text-xs text-primary font-medium">Current solution</div>
                       )}
                     </div>
                   </TooltipContent>
@@ -361,7 +361,7 @@ export default function GraphView({
                   x={scaleX(point.x) + 12}
                   y={scaleY(point.y) - 8}
                   className="text-xs font-medium"
-                  fill={isCurrent ? '#8b5cf6' : '#3b82f6'}
+                  fill={isCurrent ? '#d946ef' : '#06b6d4'}
                 >
                   {point.label}
                 </text>
@@ -370,7 +370,7 @@ export default function GraphView({
                     x={scaleX(point.x) + 12}
                     y={scaleY(point.y) + 5}
                     className="text-xs"
-                    fill="#666"
+                    fill="#94a3b8"
                   >
                     z={point.z}
                   </text>
@@ -382,11 +382,11 @@ export default function GraphView({
       </TooltipProvider>
 
       {/* Compact legend */}
-      <div className="flex items-center gap-4 px-3 py-1 border-t border-gray-100 text-xs text-gray-500 shrink-0 flex-wrap">
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-blue-500 opacity-30 border border-blue-400" />Feasible</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-purple-500" />Simplex path</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-purple-600" />Current</span>
-        {showObjectiveLine && <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-purple-400 border-dashed" />Objective</span>}
+      <div className="flex items-center gap-4 px-3 py-1 border-t border-border text-xs text-muted-foreground shrink-0 flex-wrap">
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-accent opacity-40 border border-accent" />Feasible</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-primary" />Simplex path</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-primary" />Current</span>
+        {showObjectiveLine && <span className="flex items-center gap-1"><span className="inline-block w-4 h-0.5 bg-primary/60 border-dashed" />Objective</span>}
       </div>
     </div>
   );

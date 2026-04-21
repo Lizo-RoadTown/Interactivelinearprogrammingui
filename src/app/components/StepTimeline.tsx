@@ -13,9 +13,9 @@ export default function StepTimeline({
   onStepChange
 }: StepTimelineProps) {
   return (
-    <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+    <div className="px-4 py-3 bg-card border-t border-border">
       <div className="flex items-center gap-4">
-        <Label className="text-sm font-medium whitespace-nowrap">
+        <Label className="text-sm font-medium whitespace-nowrap text-muted-foreground">
           Step Timeline:
         </Label>
         <div className="flex-1">
@@ -28,11 +28,11 @@ export default function StepTimeline({
             className="w-full"
           />
         </div>
-        <div className="text-sm font-medium text-gray-700 min-w-16 text-right">
+        <div className="text-sm font-medium text-foreground min-w-16 text-right tabular-nums">
           {currentStep + 1} / {totalSteps}
         </div>
       </div>
-      
+
       {/* Step markers */}
       <div className="flex justify-between mt-2 px-1">
         {Array.from({ length: totalSteps }, (_, i) => (
@@ -41,10 +41,10 @@ export default function StepTimeline({
             onClick={() => onStepChange(i)}
             className={`w-2 h-2 rounded-full transition-all ${
               i === currentStep
-                ? 'bg-purple-600 scale-150'
+                ? 'bg-primary scale-150 shadow-lg shadow-primary/40'
                 : i < currentStep
-                ? 'bg-purple-400'
-                : 'bg-gray-300'
+                ? 'bg-primary/60'
+                : 'bg-muted-foreground/30'
             }`}
             title={`Go to step ${i}`}
           />

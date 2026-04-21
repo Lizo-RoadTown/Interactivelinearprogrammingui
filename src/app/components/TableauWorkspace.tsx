@@ -142,16 +142,16 @@ export default function TableauWorkspace({
       <table className="w-full border-collapse text-base">
         <thead>
           <tr>
-            <th className="px-4 py-3 bg-gray-100 border border-gray-300 font-semibold text-sm">Basis</th>
+            <th className="px-4 py-3 bg-muted border border-border font-semibold text-sm text-muted-foreground">Basis</th>
             {headers.map((h, i) => {
-              let thCls = 'px-4 py-3 border border-gray-300 font-semibold text-sm ';
-              if (gp?.highlightedCol === i) thCls += 'bg-blue-200 text-blue-900 ';
-              else if (gp?.rhsEmphasis && i === rhsColIdx) thCls += 'bg-purple-100 ';
-              else if (i === pivotColForRatio && showRatios && !gp) thCls += 'bg-blue-100 ';
-              else thCls += 'bg-gray-100 ';
+              let thCls = 'px-4 py-3 border border-border font-semibold text-sm ';
+              if (gp?.highlightedCol === i) thCls += 'bg-accent/30 text-foreground ';
+              else if (gp?.rhsEmphasis && i === rhsColIdx) thCls += 'bg-primary/20 text-foreground ';
+              else if (i === pivotColForRatio && showRatios && !gp) thCls += 'bg-accent/20 text-foreground ';
+              else thCls += 'bg-muted text-muted-foreground ';
               return <th key={i} className={thCls}>{h}</th>;
             })}
-            {showRatios && <th className="px-4 py-3 bg-purple-100 border border-gray-300 font-semibold text-sm">Ratio</th>}
+            {showRatios && <th className="px-4 py-3 bg-primary/20 border border-border font-semibold text-sm text-foreground">Ratio</th>}
           </tr>
         </thead>
         <tbody>
@@ -159,7 +159,7 @@ export default function TableauWorkspace({
             const dimmed = isGuidedDimmed(rIdx);
             return (
               <tr key={rIdx} className={dimmed ? 'opacity-30' : ''}>
-                <td className="px-4 py-3 bg-gray-50 border border-gray-300 font-medium text-center text-sm">
+                <td className="px-4 py-3 bg-muted/60 border border-border font-medium text-center text-sm text-foreground">
                   {basis[rIdx]}
                 </td>
                 {row.map((cell, cIdx) => (
@@ -180,12 +180,12 @@ export default function TableauWorkspace({
                   </Tooltip>
                 ))}
                 {showRatios && (
-                  <td className="px-4 py-3 bg-purple-50 border border-gray-300 text-center text-sm">
+                  <td className="px-4 py-3 bg-primary/10 border border-border text-center text-sm">
                     {ratios?.[rIdx] != null ? (
-                      <span className={ratioMinRow === rIdx ? 'font-bold text-green-700' : ''}>
+                      <span className={ratioMinRow === rIdx ? 'font-bold text-emerald-400' : 'text-foreground'}>
                         {fmt(ratios[rIdx] as number)}{ratioMinRow === rIdx ? ' ← min' : ''}
                       </span>
-                    ) : <span className="text-gray-400">—</span>}
+                    ) : <span className="text-muted-foreground">—</span>}
                   </td>
                 )}
               </tr>
@@ -193,14 +193,14 @@ export default function TableauWorkspace({
           })}
           {/* Z-row */}
           <tr className={gp?.zRowEmphasis
-            ? 'border-t-4 border-indigo-400 bg-indigo-50'
-            : 'bg-blue-50'
+            ? 'border-t-4 border-primary bg-primary/10'
+            : 'bg-accent/10'
           }>
-            <td className={`px-4 py-3 border border-gray-300 font-semibold text-center text-sm ${
-              gp?.zRowEmphasis ? 'bg-indigo-100 text-indigo-800' : ''
+            <td className={`px-4 py-3 border border-border font-semibold text-center text-sm ${
+              gp?.zRowEmphasis ? 'bg-primary/20 text-primary' : 'text-foreground'
             }`}>
               {gp?.zRowEmphasis ? (
-                <span>Z<span className="block text-xs font-normal text-indigo-600 leading-tight">objective</span></span>
+                <span>Z<span className="block text-xs font-normal text-primary/70 leading-tight">objective</span></span>
               ) : 'Z'}
             </td>
             {rows[rows.length - 1].map((cell, cIdx) => (
@@ -214,7 +214,7 @@ export default function TableauWorkspace({
                 {fmt(cell.value)}
               </td>
             ))}
-            {showRatios && <td className="px-4 py-3 bg-purple-50 border border-gray-300" />}
+            {showRatios && <td className="px-4 py-3 bg-primary/10 border border-border" />}
           </tr>
         </tbody>
       </table>
@@ -242,48 +242,48 @@ export default function TableauWorkspace({
 
         // Cell state overrides (correct/invalid/suboptimal from attempts)
         if (cellState === 'correct') {
-          cls += 'bg-green-200 ring-2 ring-green-500 font-bold text-green-900 border-green-400 ';
+          cls += 'bg-emerald-500/30 ring-2 ring-emerald-400 font-bold text-emerald-100 border-emerald-400/60 ';
           return cls;
         }
         if (cellState === 'invalid') {
-          cls += 'bg-red-100 text-red-400 border-red-200 ';
+          cls += 'bg-destructive/15 text-destructive border-destructive/30 ';
           return cls;
         }
         if (cellState === 'suboptimal') {
-          cls += 'bg-amber-200 ring-2 ring-amber-400 font-bold text-amber-900 border-amber-300 ';
+          cls += 'bg-amber-500/30 ring-2 ring-amber-400 font-bold text-amber-200 border-amber-400/40 ';
           return cls;
         }
 
-        // Column highlight (blue) for entering column
+        // Column highlight (accent/cyan) for entering column
         if (inHighlightedCol && !isZRow && !isRhs) {
-          cls += 'bg-blue-100 border-blue-200 ';
-          if (clickable) cls += 'cursor-pointer hover:bg-blue-200 hover:ring-2 hover:ring-blue-400 ';
+          cls += 'bg-accent/20 border-accent/30 text-foreground ';
+          if (clickable) cls += 'cursor-pointer hover:bg-accent/30 hover:ring-2 hover:ring-accent/60 ';
           return cls;
         }
 
         // RHS emphasis
         if (gp!.rhsEmphasis && isRhs && !isZRow) {
-          cls += 'bg-purple-50 font-medium border-gray-200 ';
+          cls += 'bg-primary/10 font-medium border-border text-foreground ';
           return cls;
         }
 
         // Z-row cells
         if (isZRow) {
           if (isRhs) {
-            cls += 'font-semibold border-gray-300 ';
-            cls += gp!.zRowEmphasis ? 'bg-indigo-100 text-indigo-800 ' : 'bg-blue-50 ';
+            cls += 'font-semibold border-border ';
+            cls += gp!.zRowEmphasis ? 'bg-primary/20 text-primary ' : 'bg-accent/10 text-foreground ';
           } else if (gp!.zRowEmphasis) {
             // In attention phase: neutral coloring, no hints about negative/positive
-            cls += 'bg-indigo-50 border-indigo-200 ';
-            if (clickable) cls += 'cursor-pointer hover:bg-indigo-100 hover:ring-2 hover:ring-indigo-400 font-medium ';
+            cls += 'bg-primary/10 border-primary/30 text-foreground ';
+            if (clickable) cls += 'cursor-pointer hover:bg-primary/20 hover:ring-2 hover:ring-primary/60 font-medium ';
           } else {
-            cls += 'bg-blue-50 border-gray-200 ';
+            cls += 'bg-accent/10 border-border text-foreground ';
           }
           return cls;
         }
 
         // Normal constraint cells
-        cls += 'border-gray-200 ';
+        cls += 'border-border text-foreground ';
         return cls;
       },
     });
@@ -305,21 +305,21 @@ export default function TableauWorkspace({
         const isPivotCell = rIdx === pivotRow && cIdx === pivotCol;
         const isSelected = selectedCell?.row === rIdx && selectedCell?.col === cIdx;
         let cls = 'px-4 py-3 text-center border transition-all text-sm ';
-        if (isSelected) cls += 'ring-2 ring-purple-500 bg-purple-50 border-gray-200';
-        else if (isPivotCell && showHints) cls += 'bg-amber-400 font-bold text-white border-amber-500';
-        else if (showHints && rIdx === pivotRow) cls += 'bg-amber-100 border-gray-200';
-        else if (showHints && cIdx === pivotCol && !isZRow) cls += 'bg-blue-100 border-gray-200';
+        if (isSelected) cls += 'ring-2 ring-primary bg-primary/20 border-border text-foreground';
+        else if (isPivotCell && showHints) cls += 'bg-amber-500/80 font-bold text-white border-amber-400';
+        else if (showHints && rIdx === pivotRow) cls += 'bg-amber-500/20 border-border text-foreground';
+        else if (showHints && cIdx === pivotCol && !isZRow) cls += 'bg-accent/25 border-border text-foreground';
         else if (isZRow && showHints) {
-          if (cIdx === rhsColIdx) cls += 'bg-blue-100 font-semibold border-gray-300';
-          else if (cIdx === optEnteringCol) cls += 'bg-blue-400 text-white font-bold border-blue-500';
-          else if (candidateCols.some(c => c.idx === cIdx)) cls += 'bg-blue-200 font-semibold border-gray-200';
-          else if (cell.value > 1e-9) cls += 'bg-green-50 text-green-700 border-gray-200';
-          else cls += 'bg-blue-50 border-gray-200';
+          if (cIdx === rhsColIdx) cls += 'bg-accent/20 font-semibold border-border text-foreground';
+          else if (cIdx === optEnteringCol) cls += 'bg-accent/70 text-white font-bold border-accent';
+          else if (candidateCols.some(c => c.idx === cIdx)) cls += 'bg-accent/40 font-semibold border-border text-foreground';
+          else if (cell.value > 1e-9) cls += 'bg-emerald-500/10 text-emerald-300 border-border';
+          else cls += 'bg-accent/10 border-border text-foreground';
         } else if (isZRow) {
-          if (cIdx === rhsColIdx) cls += 'bg-blue-50 font-semibold border-gray-300';
-          else cls += 'bg-blue-50 border-gray-200';
-        } else cls += 'border-gray-200';
-        if (isInteractive && !isSelected) cls += ' cursor-pointer hover:bg-purple-50';
+          if (cIdx === rhsColIdx) cls += 'bg-accent/10 font-semibold border-border text-foreground';
+          else cls += 'bg-accent/10 border-border text-foreground';
+        } else cls += 'border-border text-foreground';
+        if (isInteractive && !isSelected) cls += ' cursor-pointer hover:bg-primary/10';
         return cls;
       },
     });
@@ -348,7 +348,7 @@ export default function TableauWorkspace({
           <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAfterStep(Math.max(0, afterStep - 1))} disabled={isAtStart}>
             <ChevronLeft className="w-3 h-3" />
           </Button>
-          <span className="flex-1 text-center text-sm text-gray-500">
+          <span className="flex-1 text-center text-sm text-muted-foreground">
             {isAtStart ? 'Before pivot' : isAtEnd ? 'After pivot' : `Row op ${afterStep}/${totalRows}`}
           </span>
           <Button variant="outline" size="sm" className="h-6 w-6 p-0" onClick={() => setAfterStep(Math.min(totalRows + 1, afterStep + 1))} disabled={isAtEnd}>
@@ -362,7 +362,7 @@ export default function TableauWorkspace({
         <div className="flex items-center gap-1 mb-3">
           {Array.from({ length: totalRows + 2 }).map((_, i) => (
             <button key={i} onClick={() => setAfterStep(i)}
-              className={`rounded-full transition-all ${i === afterStep ? 'w-3 h-3 bg-blue-500' : 'w-2 h-2 bg-gray-300 hover:bg-gray-400'}`} />
+              className={`rounded-full transition-all ${i === afterStep ? 'w-3 h-3 bg-accent' : 'w-2 h-2 bg-muted-foreground/40 hover:bg-muted-foreground/70'}`} />
           ))}
         </div>
 
@@ -371,9 +371,9 @@ export default function TableauWorkspace({
           <table className="w-full border-collapse text-base">
             <thead>
               <tr>
-                <th className="px-4 py-3 bg-gray-100 border border-gray-300 font-semibold text-sm">Basis</th>
+                <th className="px-4 py-3 bg-muted border border-border font-semibold text-sm">Basis</th>
                 {headers.map((h, i) => (
-                  <th key={i} className={`px-4 py-3 border border-gray-300 font-semibold text-sm ${i === pivotCol && pivotCol >= 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>{h}</th>
+                  <th key={i} className={`px-4 py-3 border border-border font-semibold text-sm ${i === pivotCol && pivotCol >= 0 ? 'bg-accent/20' : 'bg-muted'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -386,13 +386,13 @@ export default function TableauWorkspace({
                 const isBefore = isAtStart || (!isAtEnd && afterStep <= rIdx && !isActive);
                 const displayRow = getRowValues(rIdx);
                 return (
-                  <tr key={rIdx} className={isActive ? 'ring-2 ring-inset ring-blue-400' : isZRow ? 'bg-blue-50' : ''}>
-                    <td className={`px-4 py-3 border border-gray-300 font-medium text-center text-sm ${
-                      isActive ? 'font-bold bg-blue-50' : isDone ? 'bg-green-50 text-green-800' : 'bg-gray-50 text-gray-400'
+                  <tr key={rIdx} className={isActive ? 'ring-2 ring-inset ring-blue-400' : isZRow ? 'bg-accent/10' : ''}>
+                    <td className={`px-4 py-3 border border-border font-medium text-center text-sm ${
+                      isActive ? 'font-bold bg-accent/10' : isDone ? 'bg-emerald-500/10 text-emerald-300' : 'bg-muted/40 text-muted-foreground'
                     }`}>
                       {basisLabel}
-                      {isActive && <span className="block text-blue-600 font-normal text-xs">← now</span>}
-                      {isDone && !isAtEnd && <span className="block text-green-600 font-normal text-xs">✓</span>}
+                      {isActive && <span className="block text-accent font-normal text-xs">← now</span>}
+                      {isDone && !isAtEnd && <span className="block text-emerald-400 font-normal text-xs">✓</span>}
                     </td>
                     {displayRow.map((cell, cIdx) => {
                       const afterVal = tableau.rows[rIdx][cIdx].value;
@@ -400,14 +400,14 @@ export default function TableauWorkspace({
                       const isPivotCell = rIdx === pivotRow && cIdx === pivotCol;
                       const changed = Math.abs(afterVal - beforeVal) > 1e-9;
                       let cls = 'px-4 py-3 text-center border text-sm ';
-                      if (isPivotCell && !isBefore) cls += 'bg-amber-400 font-bold text-white border-amber-500';
-                      else if (isActive) cls += changed ? 'bg-green-100 font-semibold text-green-900 border-green-300' : 'border-gray-200 text-gray-400';
-                      else if (isDone) cls += changed ? 'bg-green-50 text-green-800 border-gray-200' : 'text-gray-400 border-gray-200';
-                      else cls += 'text-gray-400 border-gray-200 italic';
+                      if (isPivotCell && !isBefore) cls += 'bg-amber-500 font-bold text-white border-amber-400';
+                      else if (isActive) cls += changed ? 'bg-emerald-500/20 font-semibold text-emerald-200 border-emerald-500/40' : 'border-border text-muted-foreground';
+                      else if (isDone) cls += changed ? 'bg-emerald-500/10 text-emerald-300 border-border' : 'text-muted-foreground border-border';
+                      else cls += 'text-muted-foreground border-border italic';
                       return (
                         <td key={cIdx} className={cls}>
                           {isActive && changed && hasPrev
-                            ? <><span className="line-through text-gray-400 mr-1">{fmt(beforeVal)}</span><span className="text-green-700 font-bold">{fmt(afterVal)}</span></>
+                            ? <><span className="line-through text-muted-foreground mr-1">{fmt(beforeVal)}</span><span className="text-emerald-300 font-bold">{fmt(afterVal)}</span></>
                             : fmt(cell.value)}
                         </td>
                       );
@@ -418,11 +418,11 @@ export default function TableauWorkspace({
             </tbody>
           </table>
         </div>
-        <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-400">
-          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-blue-400" /> active</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-green-50 border border-green-300" /> done</span>
+        <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-accent" /> active</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-emerald-500/10 border border-emerald-500/40" /> done</span>
           <span className="italic">italic</span><span>= before</span>
-          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-amber-400" /> pivot</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-amber-500" /> pivot</span>
         </div>
       </>
     );
@@ -436,10 +436,10 @@ export default function TableauWorkspace({
     getCellClass: (rIdx, cIdx, isZRow) => {
       const val = tableau.rows[rIdx][cIdx].value;
       let cls = 'px-4 py-3 text-center border text-sm ';
-      if (isZRow && cIdx === rhsColIdx) cls += 'bg-blue-200 font-bold text-blue-900 border-blue-300';
-      else if (!isZRow && cIdx === rhsColIdx) cls += 'bg-green-100 font-semibold text-green-900 border-gray-200';
-      else if (isZRow) cls += val > 1e-9 ? 'text-green-700 border-gray-200 bg-blue-50' : Math.abs(val) < 1e-9 ? 'text-gray-400 border-gray-200 bg-blue-50' : 'text-red-600 border-gray-200 bg-blue-50';
-      else cls += Math.abs(val) < 1e-9 ? 'text-gray-300 border-gray-200' : 'border-gray-200';
+      if (isZRow && cIdx === rhsColIdx) cls += 'bg-accent/40 font-bold text-foreground border-accent/40';
+      else if (!isZRow && cIdx === rhsColIdx) cls += 'bg-emerald-500/20 font-semibold text-emerald-200 border-border';
+      else if (isZRow) cls += val > 1e-9 ? 'text-emerald-300 border-border bg-accent/10' : Math.abs(val) < 1e-9 ? 'text-muted-foreground border-border bg-accent/10' : 'text-destructive border-border bg-accent/10';
+      else cls += Math.abs(val) < 1e-9 ? 'text-muted-foreground/60 border-border' : 'border-border';
       return cls;
     },
   });
@@ -456,12 +456,12 @@ export default function TableauWorkspace({
       getCellClass: (rIdx, cIdx, isZRow) => {
         const isSelected = selectedCell?.row === rIdx && selectedCell?.col === cIdx;
         let cls = 'px-4 py-3 text-center border text-sm cursor-pointer ';
-        if (isSelected) cls += 'ring-2 ring-purple-500 bg-purple-50 border-gray-200';
+        if (isSelected) cls += 'ring-2 ring-primary bg-primary/10 border-border';
         else if (phase === 'choose_entering' && isZRow && cIdx < rhsColIdx && tableau.rows[rIdx][cIdx].value < -1e-9)
-          cls += cIdx === optEnteringCol ? 'bg-blue-400 text-white font-bold border-blue-500 hover:bg-blue-500' : 'bg-blue-100 font-semibold border-gray-200 hover:bg-blue-200';
+          cls += cIdx === optEnteringCol ? 'bg-accent text-white font-bold border-accent hover:bg-accent/100' : 'bg-accent/20 font-semibold border-border hover:bg-accent/40';
         else if (phase === 'choose_leaving' && !isZRow && cIdx === pivotColForRatio)
-          cls += 'bg-amber-100 border-amber-300 hover:bg-amber-200';
-        else cls += 'border-gray-200 hover:bg-purple-50';
+          cls += 'bg-amber-500/20 border-amber-400/40 hover:bg-amber-500/30';
+        else cls += 'border-border hover:bg-primary/10';
         return cls;
       },
     });
@@ -486,8 +486,8 @@ export default function TableauWorkspace({
     : renderStandardTable();
 
   return (
-    <div className="h-full bg-white p-4 overflow-auto">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">{stepLabel}</p>
+    <div className="h-full bg-card p-4 overflow-auto">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{stepLabel}</p>
       {tableContent}
     </div>
   );

@@ -57,7 +57,7 @@ export default function TopControlBar({
   };
 
   return (
-    <div className="bg-white border-b-2 border-gray-200 px-6 py-4 flex items-center gap-8">
+    <div className="bg-card border-b border-border px-6 py-4 flex items-center gap-6 flex-wrap">
       {/* Objective */}
       <div className="flex items-center gap-3 shrink-0">
         <div className="flex gap-1.5">
@@ -70,19 +70,24 @@ export default function TopControlBar({
             <Minimize2 className="w-4 h-4 mr-1.5" />Min
           </Button>
         </div>
-        <span className="text-base font-bold">z =</span>
+        <span className="text-base font-bold text-foreground">z =</span>
         {objectiveCoefficients.map((coeff, i) => (
           <span key={i} className="flex items-center gap-1.5">
-            <Input className="w-16 h-10 text-center text-base font-medium" value={coeff}
+            <Input
+              type="text"
+              inputMode="decimal"
+              className="w-16 h-10 text-center text-base font-medium"
+              value={coeff}
+              onFocus={e => e.target.select()}
               onChange={e => handleCoeff(i, e.target.value)} />
-            <span className="text-base text-gray-700 font-medium">
+            <span className="text-base text-muted-foreground font-medium">
               {variables[i] ?? `x${i + 1}`}{i < objectiveCoefficients.length - 1 ? ' +' : ''}
             </span>
           </span>
         ))}
       </div>
 
-      <div className="w-px h-10 bg-gray-300 shrink-0" />
+      <div className="w-px h-10 bg-border shrink-0" />
 
       {/* Method + controls */}
       <div className="flex items-center gap-3 shrink-0">
@@ -111,10 +116,10 @@ export default function TopControlBar({
         </Button>
       </div>
 
-      <div className="w-px h-10 bg-gray-300 shrink-0" />
+      <div className="w-px h-10 bg-border shrink-0" />
 
       {/* Toggles */}
-      <div className="flex items-center gap-5 text-sm">
+      <div className="flex items-center gap-5 text-sm text-muted-foreground">
         <label className="flex items-center gap-2 cursor-pointer">
           <Switch checked={isInteractive} onCheckedChange={onInteractiveModeToggle} />
           <span>Interactive</span>

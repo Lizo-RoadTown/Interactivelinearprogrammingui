@@ -26,9 +26,9 @@ export default function ExplanationConsole({
   const isInitial = currentStep.iteration === 0;
 
   return (
-    <div className="h-full bg-white border-t border-gray-200 p-4 flex">
+    <div className="h-full bg-card border-t border-border p-4 flex">
       {/* Main explanation area */}
-      <div className="flex-1 pr-4 border-r border-gray-200">
+      <div className="flex-1 pr-4 border-r border-border">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold">Step Explanation</h3>
           <Badge variant={isOptimal ? 'default' : 'secondary'}>
@@ -40,14 +40,14 @@ export default function ExplanationConsole({
           <div className="space-y-3">
             {/* Cell interrogation result (shown when a cell has been clicked) */}
             {cellExplanation && (
-              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded">
+              <div className="p-3 bg-primary/10 border border-primary/30 rounded">
                 <div className="flex items-center gap-2 mb-1">
-                  <Info className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                  <span className="text-xs font-semibold text-indigo-700">
+                  <Info className="w-4 h-4 text-primary flex-shrink-0" />
+                  <span className="text-xs font-semibold text-primary">
                     {isInteractive ? 'Interactive' : 'Cell Explanation'}
                   </span>
                 </div>
-                <p className="text-xs leading-relaxed text-indigo-900 whitespace-pre-line">{cellExplanation}</p>
+                <p className="text-xs leading-relaxed text-primary whitespace-pre-line">{cellExplanation}</p>
               </div>
             )}
 
@@ -55,9 +55,9 @@ export default function ExplanationConsole({
             <div className="flex gap-3">
               <div className="mt-1">
                 {isOptimal ? (
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <CheckCircle className="w-5 h-5 text-emerald-400" />
                 ) : isInitial ? (
-                  <Info className="w-5 h-5 text-blue-600" />
+                  <Info className="w-5 h-5 text-accent" />
                 ) : (
                   <TrendingUp className="w-5 h-5 text-amber-600" />
                 )}
@@ -76,14 +76,14 @@ export default function ExplanationConsole({
 
             {/* Row operations */}
             {showRowOperations && currentStep.rowOperations && currentStep.rowOperations.length > 0 && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <div className="mt-4 p-3 bg-accent/10 border border-accent/30 rounded">
                 <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="w-4 h-4 text-blue-600" />
+                  <AlertCircle className="w-4 h-4 text-accent" />
                   <h4 className="font-medium text-sm">Row Operations</h4>
                 </div>
                 <div className="space-y-1">
                   {currentStep.rowOperations.map((op, idx) => (
-                    <div key={idx} className="text-xs font-mono bg-white p-2 rounded border border-blue-100">
+                    <div key={idx} className="text-xs font-mono bg-card p-2 rounded border border-accent/20">
                       {op}
                     </div>
                   ))}
@@ -92,10 +92,10 @@ export default function ExplanationConsole({
             )}
 
             {/* Objective value */}
-            <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded">
+            <div className="mt-3 p-2 bg-primary/10 border border-primary/30 rounded">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium">Current Objective Value:</span>
-                <span className="text-lg font-bold text-purple-700">
+                <span className="text-lg font-bold text-primary">
                   z = {currentStep.objectiveValue}
                 </span>
               </div>
@@ -103,10 +103,10 @@ export default function ExplanationConsole({
 
             {/* Optimal solution details */}
             {isOptimal && (
-              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+              <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded">
                 <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <h4 className="font-medium text-sm text-green-800">Optimal Solution Found</h4>
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <h4 className="font-medium text-sm text-emerald-200">Optimal Solution Found</h4>
                 </div>
                 <div className="text-xs space-y-1">
                   <p>✓ All coefficients in Z-row are non-negative</p>
@@ -132,8 +132,8 @@ export default function ExplanationConsole({
                   key={idx}
                   className={`p-2 rounded border transition-all ${
                     isCurrent
-                      ? 'bg-purple-100 border-purple-400 border-2'
-                      : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                      ? 'bg-primary/20 border-primary/60 border-2'
+                      : 'bg-muted/40 border-border hover:bg-muted'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -141,10 +141,10 @@ export default function ExplanationConsole({
                       Iteration {step.iteration}
                     </span>
                     {step.explanation.includes('OPTIMAL') && (
-                      <CheckCircle className="w-3 h-3 text-green-600" />
+                      <CheckCircle className="w-3 h-3 text-emerald-400" />
                     )}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-muted-foreground">
                     z = {step.objectiveValue}
                   </div>
                   {step.pivotRow !== undefined && (
@@ -160,9 +160,9 @@ export default function ExplanationConsole({
 
         {/* Key indicators */}
         <div className="mt-4 space-y-2 text-xs">
-          <div className="p-2 bg-blue-50 rounded">
+          <div className="p-2 bg-accent/10 rounded">
             <div className="font-medium mb-1">Learning Points</div>
-            <ul className="space-y-1 text-gray-700">
+            <ul className="space-y-1 text-foreground">
               <li>• Watch how z increases</li>
               <li>• Follow the simplex path</li>
               <li>• Understand ratio test</li>
