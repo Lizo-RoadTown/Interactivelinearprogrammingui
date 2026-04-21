@@ -136,17 +136,46 @@ export interface ClickTableauQuestion {
   id: string;
   phase: number;
   prompt: string;
-  /**
-   * What kind of pick this question wants:
-   *  - 'entering-col' → click a column header (column index in the full
-   *    coefficient matrix, i.e. 0..n-1 where n = decVars + slacks)
-   *  - 'leaving-row' → click a basis row (0..m-1)
-   */
   pick: 'entering-col' | 'leaving-row';
-  /** The correct index (column for entering, row for leaving). */
   correctIndex: number;
-  /** When pick is 'leaving-row', which entering column's ratios to show. */
   enteringCol?: number;
+  hint: string;
+  commit: CommitPayload;
+  highlight?: QuestionHighlight;
+}
+
+/**
+ * Click-the-vertex question for Phase 6. The student clicks a specific
+ * corner of the feasible polygon on the graph — the click IS the answer.
+ * The target vertex's dot pulses while this question is active.
+ */
+export interface ClickVertexQuestion {
+  kind: 'click-vertex';
+  id: string;
+  phase: number;
+  prompt: string;
+  targetX: number;
+  targetY: number;
+  tolerance?: number;  // default 0.5 in problem units
+  hint: string;
+  commit: CommitPayload;
+  highlight?: QuestionHighlight;
+}
+
+/**
+ * Click-a-column question for the BuildB panel. The student clicks a
+ * specific column of the original constraint matrix A to pull it into
+ * the next slot of B.
+ *
+ * Column index convention: 0..n-1 are decision vars, n..n+m-1 are slacks.
+ */
+export interface ClickMatrixColumnQuestion {
+  kind: 'click-matrix-column';
+  id: string;
+  phase: number;
+  prompt: string;
+  /** Column index in A = [A_dec | I] that the student should click. */
+  targetColumn: number;
   hint: string;
   commit: CommitPayload;
   highlight?: QuestionHighlight;
@@ -154,7 +183,7 @@ export interface ClickTableauQuestion {
 
 export type Question =
   | TextQuestion | NumberQuestion | MCQuestion | FieldsQuestion | DragQuestion
-  | ClickTableauQuestion;
+  | ClickTableauQuestion | ClickVertexQuestion | ClickMatrixColumnQuestion;
 
 /**
  * When a question is answered correctly, this commit describes what to
@@ -846,27 +875,52 @@ const TOY_FACTORY_PHASE6: Question[] = [
   },
 
   // ── Piece 1: earn the basis at the optimum vertex ─────────────────────
-  // The student clicks the vertex themselves (on the graph). The panel
-  // that appears shows clues — which constraints are tight, which
-  // decision vars sit on an axis — but leaves the Basic / Non-basic
-  // slots as "?" until they EARN the reveal by answering this question.
+  // Three steps:
+  //   1. CLICK the optimum vertex on the graph (the click IS the answer).
+  //   2. MC: identify the BASIC variables (reveals Basic slots).
+  //   3. MC: identify the NON-BASIC variables (reveals Non-basic slots).
+  // Fine-grained reveals (principle 2), click-is-the-answer (principle 4),
+  // principle-first prompts (principle 3), clues not answers (principle 11).
+  {
+    kind: 'click-vertex',
+    id: 'toy-s-click-optimum',
+    phase: 6,
+    prompt: 'PRINCIPLE: every corner of the feasible region IS a basis (a choice of which variables are > 0). Dots just appeared at each corner of your feasible polygon. CLICK the optimum vertex — the corner where both constraints are tight and you landed at z* = 450.',
+    targetX: 10,
+    targetY: 15,
+    tolerance: 0.5,
+    hint: 'Look for the corner where both the rose C1 line and the violet C2 line cross. That\'s (10, 15).',
+    commit: { type: 'note', text: 's-vertex-optimum-clicked' },
+  },
   {
     kind: 'mc',
-    id: 'toy-s-basis-optimum',
+    id: 'toy-s-basic-optimum',
     phase: 6,
-    prompt: 'PRINCIPLE: every corner of the feasible region IS a basis. CLICK the optimum vertex (10, 15) on the graph — dots appeared at every corner. Then look at the Vertex Basis panel below the graph: it shows the clues (which constraints are tight, which decision vars are on an axis) but the Basic/Non-basic slots are still empty. Using those clues, which two variables are BASIC at (10, 15)?',
+    prompt: 'Good — you\'re at (10, 15). The Vertex Basis panel is showing you the clues: both constraints are tight (so s₁ = s₂ = 0), and neither decision var is on an axis. Which two variables are BASIC at this vertex?',
     options: [
-      { id: 'x1-x2', label: '{ x₁, x₂ } — both constraints are tight, so s₁ = s₂ = 0 (non-basic), leaving x₁ and x₂ basic' },
+      { id: 'x1-x2', label: '{ x₁, x₂ } — both are > 0 here, so they\'re basic' },
       { id: 's1-s2', label: '{ s₁, s₂ }' },
       { id: 'x1-s1', label: '{ x₁, s₁ }' },
       { id: 'x2-s2', label: '{ x₂, s₂ }' },
     ],
     correctId: 'x1-x2',
-    hint: 'Tight constraint → slack = 0 → slack is non-basic. Both constraints are tight at (10, 15), so s₁ and s₂ are non-basic. That leaves x₁ and x₂ as the basis.',
-    // Reveal keyed to the optimum vertex coordinates — the basis panel
-    // only fills in its slots when this key is set AND the student has
-    // that exact vertex clicked.
-    commit: { type: 's-reveal', key: 'basis-10,15' },
+    hint: 'The slacks are 0 at this corner (the constraints are tight). That means the slacks are NON-basic. What\'s left? x₁ and x₂.',
+    commit: { type: 's-reveal', key: 'basis-basic-10,15' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-s-nonbasic-optimum',
+    phase: 6,
+    prompt: 'Now the other side. Which two variables are NON-BASIC (= 0) at (10, 15)?',
+    options: [
+      { id: 's1-s2', label: '{ s₁, s₂ } — both constraints are tight, so both slacks equal 0' },
+      { id: 'x1-x2', label: '{ x₁, x₂ }' },
+      { id: 'x1-s1', label: '{ x₁, s₁ }' },
+      { id: 'x2-s2', label: '{ x₂, s₂ }' },
+    ],
+    correctId: 's1-s2',
+    hint: 'Tight constraint → no leftover capacity → slack is 0 → non-basic. Both constraints are tight here.',
+    commit: { type: 's-reveal', key: 'basis-nonbasic-10,15' },
   },
 ];
 

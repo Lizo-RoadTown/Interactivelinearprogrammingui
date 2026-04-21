@@ -19,7 +19,8 @@ import { Button } from '../../components/ui/button';
 import { WORD_PROBLEMS } from '../../data/wordProblems';
 import {
   getScript, Question, TextQuestion, NumberQuestion, MCQuestion, FieldsQuestion, DragQuestion,
-  ClickTableauQuestion, CommitPayload, QuestionHighlight, PhaseMeta,
+  ClickTableauQuestion, ClickVertexQuestion, ClickMatrixColumnQuestion,
+  CommitPayload, QuestionHighlight, PhaseMeta,
 } from '../../data/tutorialScripts';
 import DiscoveryGraph, { FeasibleVertex } from './DiscoveryGraph';
 import VertexBasisPanel from './VertexBasisPanel';
@@ -115,6 +116,16 @@ function gradeDragAnswer(q: DragQuestion, value: number | null): boolean {
 
 function gradeClickTableauAnswer(q: ClickTableauQuestion, value: number | null): boolean {
   return value != null && value === q.correctIndex;
+}
+
+function gradeClickVertexAnswer(q: ClickVertexQuestion, v: { x: number; y: number } | null): boolean {
+  if (!v) return false;
+  const tol = q.tolerance ?? 0.5;
+  return Math.abs(v.x - q.targetX) <= tol && Math.abs(v.y - q.targetY) <= tol;
+}
+
+function gradeClickMatrixColumnAnswer(q: ClickMatrixColumnQuestion, colIdx: number | null): boolean {
+  return colIdx != null && colIdx === q.targetColumn;
 }
 
 // ── Commit → LP view reducer ────────────────────────────────────────────────
@@ -711,7 +722,19 @@ export default function GuidedLearnPage() {
                       highlight={activeHighlight}
                       vertexSelectable={sensitivityActive}
                       selectedVertex={selectedVertex}
-                      onVertexSelect={(v) => setSelectedVertex(v)}
+                      activeClickVertexTarget={currentQ_pre?.kind === 'click-vertex'
+                        ? { x: currentQ_pre.targetX, y: currentQ_pre.targetY }
+                        : null}
+                      onVertexSelect={(v) => {
+                        setSelectedVertex(v);
+                        // If the current question is a click-vertex, the
+                        // click IS the answer — grade it and advance.
+                        if (currentQ_pre?.kind === 'click-vertex') {
+                          const q = currentQ_pre;
+                          const ok = gradeClickVertexAnswer(q, { x: v.x, y: v.y });
+                          handleAnswer(q, ok, { x: v.x, y: v.y });
+                        }
+                      }}
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground italic p-6 text-center">
@@ -911,6 +934,24 @@ function QuestionCard({
             {(q as ClickTableauQuestion).pick === 'entering-col'
               ? 'Tap the negative number in the z-row that you want to enter the basis.'
               : 'Tap the row (the ratio cell on the right edge) that should leave the basis.'}
+          </span>
+        </div>
+      )}
+
+      {q.kind === 'click-vertex' && !justAnswered && (
+        <div className="bg-orange-500/10 border-2 border-dashed border-orange-400/60 rounded-lg px-3 py-3 text-sm text-orange-100 flex items-start gap-2 animate-attention-pulse">
+          <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-orange-300" />
+          <span>
+            <strong>Click the pulsing vertex on the graph.</strong> The click IS the answer.
+          </span>
+        </div>
+      )}
+
+      {q.kind === 'click-matrix-column' && !justAnswered && (
+        <div className="bg-orange-500/10 border-2 border-dashed border-orange-400/60 rounded-lg px-3 py-3 text-sm text-orange-100 flex items-start gap-2 animate-attention-pulse">
+          <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-orange-300" />
+          <span>
+            <strong>Click the highlighted column in the A matrix.</strong> Pulling it into B is the answer.
           </span>
         </div>
       )}

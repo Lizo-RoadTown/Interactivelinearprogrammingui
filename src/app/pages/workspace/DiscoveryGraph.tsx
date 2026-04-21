@@ -57,6 +57,12 @@ interface Props {
   selectedVertex?: FeasibleVertex | null;
   /** Called with a vertex descriptor when the student clicks a corner. */
   onVertexSelect?: (v: FeasibleVertex) => void;
+  /**
+   * When a click-vertex question is active, the target corner's dot
+   * gets an attention-pulse to invite the click. null = no active
+   * click-vertex question → no pulse.
+   */
+  activeClickVertexTarget?: { x: number; y: number } | null;
 }
 
 /**
@@ -84,6 +90,7 @@ export default function DiscoveryGraph({
   objectiveZ, optimumConfirmed, optimumTarget, bfsPoint,
   slacksMode = false, highlight,
   vertexSelectable = false, selectedVertex = null, onVertexSelect,
+  activeClickVertexTarget = null,
 }: Props) {
   const focusedConstraint =
     highlight?.target === 'constraint' ? highlight.constraintIndex : -1;
@@ -558,18 +565,31 @@ export default function DiscoveryGraph({
         const isSelected = !!selectedVertex &&
           Math.abs(selectedVertex.x - v.x) < 1e-4 &&
           Math.abs(selectedVertex.y - v.y) < 1e-4;
+        // Is this vertex the target of an active click-vertex question?
+        // If so it gets an attention-pulse ring to invite the click.
+        const isTarget = !!activeClickVertexTarget &&
+          Math.abs(activeClickVertexTarget.x - v.x) < 0.5 &&
+          Math.abs(activeClickVertexTarget.y - v.y) < 0.5;
         return (
           <g
             key={`vx-${i}`}
             style={{ cursor: onVertexSelect ? 'pointer' : 'default' }}
             onClick={() => onVertexSelect?.(v)}
           >
-            {/* Outer halo for click target (transparent but large) */}
             <circle
               cx={scaleX(v.x)} cy={scaleY(v.y)} r="14"
               fill="transparent"
             />
-            {/* Selection ring */}
+            {/* Target ring — pulses to invite the click */}
+            {isTarget && !isSelected && (
+              <circle
+                cx={scaleX(v.x)} cy={scaleY(v.y)} r="12"
+                fill="none" stroke="#fb923c" strokeWidth="2.5"
+                strokeDasharray="3,3"
+                className="animate-attention-pulse"
+              />
+            )}
+            {/* Selection ring — stays on after click */}
             {isSelected && (
               <circle
                 cx={scaleX(v.x)} cy={scaleY(v.y)} r="11"
@@ -577,10 +597,9 @@ export default function DiscoveryGraph({
                 className="animate-attention-pulse"
               />
             )}
-            {/* Dot itself */}
             <circle
-              cx={scaleX(v.x)} cy={scaleY(v.y)} r={isSelected ? 7 : 5}
-              fill={isSelected ? '#fb923c' : '#f8fafc'}
+              cx={scaleX(v.x)} cy={scaleY(v.y)} r={isSelected || isTarget ? 7 : 5}
+              fill={isSelected ? '#fb923c' : isTarget ? '#fde68a' : '#f8fafc'}
               stroke="#0f172a" strokeWidth="2"
               style={{ transition: 'r 200ms ease, fill 200ms ease' }}
             />

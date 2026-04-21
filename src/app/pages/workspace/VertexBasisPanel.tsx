@@ -66,9 +66,9 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars, reveals }: P
   const x1 = vertex.x;
   const x2 = vertex.y;
 
-  const isRevealed = reveals.has(revealKeyFor(vertex));
+  const basicRevealed = reveals.has(`basis-basic-${revealKeyFor(vertex).slice(6)}`);
+  const nonBasicRevealed = reveals.has(`basis-nonbasic-${revealKeyFor(vertex).slice(6)}`);
 
-  // Figure out basis / non-basic at this vertex (only used when revealed).
   const nonBasicDecVars = vertex.zeroDecisionVars;
   const nonBasicSlacks = vertex.tightConstraints;
   const basicDecVars = Array.from({ length: nDecVars }, (_, i) => i)
@@ -76,13 +76,13 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars, reveals }: P
   const basicSlacks = Array.from({ length: nConstraints }, (_, i) => i)
     .filter(i => !nonBasicSlacks.includes(i));
 
-  const basicLabels = isRevealed
+  const basicLabels = basicRevealed
     ? [
         ...basicDecVars.map(i => ({ label: allDecLabels[i], color: null as string | null })),
         ...basicSlacks.map(i => ({ label: allSlackLabels[i], color: colorFor(i) })),
       ]
     : null;
-  const nonBasicLabels = isRevealed
+  const nonBasicLabels = nonBasicRevealed
     ? [
         ...nonBasicDecVars.map(i => ({ label: allDecLabels[i], color: null as string | null })),
         ...nonBasicSlacks.map(i => ({ label: allSlackLabels[i], color: colorFor(i) })),
@@ -194,7 +194,7 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars, reveals }: P
         </div>
       </div>
 
-      {!isRevealed && (
+      {(!basicRevealed || !nonBasicRevealed) && (
         <p className="text-[10px] text-muted-foreground/80 italic leading-relaxed">
           The slots will fill in once you identify the basis. Use the clues above —
           which variables must be 0 here (non-basic) and which are &gt; 0 (basic)?
