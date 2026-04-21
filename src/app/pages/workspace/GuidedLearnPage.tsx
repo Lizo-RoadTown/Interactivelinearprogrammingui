@@ -313,26 +313,66 @@ export default function GuidedLearnPage() {
   }, [currentQ_pre?.id]);
 
   // Refs for the right-column panels so we can scroll the relevant one into
-  // view whenever the student moves to a new phase. Keeps questions visually
-  // paired with the thing they're acting on (graph, tableau, etc.) without
-  // hiding the earlier artifacts.
+  // view every time the student moves to a new question. Keeping the sync
+  // per-question (not per-phase) is important because several things grow
+  // the right column mid-phase (meters appearing, tableau appearing after
+  // "slacks-added", pivot tableaus replacing the initial one). Each of those
+  // layout changes would otherwise drift the right column out of sync with
+  // the current question on the left.
   const canvasPanelRef = useRef<HTMLDivElement | null>(null);
   const graphPanelRef = useRef<HTMLDivElement | null>(null);
+  const metersPanelRef = useRef<HTMLDivElement | null>(null);
   const tableauPanelRef = useRef<HTMLDivElement | null>(null);
 
-  const currentPhase = currentQ_pre?.phase;
   useEffect(() => {
-    if (currentPhase == null) return;
-    let target: HTMLElement | null = null;
-    if (currentPhase === 1) target = canvasPanelRef.current;
-    else if (currentPhase === 2) target = graphPanelRef.current;
-    else if (currentPhase >= 3) {
-      target = tableauPanelRef.current ?? graphPanelRef.current ?? canvasPanelRef.current;
-    }
-    target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    // Re-run when the matching panel first mounts (e.g. tableau appears
-    // mid-phase) so the scroll catches up.
-  }, [currentPhase, tableauReveal.slacksAdded, anyGraphContent]);
+    if (!currentQ_pre) return;
+    const phase = currentQ_pre.phase;
+    const commitType = currentQ_pre.commit?.type;
+    const noteText = commitType === 'note'
+      ? (currentQ_pre.commit as { type: 'note'; text: string }).text
+      : null;
+
+    // Decide which panel this specific question is acting on. Falls back
+    // through what's actually mounted so we never aim at a hidden panel.
+    const pickTarget = (): HTMLElement | null => {
+      if (phase === 1) return canvasPanelRef.current;
+      if (phase === 2) return graphPanelRef.current ?? canvasPanelRef.current;
+      if (phase === 3) {
+        // The first Phase 3 questions (slack concept, ownership, identity)
+        // are reasoning about the CAPACITY METERS; the tableau fill-in
+        // questions that follow point at the tableau itself.
+        const metersFirst =
+          commitType === 'slacks-added' ||
+          commitType === 'slack-identity-revealed' ||
+          noteText === 'know-to-add-slacks' ||
+          noteText === 'slack-ownership-understood';
+        if (metersFirst) {
+          return metersPanelRef.current ?? tableauPanelRef.current ?? graphPanelRef.current;
+        }
+        return tableauPanelRef.current ?? metersPanelRef.current ?? graphPanelRef.current;
+      }
+      // Phases 4–5: pivots, optimal read-off — all tableau-centric.
+      if (phase === 4 || phase === 5) {
+        return tableauPanelRef.current ?? graphPanelRef.current;
+      }
+      // Phase 6: sensitivity talks about Z-row shadow prices — tableau again.
+      if (phase >= 6) return tableauPanelRef.current ?? graphPanelRef.current;
+      return null;
+    };
+
+    // Wait one frame so any new panel that just mounted (meters, tableau)
+    // has been laid out before we try to scroll to it.
+    const handle = requestAnimationFrame(() => {
+      pickTarget()?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(handle);
+    // Re-run when the question changes AND when panels mount/unmount.
+  }, [
+    currentQ_pre?.id,
+    tableauReveal.slacksAdded,
+    anyGraphContent,
+    // metersVisible is declared below; resolve at call-time
+  ]);
 
   // Handlers
   const handleAnswer = (q: Question, ok: boolean, studentAnswer: unknown) => {
@@ -519,7 +559,7 @@ export default function GuidedLearnPage() {
                 color-bound to each constraint so the identity pattern in the
                 tableau is visually obvious. Appears at Phase 3 onward. */}
             {metersVisible && (
-              <div>
+              <div ref={metersPanelRef} className="scroll-mt-6">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
                   Capacity meters — each constraint&apos;s bucket, and its slack
                 </p>
