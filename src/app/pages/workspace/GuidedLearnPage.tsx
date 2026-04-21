@@ -23,6 +23,7 @@ import {
 } from '../../data/tutorialScripts';
 import DiscoveryGraph, { FeasibleVertex } from './DiscoveryGraph';
 import VertexBasisPanel from './VertexBasisPanel';
+import BuildBPanel from './BuildBPanel';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
 import ConstraintMeter from './ConstraintMeters';
 import SensitivityControls from './SensitivityControls';
@@ -702,12 +703,21 @@ export default function GuidedLearnPage() {
                 {/* Phase 6: clicking any corner on the graph above lights
                     up its basis here. This is the "basis = vertex" aha. */}
                 {sensitivityActive && (
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-3">
                     <VertexBasisPanel
                       draft={sensitivityActive ? liveDraft : draft}
                       vertex={selectedVertex}
                       nDecVars={problem.numVars}
                     />
+                    {/* Piece 2: once a vertex is picked, pull basic columns
+                        out of the original constraints to form B. */}
+                    {selectedVertex && (
+                      <BuildBPanel
+                        draft={sensitivityActive ? liveDraft : draft}
+                        vertex={selectedVertex}
+                        nDecVars={problem.numVars}
+                      />
+                    )}
                   </div>
                 )}
               </div>
