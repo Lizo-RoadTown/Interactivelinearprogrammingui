@@ -23,6 +23,7 @@ import {
 } from '../../data/tutorialScripts';
 import DiscoveryGraph from './DiscoveryGraph';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
+import ConstraintMeters from './ConstraintMeters';
 import { LPDraft } from './guidedTypes';
 import {
   ArrowLeft, CheckCircle, Lightbulb, Eye, Sparkles,
@@ -260,6 +261,31 @@ export default function GuidedLearnPage() {
   // Whether the graph should be visible at all (any line drawn yet)
   const anyGraphContent = linesDrawn.size > 0 || sideDrawnFor.size > 0 || feasibleRevealed;
 
+  // Current basic feasible solution: latestPivot.bfs after a pivot, or the
+  // origin (all-slack) initial BFS before any pivot. Used for the capacity
+  // meters and the BFS point on the graph.
+  const currentBFS: Record<string, number> = useMemo(() => {
+    if (latestPivot) return latestPivot.bfs;
+    const b: Record<string, number> = { x1: 0, x2: 0 };
+    draft.constraints.forEach((c, i) => {
+      b[`s${i + 1}`] = c.rhs ?? 0;
+    });
+    return b;
+  }, [latestPivot, draft.constraints]);
+
+  // The meters and the BFS graph marker make sense once the student has
+  // entered the tableau phases (Phase 3 onward) — that's where slack
+  // becomes a named concept. Before that they'd be noise.
+  const currentQPhase = script.questions[currentIdx]?.phase ?? 1;
+  const metersVisible = currentQPhase >= 3 &&
+    draft.constraints.length > 0 &&
+    draft.constraints.every(c =>
+      c.started && c.rhs != null && c.coefficients.every(v => v != null),
+    );
+  const bfsPoint = metersVisible
+    ? { x: currentBFS['x1'] ?? 0, y: currentBFS['x2'] ?? 0 }
+    : null;
+
   // Has the optimum been found (a commit of type 'optimum-found' in the history)?
   const optimumCommit = useMemo(() => {
     for (let i = 0; i < currentIdx; i++) {
@@ -478,6 +504,7 @@ export default function GuidedLearnPage() {
                       objectiveZ={latestPivot ? latestPivot.zValue : sliderZ}
                       optimumConfirmed={!!optimumCommit || !!latestPivot}
                       optimumTarget={latestPivot?.zValue ?? optimumCommit?.zValue ?? currentDragTarget}
+                      bfsPoint={bfsPoint}
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground italic p-6 text-center">
@@ -485,6 +512,18 @@ export default function GuidedLearnPage() {
                     </p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Capacity meters — make slack = unused resource concrete,
+                color-bound to each constraint so the identity pattern in the
+                tableau is visually obvious. Appears at Phase 3 onward. */}
+            {metersVisible && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+                  Capacity meters — each constraint&apos;s bucket, and its slack
+                </p>
+                <ConstraintMeters draft={draft} bfs={currentBFS} />
               </div>
             )}
 

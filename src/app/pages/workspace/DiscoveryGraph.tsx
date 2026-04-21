@@ -15,6 +15,7 @@
 
 import { useMemo } from 'react';
 import { LPDraft } from './guidedTypes';
+import { CONSTRAINT_COLORS, colorFor, colorForFill } from './constraintColors';
 
 interface Props {
   draft: LPDraft;
@@ -30,9 +31,14 @@ interface Props {
   optimumConfirmed?: boolean;
   /** Target optimum value (to place the marker). */
   optimumTarget?: number;
+  /**
+   * Current basic feasible solution point in (x₁, x₂) space. When set, a
+   * dot is drawn there and a dashed perpendicular reaches out to each
+   * constraint line — the perpendicular's length IS the slack value.
+   * Makes "binding ⇔ slack = 0" visible geometrically.
+   */
+  bfsPoint?: { x: number; y: number } | null;
 }
-
-const CONSTRAINT_COLORS = ['#f43f5e', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
 
 // Dimensions
 const W = 420, H = 420;
@@ -40,7 +46,7 @@ const PAD = 40;
 
 export default function DiscoveryGraph({
   draft, linesDrawn, sideDrawnFor, feasibleRegionRevealed,
-  objectiveZ, optimumConfirmed, optimumTarget,
+  objectiveZ, optimumConfirmed, optimumTarget, bfsPoint,
 }: Props) {
   // Work out the axis extents from whatever constraints have coefficients +
   // RHS set so far. Fall back to a 0..20 window if nothing yet.
@@ -318,6 +324,72 @@ export default function DiscoveryGraph({
             >
               z = {Math.round(objectiveZ)}
             </text>
+          </g>
+        );
+      })()}
+
+      {/* Current BFS point + slack perpendiculars — geometric view of sᵢ */}
+      {bfsPoint && (() => {
+        const px = bfsPoint.x;
+        const py = bfsPoint.y;
+        // For each constraint with a defined line, draw a dashed segment from
+        // the point to the closest point on the line. The length of that
+        // segment IS the slack (scaled by the line's normal magnitude). We
+        // label each segment with the slack value so the student can connect
+        // "perpendicular distance on the graph" ↔ "sᵢ value in the bucket".
+        return (
+          <g>
+            {draft.constraints.map((c, idx) => {
+              if (!linesDrawn.has(idx)) return null;
+              if (c.rhs == null) return null;
+              const a = c.coefficients[0];
+              const b = c.coefficients[1];
+              if (a == null || b == null) return null;
+              const rhs = c.rhs;
+              const denom = a * a + b * b;
+              if (denom < 1e-12) return null;
+              const signed = a * px + b * py - rhs;   // negative when inside (≤)
+              const slack = Math.max(0, -signed);     // slack = rhs - (a·x + b·y) if nonneg
+              const footX = px - (signed * a) / denom;
+              const footY = py - (signed * b) / denom;
+              // If point is effectively on the line, nothing to draw
+              if (slack < 1e-6) return null;
+              const color = colorFor(idx);
+              // Midpoint for label
+              const midX = (px + footX) / 2;
+              const midY = (py + footY) / 2;
+              return (
+                <g key={`slack-${idx}`}>
+                  <line
+                    x1={scaleX(px)} y1={scaleY(py)}
+                    x2={scaleX(footX)} y2={scaleY(footY)}
+                    stroke={color}
+                    strokeWidth="1.5"
+                    strokeDasharray="3,3"
+                    opacity="0.75"
+                  />
+                  {/* Tiny tick at the foot */}
+                  <circle cx={scaleX(footX)} cy={scaleY(footY)} r="3" fill={color} opacity="0.8" />
+                  {/* Floating label "s_i = value" */}
+                  <rect
+                    x={scaleX(midX) - 22} y={scaleY(midY) - 9}
+                    width="44" height="16" rx="8"
+                    fill={colorForFill(idx, 0.9)}
+                  />
+                  <text
+                    x={scaleX(midX)} y={scaleY(midY) + 3}
+                    fontSize="10" fontWeight="700" textAnchor="middle" fill="#ffffff"
+                  >
+                    s{idx + 1}={fmt(slack)}
+                  </text>
+                </g>
+              );
+            })}
+            {/* Dot at the BFS point itself */}
+            <circle
+              cx={scaleX(px)} cy={scaleY(py)} r="6"
+              fill="#f8fafc" stroke="#0f172a" strokeWidth="2"
+            />
           </g>
         );
       })()}

@@ -12,6 +12,7 @@
  */
 
 import { LPDraft } from './guidedTypes';
+import { colorFor, colorForFill } from './constraintColors';
 
 export interface TableauReveal {
   slacksAdded: boolean;
@@ -115,14 +116,23 @@ export default function GuidedTableau({ draft, reveal, override }: Props) {
             <th className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold text-left">Basis</th>
             {allLabels.map((label, c) => {
               const isSlack = c >= nDecVars;
+              const slackIdx = isSlack ? c - nDecVars : -1;
+              // Slack columns get the same signature color as their owning
+              // constraint. That way the student sees at a glance that the s₁
+              // column "belongs to" row C1 — the identity-matrix pattern in
+              // the slack block becomes visually unmissable.
+              const slackColor = isSlack && reveal.slacksAdded ? colorFor(slackIdx) : null;
               return (
                 <th
                   key={c}
                   className={`px-3 py-2 text-center text-xs font-semibold ${
                     isSlack
-                      ? (reveal.slacksAdded ? 'text-accent animate-fill-pop' : 'text-muted-foreground/40')
+                      ? (reveal.slacksAdded ? 'animate-fill-pop' : 'text-muted-foreground/40')
                       : 'text-primary'
                   }`}
+                  style={slackColor
+                    ? { color: slackColor, backgroundColor: colorForFill(slackIdx, 0.12), borderBottom: `2px solid ${slackColor}` }
+                    : undefined}
                 >
                   {label}
                 </th>
@@ -134,17 +144,39 @@ export default function GuidedTableau({ draft, reveal, override }: Props) {
         <tbody>
           {Array.from({ length: nConstraints + 1 }, (_, r) => {
             const isZRow = r === nConstraints;
+            // Color the basis label to match the constraint that "owns" this
+            // row. The row's color is keyed by the basis variable: slack s_k
+            // → constraint k's color; decision var x_k → stay neutral
+            // (decision vars have no constraint ownership).
+            const basisLabel = basisLabels[r] ?? '';
+            const slackBasisMatch = basisLabel.match(/^s(\d+)$/);
+            const rowColor = !isZRow && reveal.slacksAdded && slackBasisMatch
+              ? colorFor(parseInt(slackBasisMatch[1], 10) - 1)
+              : null;
             return (
               <tr key={r} className={isZRow ? 'border-t-2 border-primary/50' : ''}>
-                <td className={`px-3 py-2 text-xs font-semibold ${
-                  isZRow ? 'text-primary' :
-                  reveal.slacksAdded ? 'text-foreground' : 'text-muted-foreground/40'
-                }`}>
-                  {isZRow ? 'z' : basisLabels[r]}
+                <td
+                  className={`px-3 py-2 text-xs font-semibold ${
+                    isZRow ? 'text-primary' :
+                    reveal.slacksAdded ? 'text-foreground' : 'text-muted-foreground/40'
+                  }`}
+                  style={rowColor
+                    ? { color: rowColor, backgroundColor: colorForFill(parseInt(slackBasisMatch![1], 10) - 1, 0.12) }
+                    : undefined}
+                >
+                  {isZRow ? 'z' : basisLabel}
                 </td>
                 {Array.from({ length: totalCols }, (_, c) => {
                   const v = cellValue(r, c);
-                  return <TableauCell key={c} value={v} />;
+                  const isSlackCol = c >= nDecVars && c < nDecVars + nSlacks;
+                  const slackColIdx = isSlackCol ? c - nDecVars : -1;
+                  return (
+                    <TableauCell
+                      key={c}
+                      value={v}
+                      columnTint={isSlackCol && reveal.slacksAdded ? colorForFill(slackColIdx, 0.06) : null}
+                    />
+                  );
                 })}
               </tr>
             );
@@ -155,10 +187,11 @@ export default function GuidedTableau({ draft, reveal, override }: Props) {
   );
 }
 
-function TableauCell({ value }: { value: number | null }) {
+function TableauCell({ value, columnTint }: { value: number | null; columnTint?: string | null }) {
+  const tdStyle = columnTint ? { backgroundColor: columnTint } : undefined;
   if (value === null) {
     return (
-      <td className="px-2 py-1.5">
+      <td className="px-2 py-1.5" style={tdStyle}>
         <div className="inline-flex items-center justify-center w-12 h-10 rounded-lg border-2 border-dashed border-border/60 bg-muted/20 text-muted-foreground/50 text-sm font-mono">
           ?
         </div>
@@ -167,9 +200,9 @@ function TableauCell({ value }: { value: number | null }) {
   }
   const isNeg = value < 0;
   return (
-    <td className="px-2 py-1.5">
+    <td className="px-2 py-1.5" style={tdStyle}>
       <div
-        key={value}  // forces remount + anim replay when it changes
+        key={value}
         className={`inline-flex items-center justify-center w-12 h-10 rounded-lg border-2 shadow-md font-mono text-base font-bold tabular-nums animate-fill-pop ${
           isNeg
             ? 'bg-amber-500/20 border-amber-500/50 text-amber-100 shadow-amber-500/20'
