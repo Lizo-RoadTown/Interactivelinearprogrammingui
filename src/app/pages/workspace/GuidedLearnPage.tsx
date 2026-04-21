@@ -333,44 +333,32 @@ export default function GuidedLearnPage() {
               <p className="text-sm text-foreground leading-relaxed">{problem.scenario}</p>
             </div>
 
-            {/* Answered questions (compact history) */}
+            {/* Answered questions — grouped by phase, completed phases collapsed */}
             {currentIdx > 0 && (
-              <div className="space-y-2">
-                {script.questions.slice(0, currentIdx).map((q, i) => {
-                  const ans = answers[q.id];
-                  return (
-                    <div key={q.id} className="bg-muted/40 border border-border rounded-lg px-3 py-2">
-                      <div className="flex items-start gap-2">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] text-muted-foreground">Step {i + 1}</p>
-                          <p className="text-xs text-foreground leading-snug">{q.prompt}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {ans?.shownAnswer && <span className="italic">shown to you</span>}
-                            {ans?.correct && !ans.shownAnswer && renderStudentAnswer(q, ans.studentAnswer, fieldsAnswers[q.id])}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <CollapsedHistory
+                questions={script.questions}
+                currentIdx={currentIdx}
+                answers={answers}
+                fieldsAnswers={fieldsAnswers}
+              />
             )}
 
-            {/* Current question */}
+            {/* Current question — scrolled into view when it changes */}
             {!isDone && currentQ && (
-              <QuestionCard
-                q={currentQ}
-                answerState={answers[currentQ.id]}
-                onAnswer={handleAnswer}
-                onShowMe={handleShowMe}
-                fieldsAnswer={fieldsAnswers[currentQ.id] ?? {}}
-                setFieldsAnswer={(v) => setFieldsAnswers(prev => ({ ...prev, [currentQ.id]: v }))}
-                sliderZ={sliderZ}
-                setSliderZ={setSliderZ}
-                wrongPrefix={pickWarm(WARM_PREFIXES_WRONG, wrongSeedRef.current)}
-                correctPrefix={pickWarm(WARM_PREFIXES_CORRECT, correctSeedRef.current)}
-              />
+              <ScrollIntoViewOnChange keyId={currentQ.id}>
+                <QuestionCard
+                  q={currentQ}
+                  answerState={answers[currentQ.id]}
+                  onAnswer={handleAnswer}
+                  onShowMe={handleShowMe}
+                  fieldsAnswer={fieldsAnswers[currentQ.id] ?? {}}
+                  setFieldsAnswer={(v) => setFieldsAnswers(prev => ({ ...prev, [currentQ.id]: v }))}
+                  sliderZ={sliderZ}
+                  setSliderZ={setSliderZ}
+                  wrongPrefix={pickWarm(WARM_PREFIXES_WRONG, wrongSeedRef.current)}
+                  correctPrefix={pickWarm(WARM_PREFIXES_CORRECT, correctSeedRef.current)}
+                />
+              </ScrollIntoViewOnChange>
             )}
 
             {/* Done state */}
@@ -588,10 +576,17 @@ function TextInput({
   onSubmit: () => void;
   disabled?: boolean;
 }) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  // Auto-focus on appear so the student can start typing immediately
+  useEffect(() => {
+    if (!disabled) ref.current?.focus();
+  }, [disabled]);
   return (
     <div className="flex gap-2">
       <input
+        ref={ref}
         type="text"
+        aria-label={placeholder ?? 'answer'}
         inputMode={numeric ? 'decimal' : 'text'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -654,17 +649,56 @@ function FieldsInput({
   onSubmit: () => void;
   disabled?: boolean;
 }) {
+  // Refs for each input so Enter can jump focus to the next empty field, or
+  // submit if all are filled. Tab works natively via browser.
+  const refs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Auto-focus the first empty field when the question appears
+  useEffect(() => {
+    if (disabled) return;
+    const firstEmpty = q.fields.find(f => !values[f.id]?.trim());
+    if (firstEmpty) refs.current[firstEmpty.id]?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.id, disabled]);
+
+  const focusNextEmptyOrSubmit = (fromIdx: number) => {
+    // Look after the current one first
+    for (let i = fromIdx + 1; i < q.fields.length; i++) {
+      if (!values[q.fields[i].id]?.trim()) {
+        refs.current[q.fields[i].id]?.focus();
+        return;
+      }
+    }
+    // Then wrap to the start
+    for (let i = 0; i < fromIdx; i++) {
+      if (!values[q.fields[i].id]?.trim()) {
+        refs.current[q.fields[i].id]?.focus();
+        return;
+      }
+    }
+    // All filled → submit
+    if (!disabled) onSubmit();
+  };
+
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {q.fields.map(f => (
+        {q.fields.map((f, idx) => (
           <div key={f.id}>
-            <label className="text-[10px] text-muted-foreground block mb-0.5">{f.label}</label>
+            <label htmlFor={`field-${q.id}-${f.id}`} className="text-[10px] text-muted-foreground block mb-0.5">{f.label}</label>
             <input
+              id={`field-${q.id}-${f.id}`}
+              ref={(el) => { refs.current[f.id] = el; }}
               type="text"
               inputMode="decimal"
               value={values[f.id] ?? ''}
               onChange={(e) => onChange({ ...values, [f.id]: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !disabled) {
+                  e.preventDefault();
+                  focusNextEmptyOrSubmit(idx);
+                }
+              }}
               placeholder={f.placeholder}
               onFocus={(e) => e.target.select()}
               disabled={disabled}
@@ -930,6 +964,119 @@ function OperatorSlot({ op }: { op: '<=' | '>=' | '=' | null }) {
   );
 }
 
+// ── ScrollIntoViewOnChange ─────────────────────────────────────────────────
+// Wraps a child and scrolls it into view whenever `keyId` changes.
+
+function ScrollIntoViewOnChange({ keyId, children }: { keyId: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [keyId]);
+  return <div ref={ref}>{children}</div>;
+}
+
+// ── CollapsedHistory ────────────────────────────────────────────────────────
+// Groups answered questions by phase. Each completed phase collapses to a
+// single summary card ("Phase 1 — Formulation ✓ complete, X answers"); the
+// student can click to expand and review individual questions.
+
+function CollapsedHistory({
+  questions, currentIdx, answers, fieldsAnswers,
+}: {
+  questions: Question[];
+  currentIdx: number;
+  answers: AnswerState;
+  fieldsAnswers: Record<string, Record<string, string>>;
+}) {
+  // Group the already-answered questions by phase
+  const answered = questions.slice(0, currentIdx);
+  const byPhase = new Map<number, Question[]>();
+  for (const q of answered) {
+    if (!byPhase.has(q.phase)) byPhase.set(q.phase, []);
+    byPhase.get(q.phase)!.push(q);
+  }
+  const currentPhase = questions[currentIdx]?.phase ?? -1;
+  const phaseNames: Record<number, string> = {
+    1: 'Formulation',
+    2: 'Graph construction',
+    3: 'Tableau setup',
+    4: 'Simplex pivots',
+    5: 'Optimal solution',
+    6: 'Sensitivity analysis',
+  };
+
+  const sortedPhases = Array.from(byPhase.keys()).sort((a, b) => a - b);
+
+  return (
+    <div className="space-y-2">
+      {sortedPhases.map(phase => {
+        const qs = byPhase.get(phase)!;
+        const isFullyPast = phase < currentPhase; // every q in the phase answered AND student has moved on
+        return (
+          <PhaseGroup
+            key={phase}
+            phase={phase}
+            name={phaseNames[phase] ?? `Phase ${phase}`}
+            questions={qs}
+            answers={answers}
+            fieldsAnswers={fieldsAnswers}
+            defaultExpanded={!isFullyPast}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function PhaseGroup({
+  phase, name, questions, answers, fieldsAnswers, defaultExpanded,
+}: {
+  phase: number;
+  name: string;
+  questions: Question[];
+  answers: AnswerState;
+  fieldsAnswers: Record<string, Record<string, string>>;
+  defaultExpanded: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  useEffect(() => { setExpanded(defaultExpanded); }, [defaultExpanded]);
+
+  return (
+    <div className="bg-muted/30 border border-border rounded-lg">
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-muted/50 rounded-lg"
+      >
+        <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span className="text-xs font-semibold text-foreground">
+          Phase {phase} — {name}
+        </span>
+        <span className="text-[10px] text-muted-foreground ml-auto">
+          {questions.length} answer{questions.length === 1 ? '' : 's'} ·{' '}
+          <span className="text-primary">{expanded ? 'hide' : 'review'}</span>
+        </span>
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2">
+          {questions.map(q => {
+            const ans = answers[q.id];
+            return (
+              <div key={q.id} className="border-l-2 border-emerald-500/30 pl-3 py-1">
+                <p className="text-[11px] text-muted-foreground leading-snug">{q.prompt}</p>
+                <p className="text-xs text-emerald-300 mt-0.5 font-medium">
+                  {ans?.shownAnswer && <span className="italic text-muted-foreground">shown to you</span>}
+                  {ans?.correct && !ans.shownAnswer && renderStudentAnswer(q, ans.studentAnswer, fieldsAnswers[q.id])}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Display a student's answer in the compact history ───────────────────────
 
 function renderStudentAnswer(q: Question, ans: unknown, fieldsAnswer?: Record<string, string>): string {
@@ -943,6 +1090,9 @@ function renderStudentAnswer(q: Question, ans: unknown, fieldsAnswer?: Record<st
     const f = fieldsAnswer ?? {};
     const entries = (q as FieldsQuestion).fields.map(x => `${x.label}: ${f[x.id] ?? '?'}`).join(', ');
     return `→ ${entries}`;
+  }
+  if (q.kind === 'drag') {
+    return `→ z = ${Math.round(Number(ans ?? 0))}`;
   }
   return '';
 }
