@@ -19,7 +19,7 @@ import { Button } from '../../components/ui/button';
 import { WORD_PROBLEMS } from '../../data/wordProblems';
 import {
   getScript, Question, TextQuestion, NumberQuestion, MCQuestion, FieldsQuestion, DragQuestion,
-  CommitPayload, QuestionHighlight, PhaseMeta,
+  ClickTableauQuestion, CommitPayload, QuestionHighlight, PhaseMeta,
 } from '../../data/tutorialScripts';
 import DiscoveryGraph from './DiscoveryGraph';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
@@ -107,6 +107,10 @@ function gradeDragAnswer(q: DragQuestion, value: number | null): boolean {
   return Math.abs(value - q.target) <= tol;
 }
 
+function gradeClickTableauAnswer(q: ClickTableauQuestion, value: number | null): boolean {
+  return value != null && value === q.correctIndex;
+}
+
 // ── Commit → LP view reducer ────────────────────────────────────────────────
 //
 // Builds a partial LPProblem-like object from the sequence of commits the
@@ -192,6 +196,15 @@ export default function GuidedLearnPage() {
    * the extraction. Auto-clears after one animation cycle.
    */
   const [extractionPulse, setExtractionPulse] = useState<ExtractionPulseKind>(null);
+  /**
+   * Current pivot selection across click-tableau questions. selectedCol
+   * is set by the entering-col pick and persists into the next
+   * leaving-row pick (so the ratio column can render). Both clear when
+   * a pivot is applied.
+   */
+  const [pivotPick, setPivotPick] = useState<{ col: number | null; row: number | null }>({
+    col: null, row: null,
+  });
 
   // Per-render warm phrase seed so feedback text varies a bit between wrongs
   const wrongSeedRef = useRef(0);
@@ -415,8 +428,6 @@ export default function GuidedLearnPage() {
     });
     if (ok) {
       correctSeedRef.current++;
-      // If this answer's commit populates tableau cells, flash the matching
-      // source coefficients in the Canvas so the extraction reads as a copy.
       const kind: ExtractionPulseKind =
         q.commit.type === 'slack-identity-revealed' ? 'slack-identity' :
         q.commit.type === 'z-row-x-revealed' ? 'z-row-x' :
@@ -426,11 +437,31 @@ export default function GuidedLearnPage() {
         setExtractionPulse(kind);
         setTimeout(() => setExtractionPulse(null), 1100);
       }
-      // small delay so the correct confirmation registers before advancing
+      // Clear pivot pick state when a pivot lands so the next cycle starts
+      // clean. The click-tableau question itself handles persisting col
+      // across the entering→leaving transition.
+      if (q.commit.type === 'pivot-applied') {
+        setPivotPick({ col: null, row: null });
+      }
       setTimeout(() => setCurrentIdx(i => Math.min(i + 1, totalQ)), 900);
     } else {
       wrongSeedRef.current++;
     }
+  };
+
+  // Click-tableau handler: called by GuidedTableau when the student
+  // clicks a cell eligible for the current click-mode. We update pivot
+  // selection state AND call handleAnswer with the clicked index.
+  const handleTableauPick = (idx: number) => {
+    if (currentQ_pre?.kind !== 'click-tableau') return;
+    const q = currentQ_pre;
+    if (q.pick === 'entering-col') {
+      setPivotPick({ col: idx, row: null });
+    } else if (q.pick === 'leaving-row') {
+      setPivotPick(p => ({ col: p.col, row: idx }));
+    }
+    const ok = gradeClickTableauAnswer(q, idx);
+    handleAnswer(q, ok, idx);
   };
 
   const handleShowMe = (q: Question) => {
@@ -657,6 +688,22 @@ export default function GuidedLearnPage() {
                         ? { matrix: latestPivot.matrix, basis: latestPivot.basis }
                         : undefined}
                       highlight={activeHighlight}
+                      clickMode={currentQ_pre?.kind === 'click-tableau'
+                        ? currentQ_pre.pick
+                        : null}
+                      selectedCol={(() => {
+                        // For a leaving-row question the entering col is
+                        // embedded in the question itself (question authors
+                        // know which column the student just picked).
+                        if (currentQ_pre?.kind === 'click-tableau' &&
+                            currentQ_pre.pick === 'leaving-row' &&
+                            currentQ_pre.enteringCol != null) {
+                          return currentQ_pre.enteringCol;
+                        }
+                        return pivotPick.col;
+                      })()}
+                      selectedRow={pivotPick.row}
+                      onPick={handleTableauPick}
                     />
                   </div>
                 </div>
@@ -772,6 +819,18 @@ function QuestionCard({
           }}
           disabled={justAnswered}
         />
+      )}
+
+      {q.kind === 'click-tableau' && !justAnswered && (
+        <div className="bg-orange-500/10 border-2 border-dashed border-orange-400/60 rounded-lg px-3 py-3 text-sm text-orange-100 flex items-start gap-2 animate-attention-pulse">
+          <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-orange-300" />
+          <span>
+            <strong>Click the tableau on the right.</strong>{' '}
+            {(q as ClickTableauQuestion).pick === 'entering-col'
+              ? 'Tap the negative number in the z-row that you want to enter the basis.'
+              : 'Tap the row (the ratio cell on the right edge) that should leave the basis.'}
+          </span>
+        </div>
       )}
 
       {/* Feedback */}

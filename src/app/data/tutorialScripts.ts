@@ -123,7 +123,38 @@ export interface DragQuestion {
   highlight?: QuestionHighlight;
 }
 
-export type Question = TextQuestion | NumberQuestion | MCQuestion | FieldsQuestion | DragQuestion;
+/**
+ * Interactive tableau click question. The tableau itself becomes the
+ * input: the student clicks a column header (to pick the entering
+ * variable) or a basis row (to pick the leaving variable). The rest of
+ * the tableau responds immediately — ratios appear when a column is
+ * picked, the matching row highlights when clicked — so the student is
+ * *reading the tableau* rather than being quizzed about it.
+ */
+export interface ClickTableauQuestion {
+  kind: 'click-tableau';
+  id: string;
+  phase: number;
+  prompt: string;
+  /**
+   * What kind of pick this question wants:
+   *  - 'entering-col' → click a column header (column index in the full
+   *    coefficient matrix, i.e. 0..n-1 where n = decVars + slacks)
+   *  - 'leaving-row' → click a basis row (0..m-1)
+   */
+  pick: 'entering-col' | 'leaving-row';
+  /** The correct index (column for entering, row for leaving). */
+  correctIndex: number;
+  /** When pick is 'leaving-row', which entering column's ratios to show. */
+  enteringCol?: number;
+  hint: string;
+  commit: CommitPayload;
+  highlight?: QuestionHighlight;
+}
+
+export type Question =
+  | TextQuestion | NumberQuestion | MCQuestion | FieldsQuestion | DragQuestion
+  | ClickTableauQuestion;
 
 /**
  * When a question is answered correctly, this commit describes what to
@@ -624,53 +655,31 @@ const PIVOT2_BASIS = ['x2', 'x1'];
 
 const TOY_FACTORY_PHASE4: Question[] = [
 
-  // ── Pivot 1: choose entering variable ────────────────────────────────────
+  // ── Pivot 1: principle → click the tableau ─────────────────────────────
+  //
+  // Column indices in the initial tableau: 0=x1, 1=x2, 2=s1, 3=s2. Rows: 0=C1, 1=C2.
+  // The picks use raw column/row indices because the student is clicking on the
+  // tableau itself — no option IDs, no typing.
   {
-    kind: 'mc',
+    kind: 'click-tableau',
     id: 'toy-p1-entering',
     phase: 4,
-    prompt: 'The Z-row is (−15, −20, 0, 0). For MAX, we pick the MOST negative value — that variable improves z the fastest. Which variable enters the basis?',
-    options: [
-      { id: 'x1', label: 'x₁ (Z-row value: −15)' },
-      { id: 'x2', label: 'x₂ (Z-row value: −20)' },
-      { id: 's1', label: 's₁ (Z-row value: 0)' },
-      { id: 's2', label: 's₂ (Z-row value: 0)' },
-    ],
-    correctId: 'x2',
-    hint: 'Compare −15 and −20. Which is SMALLER (most negative)? That\'s the entering variable — it gives the biggest increase in z per unit.',
+    prompt: 'PRINCIPLE: every pivot picks the variable that will grow z the fastest — that\'s the MOST NEGATIVE value in the z-row. Find it in the tableau and click it.',
+    pick: 'entering-col',
+    correctIndex: 1, // x2 column
+    hint: 'The z-row is (−15, −20, 0, 0). Which one is smallest? −20 wins → click the −20 under x₂.',
     commit: { type: 'note', text: 'p1-entering-picked' },
+    highlight: { target: 'tableau-z-row' },
   },
   {
-    kind: 'number',
-    id: 'toy-p1-ratio1',
-    phase: 4,
-    prompt: 'Ratio test: divide each positive entry in the x₂ column into its RHS. Row s₁ has x₂ coefficient 4 and RHS 80. What\'s 80 / 4?',
-    placeholder: 'e.g. 20',
-    correct: 20,
-    hint: '80 ÷ 4 = ?',
-    commit: { type: 'note', text: 'p1-ratio1' },
-  },
-  {
-    kind: 'number',
-    id: 'toy-p1-ratio2',
-    phase: 4,
-    prompt: 'Row s₂ has x₂ coefficient 2 and RHS 60. What\'s 60 / 2?',
-    placeholder: 'e.g. 30',
-    correct: 30,
-    hint: '60 ÷ 2 = ?',
-    commit: { type: 'note', text: 'p1-ratio2' },
-  },
-  {
-    kind: 'mc',
+    kind: 'click-tableau',
     id: 'toy-p1-leaving',
     phase: 4,
-    prompt: 'The ratio test picks the SMALLEST non-negative ratio — that\'s the constraint that binds first as x₂ increases. Which row wins? (Row s₁: 20, Row s₂: 30)',
-    options: [
-      { id: 's1', label: 'Row s₁ leaves (ratio 20 — smaller)' },
-      { id: 's2', label: 'Row s₂ leaves (ratio 30)' },
-    ],
-    correctId: 's1',
-    hint: 'Smaller ratio wins: 20 < 30. That means s₁ leaves the basis and x₂ takes its place.',
+    prompt: 'PRINCIPLE: we can grow x₂ only until one of the constraints binds. The ratios RHS ÷ (x₂ coefficient) tell you how far each row can stretch before it binds. Click the row with the SMALLEST positive ratio — that constraint binds first, so its variable leaves.',
+    pick: 'leaving-row',
+    enteringCol: 1,   // continue showing x₂ ratios
+    correctIndex: 0,  // row C1 (s1 leaves at ratio 20)
+    hint: 'Ratios: row s₁ has 80/4 = 20, row s₂ has 60/2 = 30. 20 is smaller — that means s₁ leaves.',
     commit: {
       type: 'pivot-applied',
       pivotNumber: 1,
@@ -683,53 +692,27 @@ const TOY_FACTORY_PHASE4: Question[] = [
     },
   },
 
-  // ── Pivot 2: the Z-row still has a negative entry (x₁ = −5) ──────────────
+  // ── Pivot 2 ─────────────────────────────────────────────────────────────
   {
-    kind: 'mc',
+    kind: 'click-tableau',
     id: 'toy-p2-entering',
     phase: 4,
-    prompt: 'Look at the new Z-row: (−5, 0, 5, 0). Is x₂ still negative? No — it\'s 0 now. But x₁ is still −5, so z can still improve. Which variable enters next?',
-    options: [
-      { id: 'x1', label: 'x₁ (Z-row value: −5)' },
-      { id: 'x2', label: 'x₂ (already basic; Z-row value is 0)' },
-      { id: 's1', label: 's₁ (Z-row value: 5 — positive, so no improvement)' },
-      { id: 's2', label: 's₂ (Z-row value: 0)' },
-    ],
-    correctId: 'x1',
-    hint: 'We pick the variable with a negative Z-row entry. Only x₁ has one (−5).',
+    prompt: 'The pivot moved us: new BFS (0, 20), z = 400. The z-row is now (−5, 0, 5, 0). Is z optimal yet? No — there\'s still a negative value, meaning some variable can still grow z. Click the most negative z-row entry.',
+    pick: 'entering-col',
+    correctIndex: 0, // x1 column
+    hint: 'Only x₁ has a negative z-row entry (−5). Click the −5 under x₁.',
     commit: { type: 'note', text: 'p2-entering-picked' },
+    highlight: { target: 'tableau-z-row' },
   },
   {
-    kind: 'number',
-    id: 'toy-p2-ratio1',
-    phase: 4,
-    prompt: 'Ratio test for x₁ column. Row x₂ has x₁ coefficient 0.5 and RHS 20. What\'s 20 / 0.5?',
-    placeholder: 'e.g. 40',
-    correct: 40,
-    hint: '20 ÷ 0.5 = ?',
-    commit: { type: 'note', text: 'p2-ratio1' },
-  },
-  {
-    kind: 'number',
-    id: 'toy-p2-ratio2',
-    phase: 4,
-    prompt: 'Row s₂ has x₁ coefficient 2 and RHS 20. What\'s 20 / 2?',
-    placeholder: 'e.g. 10',
-    correct: 10,
-    hint: '20 ÷ 2 = ?',
-    commit: { type: 'note', text: 'p2-ratio2' },
-  },
-  {
-    kind: 'mc',
+    kind: 'click-tableau',
     id: 'toy-p2-leaving',
     phase: 4,
-    prompt: 'Ratios: x₂ row has 40, s₂ row has 10. Which row leaves?',
-    options: [
-      { id: 'x2', label: 'Row x₂ leaves (ratio 40)' },
-      { id: 's2', label: 'Row s₂ leaves (ratio 10 — smaller)' },
-    ],
-    correctId: 's2',
-    hint: '10 < 40, so s₂ leaves. x₁ takes its place in the basis.',
+    prompt: 'Same ratio test, now for the x₁ column. Click the row with the smallest positive ratio — that\'s the constraint that stops x₁ from growing further.',
+    pick: 'leaving-row',
+    enteringCol: 0,
+    correctIndex: 1,  // row s2 (ratio 10 < 40)
+    hint: 'x₂ row: 20 / 0.5 = 40. s₂ row: 20 / 2 = 10. 10 < 40 → s₂ leaves.',
     commit: {
       type: 'pivot-applied',
       pivotNumber: 2,
