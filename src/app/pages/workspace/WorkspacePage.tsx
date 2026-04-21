@@ -16,7 +16,11 @@ import { Button } from '../../components/ui/button';
 import TableauWorkspace from '../../components/TableauWorkspace';
 import GraphView from '../../components/GraphView';
 import NarrativeBanner from './NarrativeBanner';
-import { useLPWorkspace } from '../../hooks/useLPWorkspace';
+import LensRail, { LENSES } from './LensRail';
+import LensDrawer from './LensDrawer';
+import FormulationLens from './lenses/FormulationLens';
+import SolutionLens from './lenses/SolutionLens';
+import { useLPWorkspace, LensId } from '../../hooks/useLPWorkspace';
 import { WORD_PROBLEMS, WordProblem } from '../../data/wordProblems';
 import { LPProblem } from '../../types';
 import {
@@ -68,6 +72,17 @@ export default function WorkspacePage() {
 
   // Problem-switcher state (Phase A convenience; Phase F will replace with templates)
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Only one secondary lens open at a time. The LensRail toggle cycles
+  // selected → deselected. Primary lenses (tableau, graph) are always
+  // visible in the center; the rail covers secondary lenses.
+  const [activeLens, setActiveLens] = useState<LensId | null>(null);
+  const handleToggleLens = (id: LensId) => {
+    // Primary lenses don't open a drawer — they're always rendered in the center
+    if (id === 'tableau' || id === 'graph') return;
+    setActiveLens(curr => (curr === id ? null : id));
+  };
+  const activeLensDef = LENSES.find(l => l.id === activeLens);
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
@@ -140,8 +155,14 @@ export default function WorkspacePage() {
         }
       />
 
-      {/* ── Main canvas: tableau + graph co-located ─────────────────────────── */}
+      {/* ── Main canvas: rail | tableau + graph | optional drawer ───────────── */}
       <div className="flex-1 flex overflow-hidden">
+
+        <LensRail
+          lenses={ws.lenses}
+          onToggle={handleToggleLens}
+          active={activeLens}
+        />
 
         {/* Tableau lens (left, dominant) */}
         <section className="flex-1 min-w-0 flex flex-col border-r border-border">
@@ -190,8 +211,11 @@ export default function WorkspacePage() {
           </div>
         </section>
 
-        {/* Graph lens (right, companion) */}
-        <aside className="w-[42%] min-w-[380px] max-w-[620px] flex flex-col bg-card/30">
+        {/* Graph lens (right, companion) — narrower when a drawer is open */}
+        <aside className={`
+          ${activeLens ? 'w-[32%] min-w-[300px] max-w-[480px]' : 'w-[42%] min-w-[380px] max-w-[620px]'}
+          flex flex-col bg-card/30 transition-all
+        `}>
           <div className="px-3 py-1.5 border-b border-border bg-card/40 shrink-0">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Graph</span>
           </div>
@@ -215,12 +239,24 @@ export default function WorkspacePage() {
             )}
           </div>
         </aside>
-      </div>
 
-      {/* ── Phase B preview: lens rail placeholder ───────────────────────────── */}
-      <footer className="border-t border-border bg-card/40 px-4 py-2 text-[10px] text-muted-foreground shrink-0">
-        Phase A: tableau + graph co-located. Lens rail (formulation, matrix form, sensitivity, etc.) coming in Phase B.
-      </footer>
+        {/* Secondary lens drawer (Formulation / Solution / Sensitivity / etc.) */}
+        {activeLens && activeLensDef && (
+          <LensDrawer
+            title={activeLensDef.label}
+            subtitle={activeLensDef.description}
+            onClose={() => setActiveLens(null)}
+          >
+            {activeLens === 'formulation' && <FormulationLens problem={ws.problem} />}
+            {activeLens === 'solution'    && <SolutionLens response={solverResponse} isLoading={isLoading} />}
+            {activeLens !== 'formulation' && activeLens !== 'solution' && (
+              <div className="text-sm text-muted-foreground italic">
+                The <strong className="text-foreground">{activeLensDef.label}</strong> lens is coming in Phase {activeLensDef.phase ?? '?'}.
+              </div>
+            )}
+          </LensDrawer>
+        )}
+      </div>
     </div>
   );
 }
