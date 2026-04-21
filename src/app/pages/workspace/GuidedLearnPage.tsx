@@ -19,7 +19,7 @@ import { Button } from '../../components/ui/button';
 import { WORD_PROBLEMS } from '../../data/wordProblems';
 import {
   getScript, Question, TextQuestion, NumberQuestion, MCQuestion, FieldsQuestion, DragQuestion,
-  CommitPayload,
+  CommitPayload, QuestionHighlight,
 } from '../../data/tutorialScripts';
 import DiscoveryGraph from './DiscoveryGraph';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
@@ -302,6 +302,13 @@ export default function GuidedLearnPage() {
   const isCurrentDrag = currentQ_pre?.kind === 'drag';
   const currentDragTarget = isCurrentDrag ? (currentQ_pre as DragQuestion).target : undefined;
 
+  // Active highlight — the current question's `highlight` field, nulled out
+  // once the student has answered it correctly so the pulse stops and the
+  // visual relaxes before the next question takes over.
+  const currentQAnswered = currentQ_pre ? answers[currentQ_pre.id]?.correct === true : false;
+  const activeHighlight: QuestionHighlight | null =
+    currentQ_pre && !currentQAnswered ? (currentQ_pre.highlight ?? null) : null;
+
   // Reset slider when arriving at a new drag question
   useEffect(() => {
     if (isCurrentDrag) {
@@ -525,7 +532,12 @@ export default function GuidedLearnPage() {
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
                 Your LP formulation — grows as you answer
               </p>
-              <Canvas draft={draft} variablesCount={problem.numVars} constraintsCount={problem.constraints.length} />
+              <Canvas
+                draft={draft}
+                variablesCount={problem.numVars}
+                constraintsCount={problem.constraints.length}
+                highlight={activeHighlight}
+              />
             </div>
 
             {/* Graph section — appears as soon as the student starts earning graph content */}
@@ -563,7 +575,7 @@ export default function GuidedLearnPage() {
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
                   Capacity meters — each constraint&apos;s bucket, and its slack
                 </p>
-                <ConstraintMeters draft={draft} bfs={currentBFS} />
+                <ConstraintMeters draft={draft} bfs={currentBFS} highlight={activeHighlight} />
               </div>
             )}
 
@@ -593,6 +605,7 @@ export default function GuidedLearnPage() {
                       override={latestPivot
                         ? { matrix: latestPivot.matrix, basis: latestPivot.basis }
                         : undefined}
+                      highlight={activeHighlight}
                     />
                   </div>
                 </div>
@@ -958,11 +971,15 @@ function DragInput({
 // the value rendered large. The `fill-pop` animation gives each fill a
 // physical sense of arrival: scale from 0.6 to 1.0 with a small bounce.
 
-function Canvas({ draft, variablesCount, constraintsCount }: {
+function Canvas({ draft, variablesCount, constraintsCount, highlight }: {
   draft: LPDraft;
   variablesCount: number;
   constraintsCount: number;
+  highlight?: QuestionHighlight | null;
 }) {
+  const pulseOperators = highlight?.target === 'constraint-operators';
+  const pulseRhs = highlight?.target === 'constraint-rhs';
+  const pulseObjCoefs = highlight?.target === 'objective-coefficients';
   return (
     <div className="space-y-6">
 
@@ -992,7 +1009,7 @@ function Canvas({ draft, variablesCount, constraintsCount }: {
             return (
               <div key={i} className="flex items-center gap-2">
                 {i > 0 && <span className="text-2xl text-muted-foreground">+</span>}
-                <SlotNumber value={c} />
+                <SlotNumber value={c} pulse={pulseObjCoefs} />
                 <VarChip label={`x${i + 1}`} size="sm" />
               </div>
             );
@@ -1029,8 +1046,8 @@ function Canvas({ draft, variablesCount, constraintsCount }: {
                       </div>
                     );
                   })}
-                  <OperatorSlot op={c?.operator ?? null} />
-                  <SlotNumber value={c?.rhs ?? null} accent />
+                  <OperatorSlot op={c?.operator ?? null} pulse={pulseOperators} />
+                  <SlotNumber value={c?.rhs ?? null} accent pulse={pulseRhs} />
                 </div>
               </div>
             );
@@ -1070,10 +1087,11 @@ function VarChip({ label, size = 'md' }: { label: string; size?: 'sm' | 'md' }) 
   );
 }
 
-function SlotNumber({ value, accent = false }: { value: number | null; accent?: boolean }) {
+function SlotNumber({ value, accent = false, pulse = false }: { value: number | null; accent?: boolean; pulse?: boolean }) {
+  const pulseCls = pulse ? ' animate-attention-pulse' : '';
   if (value === null) {
     return (
-      <span className="inline-flex items-center justify-center w-14 h-14 rounded-xl border-2 border-dashed border-border/80 bg-muted/30 text-muted-foreground/60 text-2xl font-mono">
+      <span className={`inline-flex items-center justify-center w-14 h-14 rounded-xl border-2 border-dashed border-border/80 bg-muted/30 text-muted-foreground/60 text-2xl font-mono${pulseCls}`}>
         ?
       </span>
     );
@@ -1083,8 +1101,8 @@ function SlotNumber({ value, accent = false }: { value: number | null; accent?: 
     : 'bg-emerald-500/25 border-emerald-500/60 text-emerald-100 shadow-emerald-500/20';
   return (
     <span
-      key={value} // forces remount + anim replay when the value arrives
-      className={`inline-flex items-center justify-center w-14 h-14 rounded-xl border-2 ${colorCls} shadow-lg font-mono text-2xl font-bold tabular-nums animate-fill-pop`}
+      key={value}
+      className={`inline-flex items-center justify-center w-14 h-14 rounded-xl border-2 ${colorCls} shadow-lg font-mono text-2xl font-bold tabular-nums animate-fill-pop${pulseCls}`}
     >
       {value}
     </span>
@@ -1127,10 +1145,11 @@ function SenseBadge({ sense }: { sense: 'max' | 'min' | null }) {
   );
 }
 
-function OperatorSlot({ op }: { op: '<=' | '>=' | '=' | null }) {
+function OperatorSlot({ op, pulse = false }: { op: '<=' | '>=' | '=' | null; pulse?: boolean }) {
+  const pulseCls = pulse ? ' animate-attention-pulse' : '';
   if (op === null) {
     return (
-      <span className="inline-flex items-center justify-center w-12 h-14 rounded-xl border-2 border-dashed border-border/80 bg-muted/30 text-muted-foreground/60 text-2xl font-mono">
+      <span className={`inline-flex items-center justify-center w-12 h-14 rounded-xl border-2 border-dashed border-border/80 bg-muted/30 text-muted-foreground/60 text-2xl font-mono${pulseCls}`}>
         ?
       </span>
     );
@@ -1139,7 +1158,7 @@ function OperatorSlot({ op }: { op: '<=' | '>=' | '=' | null }) {
   return (
     <span
       key={op}
-      className="inline-flex items-center justify-center w-12 h-14 rounded-xl border-2 border-primary/60 bg-primary/20 text-primary text-3xl font-bold shadow-lg shadow-primary/20 animate-fill-pop"
+      className={`inline-flex items-center justify-center w-12 h-14 rounded-xl border-2 border-primary/60 bg-primary/20 text-primary text-3xl font-bold shadow-lg shadow-primary/20 animate-fill-pop${pulseCls}`}
     >
       {sym}
     </span>

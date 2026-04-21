@@ -13,6 +13,7 @@
 
 import { LPDraft } from './guidedTypes';
 import { colorFor, colorForFill } from './constraintColors';
+import type { QuestionHighlight } from '../../data/tutorialScripts';
 
 export interface TableauReveal {
   slacksAdded: boolean;
@@ -36,6 +37,8 @@ interface Props {
     /** Most recent pivot to pulse-highlight: { row, col } in the matrix. */
     highlightPivot?: { row: number; col: number };
   };
+  /** Active question highlight — pulse-glow matching rows / columns / cells. */
+  highlight?: QuestionHighlight | null;
 }
 
 function fmt(v: number): string {
@@ -44,7 +47,7 @@ function fmt(v: number): string {
   return v.toFixed(2).replace(/\.?0+$/, '');
 }
 
-export default function GuidedTableau({ draft, reveal, override }: Props) {
+export default function GuidedTableau({ draft, reveal, override, highlight }: Props) {
   const nDecVars = draft.variables.length || 2;
   const nSlacks = reveal.slacksAdded ? draft.constraints.length : 0;
   const nConstraints = draft.constraints.length;
@@ -108,6 +111,13 @@ export default function GuidedTableau({ draft, reveal, override }: Props) {
 
   const totalCols = allLabels.length + 1; // +1 for RHS
 
+  // Pulse targets derived from the active question highlight
+  const pulseZRow = highlight?.target === 'tableau-z-row';
+  const pulseSlackCols = highlight?.target === 'tableau-slack-columns';
+  const pulseRhsCol = highlight?.target === 'tableau-rhs-column';
+  const pulseRow = highlight?.target === 'tableau-row' ? highlight.row : -1;
+  const pulseCol = highlight?.target === 'tableau-col' ? highlight.col : -1;
+
   return (
     <div className="overflow-x-auto">
       <table className="border-collapse font-mono text-sm">
@@ -170,11 +180,19 @@ export default function GuidedTableau({ draft, reveal, override }: Props) {
                   const v = cellValue(r, c);
                   const isSlackCol = c >= nDecVars && c < nDecVars + nSlacks;
                   const slackColIdx = isSlackCol ? c - nDecVars : -1;
+                  const isRhsCol = c === totalCols - 1;
+                  const pulse =
+                    (pulseZRow && isZRow) ||
+                    (pulseSlackCols && isSlackCol) ||
+                    (pulseRhsCol && isRhsCol) ||
+                    (pulseRow === r) ||
+                    (pulseCol === c);
                   return (
                     <TableauCell
                       key={c}
                       value={v}
                       columnTint={isSlackCol && reveal.slacksAdded ? colorForFill(slackColIdx, 0.06) : null}
+                      pulse={pulse}
                     />
                   );
                 })}
@@ -187,12 +205,15 @@ export default function GuidedTableau({ draft, reveal, override }: Props) {
   );
 }
 
-function TableauCell({ value, columnTint }: { value: number | null; columnTint?: string | null }) {
+function TableauCell({
+  value, columnTint, pulse = false,
+}: { value: number | null; columnTint?: string | null; pulse?: boolean }) {
   const tdStyle = columnTint ? { backgroundColor: columnTint } : undefined;
+  const pulseCls = pulse ? ' animate-attention-pulse' : '';
   if (value === null) {
     return (
       <td className="px-2 py-1.5" style={tdStyle}>
-        <div className="inline-flex items-center justify-center w-12 h-10 rounded-lg border-2 border-dashed border-border/60 bg-muted/20 text-muted-foreground/50 text-sm font-mono">
+        <div className={`inline-flex items-center justify-center w-12 h-10 rounded-lg border-2 border-dashed border-border/60 bg-muted/20 text-muted-foreground/50 text-sm font-mono${pulseCls}`}>
           ?
         </div>
       </td>
@@ -203,7 +224,7 @@ function TableauCell({ value, columnTint }: { value: number | null; columnTint?:
     <td className="px-2 py-1.5" style={tdStyle}>
       <div
         key={value}
-        className={`inline-flex items-center justify-center w-12 h-10 rounded-lg border-2 shadow-md font-mono text-base font-bold tabular-nums animate-fill-pop ${
+        className={`inline-flex items-center justify-center w-12 h-10 rounded-lg border-2 shadow-md font-mono text-base font-bold tabular-nums animate-fill-pop${pulseCls} ${
           isNeg
             ? 'bg-amber-500/20 border-amber-500/50 text-amber-100 shadow-amber-500/20'
             : 'bg-emerald-500/20 border-emerald-500/50 text-emerald-100 shadow-emerald-500/20'

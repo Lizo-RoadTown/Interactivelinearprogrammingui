@@ -21,6 +21,7 @@
 
 import { LPDraft } from './guidedTypes';
 import { colorFor, colorForFill } from './constraintColors';
+import type { QuestionHighlight } from '../../data/tutorialScripts';
 
 interface Props {
   draft: LPDraft;
@@ -30,6 +31,8 @@ interface Props {
    * Keys are variable names ("x1", "x2", "s1", ...).
    */
   bfs: Record<string, number>;
+  /** When set, pulse-glow the matching meter / slack tail. */
+  highlight?: QuestionHighlight | null;
 }
 
 function fmt(v: number): string {
@@ -38,7 +41,7 @@ function fmt(v: number): string {
   return v.toFixed(1);
 }
 
-export default function ConstraintMeters({ draft, bfs }: Props) {
+export default function ConstraintMeters({ draft, bfs, highlight }: Props) {
   const x1 = bfs['x1'] ?? 0;
   const x2 = bfs['x2'] ?? 0;
 
@@ -64,11 +67,16 @@ export default function ConstraintMeters({ draft, bfs }: Props) {
         const slackFrac = 1 - usedFrac;
         const color = colorFor(idx);
         const binding = Math.abs(slack) < 1e-6;
+        const pulseMeter =
+          highlight?.target === 'meter' && highlight.constraintIndex === idx;
+        const pulseTail =
+          (highlight?.target === 'meter-tail' && highlight.constraintIndex === idx) ||
+          highlight?.target === 'meter-tails-all';
 
         return (
           <div
             key={idx}
-            className="bg-card/40 border rounded-xl p-3 space-y-2"
+            className={`bg-card/40 border rounded-xl p-3 space-y-2${pulseMeter ? ' animate-attention-pulse' : ''}`}
             style={{ borderColor: colorForFill(idx, 0.45) }}
           >
             <div className="flex items-baseline justify-between gap-2">
@@ -101,7 +109,7 @@ export default function ConstraintMeters({ draft, bfs }: Props) {
               />
               {/* Slack portion — hatched / subtler so it reads as "empty" */}
               <div
-                className="absolute top-0 bottom-0 transition-all duration-500"
+                className={`absolute top-0 bottom-0 transition-all duration-500${pulseTail ? ' animate-attention-pulse' : ''}`}
                 style={{
                   left: `${usedFrac * 100}%`,
                   width: `${slackFrac * 100}%`,
@@ -129,7 +137,7 @@ export default function ConstraintMeters({ draft, bfs }: Props) {
                 ) : null}
               </span>
               <span
-                className={`px-2 py-0.5 rounded font-bold ${binding ? 'animate-fill-pop' : ''}`}
+                className={`px-2 py-0.5 rounded font-bold ${binding ? 'animate-fill-pop' : ''}${pulseTail ? ' animate-attention-pulse' : ''}`}
                 style={{
                   color: binding ? '#10b981' : color,
                   backgroundColor: binding ? 'rgba(16, 185, 129, 0.15)' : colorForFill(idx, 0.15),

@@ -14,6 +14,26 @@
 
 // ── Question input shapes ────────────────────────────────────────────────────
 
+/**
+ * Attention highlight — when set on a question, the named element in the
+ * right-column visuals pulses/glows until the student answers. Acts as
+ * a visible finger pointing from the prompt to the thing the prompt is
+ * about ("how many ≤ constraints are there?" → ≤ operators pulse).
+ */
+export type QuestionHighlight =
+  | { target: 'constraint-operators' }                          // all ≤/≥ operator boxes
+  | { target: 'constraint-rhs' }                                // all RHS value boxes
+  | { target: 'objective-coefficients' }                        // objective-row coefficient slots
+  | { target: 'meter'; constraintIndex: number }                // one full capacity meter
+  | { target: 'meter-tail'; constraintIndex: number }           // the unused (slack) tail of one meter
+  | { target: 'meter-tails-all' }                               // all slack tails across all meters
+  | { target: 'tableau-row'; row: number }                      // a tableau row (basis row)
+  | { target: 'tableau-col'; col: number }                      // a tableau column
+  | { target: 'tableau-z-row' }                                 // the Z-row specifically
+  | { target: 'tableau-slack-columns' }                         // every slack column together
+  | { target: 'tableau-rhs-column' };                           // the RHS column
+
+
 /** Free-text answer, graded by normalized-string comparison against accepted forms. */
 export interface TextQuestion {
   kind: 'text';
@@ -27,6 +47,8 @@ export interface TextQuestion {
   hint: string;
   /** What this answer adds to the canvas. */
   commit: CommitPayload;
+  /** Optional visual element(s) to pulse-highlight while this question is active. */
+  highlight?: QuestionHighlight;
 }
 
 /** Fill-in-the-number question, graded with numeric tolerance. */
@@ -41,6 +63,7 @@ export interface NumberQuestion {
   tolerance?: number;
   hint: string;
   commit: CommitPayload;
+  highlight?: QuestionHighlight;
 }
 
 /** Multiple choice question, correctness keyed by option id. */
@@ -55,6 +78,7 @@ export interface MCQuestion {
   hint: string;
   hintPerOption?: Record<string, string>;
   commit: CommitPayload;
+  highlight?: QuestionHighlight;
 }
 
 /** Composite: several numeric fields on one question (e.g., objective coefficients). */
@@ -66,6 +90,7 @@ export interface FieldsQuestion {
   fields: { id: string; label: string; correct: number; tolerance?: number; placeholder?: string }[];
   hint: string;
   commit: CommitPayload;
+  highlight?: QuestionHighlight;
 }
 
 /**
@@ -90,6 +115,7 @@ export interface DragQuestion {
   tolerance?: number;
   hint: string;
   commit: CommitPayload;
+  highlight?: QuestionHighlight;
 }
 
 export type Question = TextQuestion | NumberQuestion | MCQuestion | FieldsQuestion | DragQuestion;
@@ -460,6 +486,7 @@ const TOY_FACTORY_PHASE3: Question[] = [
     correct: 2,
     hint: 'One slack per ≤ constraint.',
     commit: { type: 'slacks-added', count: 2 },
+    highlight: { target: 'constraint-operators' },
   },
   {
     kind: 'mc',
@@ -474,6 +501,7 @@ const TOY_FACTORY_PHASE3: Question[] = [
     correctId: 'no',
     hint: 'Pour unused hours into the wood bucket and nothing changes — they are different resources. s₁ is meaningful only inside C1.',
     commit: { type: 'note', text: 'slack-ownership-understood' },
+    highlight: { target: 'meter-tails-all' },
   },
   {
     kind: 'mc',
@@ -489,6 +517,7 @@ const TOY_FACTORY_PHASE3: Question[] = [
     correctId: 'one-zero',
     hint: 'Watch the C1 meter: s₁ fills C1\'s tail — it\'s C1\'s slack (coeff 1). s₂ belongs to C2\'s meter entirely (coeff 0 in this row). Same pattern in row C2, flipped: (0, 1). Together those two rows form the identity block in the tableau.',
     commit: { type: 'slack-identity-revealed' },
+    highlight: { target: 'meter', constraintIndex: 0 },
   },
   {
     kind: 'mc',
@@ -504,6 +533,7 @@ const TOY_FACTORY_PHASE3: Question[] = [
     correctId: 'neg-neg',
     hint: 'For MAX, moving the objective to the left side of the equation z − 15x₁ − 20x₂ = 0 makes the x coefficients negative. The simplex will drive them toward zero.',
     commit: { type: 'z-row-x-revealed' },
+    highlight: { target: 'tableau-z-row' },
   },
   {
     kind: 'number',
@@ -514,6 +544,7 @@ const TOY_FACTORY_PHASE3: Question[] = [
     correct: 80,
     hint: 'Simplify: 0 + 0 + s₁ = 80, so s₁ = ?',
     commit: { type: 'note', text: 'initial-s1' },
+    highlight: { target: 'meter-tail', constraintIndex: 0 },
   },
   {
     kind: 'number',
@@ -524,6 +555,7 @@ const TOY_FACTORY_PHASE3: Question[] = [
     correct: 60,
     hint: 's₂ takes up all of C2\'s capacity because nothing is being produced yet.',
     commit: { type: 'initial-basic-values-revealed' },
+    highlight: { target: 'meter-tail', constraintIndex: 1 },
   },
   {
     kind: 'number',
