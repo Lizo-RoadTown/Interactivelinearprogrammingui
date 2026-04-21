@@ -426,7 +426,7 @@ export default function GuidedLearnPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="bg-card/60 backdrop-blur border-b border-border px-4 py-2 flex items-center gap-3 shrink-0">
