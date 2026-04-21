@@ -373,12 +373,14 @@ export default function GuidedLearnPage() {
       pickTarget()?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     });
     return () => cancelAnimationFrame(handle);
-    // Re-run when the question changes AND when panels mount/unmount.
+    // Re-run when the question changes AND when panels mount/unmount —
+    // meters appearing mid-phase is the common case that needed the extra
+    // trigger.
   }, [
     currentQ_pre?.id,
     tableauReveal.slacksAdded,
     anyGraphContent,
-    // metersVisible is declared below; resolve at call-time
+    metersVisible,
   ]);
 
   // Handlers
@@ -1171,9 +1173,12 @@ function OperatorSlot({ op, pulse = false }: { op: '<=' | '>=' | '=' | null; pul
 function ScrollIntoViewOnChange({ keyId, children }: { keyId: string; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // block: 'start' (with scroll-mt on the wrapper) keeps the FULL prompt
+    // visible — 'center' was cutting off the top of long prompts when the
+    // card was taller than the viewport.
+    ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, [keyId]);
-  return <div ref={ref}>{children}</div>;
+  return <div ref={ref} className="scroll-mt-6">{children}</div>;
 }
 
 // ── CollapsedHistory ────────────────────────────────────────────────────────
