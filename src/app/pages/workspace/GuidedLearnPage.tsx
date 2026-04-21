@@ -391,21 +391,40 @@ export default function GuidedLearnPage() {
               </ScrollIntoViewOnChange>
             )}
 
-            {/* Done state */}
+            {/* Done state — end-to-end celebration */}
             {isDone && (
-              <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-xl p-5 space-y-3">
-                <div className="flex items-center gap-2 text-emerald-300 font-semibold">
-                  <CheckCircle className="w-5 h-5" />
-                  Formulation complete!
+              <div className="bg-gradient-to-br from-emerald-500/15 via-primary/10 to-accent/15 border border-emerald-500/50 rounded-2xl p-6 space-y-4 shadow-2xl shadow-emerald-500/20 animate-fill-pop">
+                <div className="flex items-center gap-2 text-emerald-300 font-bold text-lg">
+                  <Sparkles className="w-6 h-6" />
+                  You did it — end to end!
                 </div>
-                <p className="text-sm text-emerald-200 leading-relaxed">
-                  You&apos;ve walked through the entire formulation. Your LP is built on the canvas
-                  to the right. The next phases (drawing the graph, setting up the initial
-                  tableau, and doing simplex pivots) will be added in the next round.
+                <p className="text-sm text-emerald-100 leading-relaxed">
+                  You built the LP from a word problem, drew the graph, discovered the optimum
+                  by dragging the objective line, set up the initial simplex tableau, walked
+                  through two pivots, and read the final answer off the last tableau. Both
+                  methods gave you the same result: <strong>10 toy cars, 15 toy trucks,
+                  z* = $450/week</strong>.
                 </p>
-                <Button onClick={() => navigate('/')} className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                  Back home
-                </Button>
+                <div className="bg-card/50 border border-border rounded-lg p-3 text-xs text-muted-foreground leading-relaxed">
+                  <strong className="text-foreground">What you now know:</strong> how to
+                  formulate an LP, how to visualize it as a feasible region + objective line,
+                  how to standardize it with slacks, and how to run the simplex method by
+                  hand. This is a full end-to-end pass.
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => navigate('/workspace?problem=wp-toy-factory')}
+                    className="bg-accent hover:bg-accent/90 text-white"
+                  >
+                    Open the free workspace (explore / sensitivity)
+                  </Button>
+                  <Button
+                    onClick={() => navigate('/')}
+                    variant="outline"
+                  >
+                    Back home
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -448,24 +467,36 @@ export default function GuidedLearnPage() {
             )}
 
             {/* Tableau section — appears once Phase 3 starts (slacksAdded) */}
-            {tableauReveal.slacksAdded && (
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
-                  {latestPivot
-                    ? `Your tableau — after pivot ${latestPivot.pivotNumber} (z = ${latestPivot.zValue})`
-                    : 'Your initial tableau — fills in as you answer'}
-                </p>
-                <div className="bg-card/40 border border-border rounded-xl p-3">
-                  <GuidedTableau
-                    draft={draft}
-                    reveal={tableauReveal}
-                    override={latestPivot
-                      ? { matrix: latestPivot.matrix, basis: latestPivot.basis }
-                      : undefined}
-                  />
+            {tableauReveal.slacksAdded && (() => {
+              // Has the student reached optimal? That's when the phase of the
+              // current question is >= 5 (we're in the reveal/bridge phase) or
+              // the script is done.
+              const atOptimal = isDone || (currentQ && currentQ.phase >= 5);
+              return (
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+                    {atOptimal
+                      ? `Optimal tableau — z* = ${latestPivot?.zValue ?? '?'}`
+                      : latestPivot
+                        ? `Your tableau — after pivot ${latestPivot.pivotNumber} (z = ${latestPivot.zValue})`
+                        : 'Your initial tableau — fills in as you answer'}
+                  </p>
+                  <div className={`rounded-xl p-3 transition-all ${
+                    atOptimal
+                      ? 'bg-gradient-to-br from-emerald-500/15 to-card/40 border-2 border-emerald-500/50 shadow-lg shadow-emerald-500/20'
+                      : 'bg-card/40 border border-border'
+                  }`}>
+                    <GuidedTableau
+                      draft={draft}
+                      reveal={tableauReveal}
+                      override={latestPivot
+                        ? { matrix: latestPivot.matrix, basis: latestPivot.basis }
+                        : undefined}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </section>
       </div>

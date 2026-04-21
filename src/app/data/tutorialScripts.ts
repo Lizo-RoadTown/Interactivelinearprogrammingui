@@ -689,6 +689,68 @@ const TOY_FACTORY_PHASE4: Question[] = [
   },
 ];
 
+// ── Toy Factory — Phase 5: read the answer + bridge back to the graph ───────
+//
+// The algebra just landed the student at the optimal tableau. Phase 5
+// reads the answer straight off the RHS, translates it to plain English
+// ("make 10 cars and 15 trucks"), and explicitly links the algebraic
+// solution to the vertex the student discovered graphically in Phase 2b.
+// This is the closing circle — "both methods gave the same answer."
+
+const TOY_FACTORY_PHASE5: Question[] = [
+  {
+    kind: 'fields',
+    id: 'toy-r-read-xs',
+    phase: 5,
+    prompt: 'Read the final solution directly off the tableau. The basic variables are x₂ and x₁, and their values are in the RHS column (15 in row x₂, 10 in row x₁). What are (x₁, x₂)?',
+    fields: [
+      { id: 'x1', label: 'x₁', correct: 10, placeholder: '10' },
+      { id: 'x2', label: 'x₂', correct: 15, placeholder: '15' },
+    ],
+    hint: 'Look at the final tableau\'s RHS column. Row x₂ has 15. Row x₁ has 10.',
+    commit: { type: 'note', text: 'optimal-xs-read' },
+  },
+  {
+    kind: 'number',
+    id: 'toy-r-read-z',
+    phase: 5,
+    prompt: 'And the optimal objective value z* is in the Z-row RHS. What is z*?',
+    placeholder: 'e.g. 450',
+    correct: 450,
+    hint: 'Look at the Z-row\'s RHS cell.',
+    commit: { type: 'note', text: 'optimal-z-read' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-r-translation',
+    phase: 5,
+    prompt: 'Translate the algebra back into the business decision. What should the toy factory do?',
+    options: [
+      { id: 'make-10-15', label: 'Make 10 toy cars and 15 toy trucks per week. Weekly profit = $450.' },
+      { id: 'make-15-10', label: 'Make 15 toy cars and 10 toy trucks per week.' },
+      { id: 'make-20-30', label: 'Make 20 cars and 30 trucks (more of both).' },
+      { id: 'close',      label: 'Close the factory.' },
+    ],
+    correctId: 'make-10-15',
+    hint: 'x₁ is toy cars, x₂ is toy trucks. You just found x₁ = 10, x₂ = 15 with z = 450.',
+    commit: { type: 'note', text: 'business-translation' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-r-bridge',
+    phase: 5,
+    prompt: 'Back in Phase 2, when you dragged the objective line outward, it stopped when z = 450 at (10, 15). Now the simplex pivots gave you the same answer. Why do both methods land in the same place?',
+    options: [
+      { id: 'same-place', label: 'They\'re two ways to find the same optimum. The graph finds it geometrically (farthest corner in the improvement direction); the tableau finds it algebraically (walk corner to corner until Z-row is non-negative).' },
+      { id: 'coincidence', label: 'Coincidence — they usually give different answers.' },
+      { id: 'different-methods', label: 'They\'re different methods for different kinds of problems.' },
+    ],
+    correctId: 'same-place',
+    hint: 'Every simplex pivot walks you from one corner of the feasible region to an adjacent corner with a better z. The optimum is always at a corner — that\'s the vertex the objective-line drag also found.',
+    commit: { type: 'note', text: 'bridge-understood' },
+  },
+];
+
 export const TOY_FACTORY_SCRIPT: TutorialScript = {
   id: 'script-toy-factory-v1',
   problemId: 'wp-toy-factory',
@@ -698,6 +760,7 @@ export const TOY_FACTORY_SCRIPT: TutorialScript = {
     ...TOY_FACTORY_PHASE2,
     ...TOY_FACTORY_PHASE3,
     ...TOY_FACTORY_PHASE4,
+    ...TOY_FACTORY_PHASE5,
   ],
 };
 
