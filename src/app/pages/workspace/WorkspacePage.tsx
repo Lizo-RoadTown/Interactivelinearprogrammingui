@@ -21,6 +21,8 @@ import LensDrawer from './LensDrawer';
 import FormulationLens from './lenses/FormulationLens';
 import SolutionLens from './lenses/SolutionLens';
 import SensitivityLens from './lenses/SensitivityLens';
+import MatrixFormLens from './lenses/MatrixFormLens';
+import ShadowPricesLens from './lenses/ShadowPricesLens';
 import { useLPWorkspace, LensId } from '../../hooks/useLPWorkspace';
 import { WORD_PROBLEMS, WordProblem } from '../../data/wordProblems';
 import { LPProblem } from '../../types';
@@ -258,9 +260,25 @@ export default function WorkspacePage() {
                 method={ws.method}
               />
             )}
-            {activeLens !== 'formulation' && activeLens !== 'solution' && activeLens !== 'sensitivity' && (
+            {activeLens === 'matrix' && (
+              <MatrixFormLens
+                problem={ws.problem}
+                response={solverResponse}
+                isLoading={isLoading}
+                method={ws.method}
+              />
+            )}
+            {activeLens === 'shadow' && (
+              <ShadowPricesLens
+                problem={ws.problem}
+                response={solverResponse}
+                isLoading={isLoading}
+                method={ws.method}
+              />
+            )}
+            {(activeLens === 'dual' || activeLens === 'history') && (
               <div className="text-sm text-muted-foreground italic">
-                The <strong className="text-foreground">{activeLensDef.label}</strong> lens is coming in Phase {activeLensDef.phase ?? '?'}.
+                The <strong className="text-foreground">{activeLensDef.label}</strong> lens is coming in a later phase.
               </div>
             )}
           </LensDrawer>
