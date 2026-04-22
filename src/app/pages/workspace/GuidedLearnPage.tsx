@@ -813,6 +813,16 @@ export default function GuidedLearnPage() {
                               sensitivityReveals.has('s-binv-0-1') &&
                               sensitivityReveals.has('s-binv-1-0') &&
                               sensitivityReveals.has('s-binv-1-1');
+                            const allFormulaRevealed =
+                              sensitivityReveals.has('s-binvN-0-0') &&
+                              sensitivityReveals.has('s-binvN-0-1') &&
+                              sensitivityReveals.has('s-binvN-1-0') &&
+                              sensitivityReveals.has('s-binvN-1-1') &&
+                              sensitivityReveals.has('s-binvb-0') &&
+                              sensitivityReveals.has('s-binvb-1') &&
+                              sensitivityReveals.has('s-zrow-0') &&
+                              sensitivityReveals.has('s-zrow-1') &&
+                              sensitivityReveals.has('s-zstar');
                             return (
                               <>
                                 <InverseBPanel
@@ -829,6 +839,40 @@ export default function GuidedLearnPage() {
                                     basisLabels={basisLabels}
                                     nDecVars={problem.numVars}
                                     reveals={sensitivityReveals}
+                                  />
+                                )}
+                                {/* Piece 5: Sensitivity scenarios. Once the
+                                    toolkit is built and the Formulas panel
+                                    shows every slot, unlock the sliders.
+                                    A student action here propagates through
+                                    EVERY tool at once — graph, meters,
+                                    Formulas panel, reconstructed tableau. */}
+                                {allFormulaRevealed && (
+                                  <SensitivityControls
+                                    draft={draft}
+                                    rhsDelta={rhsDelta}
+                                    objDelta={objDelta}
+                                    onRhsDelta={(idx, delta) => {
+                                      setRhsDelta(prev => {
+                                        const arr = [...prev];
+                                        while (arr.length <= idx) arr.push(0);
+                                        arr[idx] = delta;
+                                        return arr;
+                                      });
+                                    }}
+                                    onObjDelta={(idx, delta) => {
+                                      setObjDelta(prev => {
+                                        const arr = [...prev];
+                                        while (arr.length <= idx) arr.push(0);
+                                        arr[idx] = delta;
+                                        return arr;
+                                      });
+                                    }}
+                                    onReset={() => {
+                                      setRhsDelta([]);
+                                      setObjDelta([]);
+                                    }}
+                                    baseline={baselineSolution}
                                   />
                                 )}
                               </>

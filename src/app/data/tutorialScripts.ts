@@ -1200,6 +1200,117 @@ const TOY_FACTORY_PHASE6: Question[] = [
     hint: 'Outside the allowable range, a different vertex becomes optimal. Different vertex → different basis → different B → different B⁻¹ → different shadow price.',
     commit: { type: 'note', text: 's-range-understood' },
   },
+
+  // ── Piece 6: SCENARIOS — transform a constraint and watch every tool
+  //    react together. The Sensitivity Playground panel at the bottom has
+  //    sliders for each constraint\'s RHS and each variable\'s objective
+  //    coefficient. A single slider move updates, at the same time:
+  //      • the graph (constraint line moves or objective tilts),
+  //      • the inline capacity meters (used/unused shifts),
+  //      • the Formulas panel (B⁻¹b and Z-row recompute),
+  //      • the reconstructed optimal tableau below the formulas.
+  //    That is the alignment: one action, every tool in sync.
+
+  {
+    kind: 'number',
+    id: 'toy-scenario-1-small-b',
+    phase: 6,
+    prompt: 'SCENARIO: Your supervisor says "we can get 5 more assembly hours — is it worth buying?" Drag C1\'s RHS slider in the Sensitivity Playground to 85 (Δ = +5). Watch what happens to every view. What is the new z*? Read it from the Formulas panel (z* cell) OR compute it using the shadow price.',
+    placeholder: 'e.g. 468.75',
+    correct: 468.75,
+    tolerance: 0.01,
+    hint: 'Inside the allowable range, z* = 450 + shadow·Δb₁ = 450 + 3.75·5 = 468.75. The Formulas panel\'s z* cell now reads 468.75 live.',
+    commit: { type: 'note', text: 'scenario-1-answered' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-scenario-1-observe',
+    phase: 6,
+    prompt: 'Look at the graph, the inline meters, and the Formulas panel. Did the optimal MIX (x₁*, x₂*) change, stay exactly the same, or shift slightly?',
+    options: [
+      { id: 'shifted', label: 'It shifted slightly — x₁* and x₂* are new numbers, but the BASIS ({x₁, x₂}) is the same. Same corner geometry, different coordinates.' },
+      { id: 'same', label: 'Exactly the same — still (10, 15).' },
+      { id: 'flipped', label: 'The mix flipped to a completely different corner.' },
+    ],
+    correctId: 'shifted',
+    hint: 'The Formulas panel\'s B⁻¹·b cells now read (8.75, 16.875) — the same BASIS but new values, because the right-hand side changed. On the graph the optimum dot slid along C2, still at the C1∩C2 corner. All four tools agree.',
+    commit: { type: 'note', text: 'scenario-1-observed' },
+  },
+
+  {
+    kind: 'mc',
+    id: 'toy-scenario-2-large-b',
+    phase: 6,
+    prompt: 'SCENARIO: "We can get 50 more assembly hours — huge increase!" Drag C1\'s RHS slider all the way to 130 (Δ = +50). Watch every view carefully. Does the OLD corner (10, 15) survive, or does a different vertex take over?',
+    options: [
+      { id: 'flipped', label: 'A different vertex takes over. The Formulas panel\'s B⁻¹·b shows a negative entry (infeasible!), the graph\'s optimum dot jumped, and C1 is no longer binding — it became "meaningless" at the new corner.' },
+      { id: 'stayed', label: 'The corner stayed at (10, 15).' },
+      { id: 'infeasible', label: 'The problem is infeasible now.' },
+    ],
+    correctId: 'flipped',
+    hint: 'The Formulas panel shows B⁻¹·b = (−2.5, 33.75) — the −2.5 means "old basis no longer feasible." The graph shows the optimum jumped to (0, 30). C1 is now loose (s₁ > 0) — at this new corner C1 doesn\'t bind any more. This is what "outside the allowable range" feels like.',
+    commit: { type: 'note', text: 'scenario-2-observed' },
+  },
+
+  {
+    kind: 'mc',
+    id: 'toy-scenario-3-small-c',
+    phase: 6,
+    prompt: 'SCENARIO: "Market shift — truck profit drops from $20 to $18." Reset the sliders (use the "reset to baseline" link). Then drag x₂\'s profit slider to 18. Observe the objective line on the graph and the Formulas panel. What changed?',
+    options: [
+      { id: 'z-only', label: 'The optimal MIX stayed at (10, 15), but z* dropped. The objective line on the graph tilted slightly, and the Formulas panel\'s Z-row and z* cells updated, but B⁻¹·b is unchanged (same RHS).' },
+      { id: 'mix-flipped', label: 'The mix flipped to a different corner.' },
+      { id: 'nothing', label: 'Nothing changed.' },
+    ],
+    correctId: 'z-only',
+    hint: '18 is inside c₂\'s allowable range [10, 30]. The objective line tilts but (10, 15) is still the highest point on it. Only z changes: new z* = 15·10 + 18·15 = 420. The BASIS is unchanged.',
+    commit: { type: 'note', text: 'scenario-3-observed' },
+  },
+
+  {
+    kind: 'mc',
+    id: 'toy-scenario-4-large-c',
+    phase: 6,
+    prompt: 'SCENARIO: "Market crash — truck profit falls all the way to $8." Keep dragging x₂\'s profit down to 8. Now what happens to the optimal mix?',
+    options: [
+      { id: 'flipped', label: 'The mix flipped — a different corner is now optimal. The objective line tilted past the edge of the allowable range and now points to a different vertex.' },
+      { id: 'same', label: 'Still (10, 15) — c changes never affect the mix.' },
+      { id: 'infeasible', label: 'Infeasible.' },
+    ],
+    correctId: 'flipped',
+    hint: '8 is outside c₂\'s allowable range [10, 30]. Below 10, producing trucks is no longer worth the opportunity cost. The optimum flips to (20, 0) — all cars, no trucks. z* = 15·20 + 8·0 = 300.',
+    commit: { type: 'note', text: 'scenario-4-observed' },
+  },
+
+  // ── Synthesis ──────────────────────────────────────────────────────────
+  {
+    kind: 'mc',
+    id: 'toy-scenario-synthesis',
+    phase: 6,
+    prompt: 'PATTERN: you\'ve now seen four scenarios — two small changes that preserved the optimal mix, and two large changes that flipped it. What\'s the single thing that determines which category a change falls into?',
+    options: [
+      { id: 'allowable-range', label: 'The ALLOWABLE RANGE — a window of values around each parameter. Inside the window, the current basis stays optimal (only z changes). Outside it, a different vertex takes over.' },
+      { id: 'size-absolute', label: 'The absolute size of the change (bigger = always flips).' },
+      { id: 'sign', label: 'Whether the change is positive or negative.' },
+    ],
+    correctId: 'allowable-range',
+    hint: 'The window depends on the specific parameter: for b₁ the range is [40, 120]; for c₂ it\'s [10, 30]. Some parameters have wide windows, some narrow. The boundary is always where a Formulas-panel cell crosses zero (B⁻¹b going negative → infeasibility, or Z-row going negative → non-optimality).',
+    commit: { type: 'note', text: 'scenario-synthesis' },
+  },
+  {
+    kind: 'mc',
+    id: 'toy-scenario-unified',
+    phase: 6,
+    prompt: 'FINAL: when you perturb a parameter, every tool responds simultaneously — the graph, the meters, the Formulas panel, the tableau. What does that tell you about what a "tableau" actually is?',
+    options: [
+      { id: 'one-object', label: 'The optimal tableau is ONE object expressed in multiple languages — algebraic (B⁻¹ applied to data), geometric (a vertex with tight constraints), physical (resource capacities used/unused). The tools aren\'t separate; they\'re aligned views of the same transformation.' },
+      { id: 'formula-only', label: 'It\'s only the algebra — the graph is a separate thing.' },
+      { id: 'graph-only', label: 'It\'s only the graph — the tableau is a separate thing.' },
+    ],
+    correctId: 'one-object',
+    hint: 'That\'s why a single slider move updates everything at once: they\'re not parallel; they\'re the same object. This is how sensitivity analysis becomes a tool you can USE — you can predict the outcome of a change before committing to it.',
+    commit: { type: 'note', text: 'scenario-unified' },
+  },
 ];
 
 const TOY_FACTORY_PHASES_META: PhaseMeta[] = [
