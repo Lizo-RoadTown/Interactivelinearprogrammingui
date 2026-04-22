@@ -4,6 +4,7 @@ import PracticeMode from "./pages/PracticeMode";
 import SensitivityMode from "./pages/SensitivityMode";
 import WorkspacePage from "./pages/workspace/WorkspacePage";
 import GuidedLearnPage from "./pages/workspace/GuidedLearnPage";
+import EducatorPortal from "./pages/EducatorPortal";
 
 export const router = createBrowserRouter([
   {
@@ -29,5 +30,11 @@ export const router = createBrowserRouter([
   {
     path: "/sensitivity",
     Component: SensitivityMode,
+  },
+  {
+    // Team-project portal: three Python functions the beginners wrote,
+    // demoed end-to-end. Three cards, one per teammate.
+    path: "/educator",
+    Component: EducatorPortal,
   },
 ]);
