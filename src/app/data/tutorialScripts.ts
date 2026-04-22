@@ -896,7 +896,7 @@ const TOY_FACTORY_PHASE6: Question[] = [
     kind: 'mc',
     id: 'toy-s-basic-optimum',
     phase: 6,
-    prompt: 'Good — you\'re at (10, 15). The Vertex Basis panel is showing you the clues: both constraints are tight (so s₁ = s₂ = 0), and neither decision var is on an axis. Which two variables are BASIC at this vertex?',
+    prompt: 'Good — you\'re at (10, 15). Look at the Vertex Basis panel\'s clues AND the inline capacity meters under the Canvas. The clues list tells you which slacks are 0 here; the meters show each constraint fully used with s_i = 0 BINDING. PRINCIPLE: basic variables are the ones that are > 0 at this vertex. Which two variables are BASIC here?',
     options: [
       { id: 'x1-x2', label: '{ x₁, x₂ } — both are > 0 here, so they\'re basic' },
       { id: 's1-s2', label: '{ s₁, s₂ }' },
@@ -904,14 +904,14 @@ const TOY_FACTORY_PHASE6: Question[] = [
       { id: 'x2-s2', label: '{ x₂, s₂ }' },
     ],
     correctId: 'x1-x2',
-    hint: 'The slacks are 0 at this corner (the constraints are tight). That means the slacks are NON-basic. What\'s left? x₁ and x₂.',
+    hint: 'The clue list and the meters both tell you s₁ = 0 and s₂ = 0. So the slacks are NON-basic. The only variables > 0 are x₁ = 10 and x₂ = 15 — those are basic.',
     commit: { type: 's-reveal', key: 'basis-basic-10,15' },
   },
   {
     kind: 'mc',
     id: 'toy-s-nonbasic-optimum',
     phase: 6,
-    prompt: 'Now the other side. Which two variables are NON-BASIC (= 0) at (10, 15)?',
+    prompt: 'Now the other side. The clue list in the Vertex Basis panel explicitly names which slacks are 0 here, and the capacity meters under the Canvas confirm it — each meter is fully used and shows s_i = 0 with a BINDING badge. PRINCIPLE: non-basic = set to 0. Which two variables are NON-BASIC at (10, 15)?',
     options: [
       { id: 's1-s2', label: '{ s₁, s₂ } — both constraints are tight, so both slacks equal 0' },
       { id: 'x1-x2', label: '{ x₁, x₂ }' },
@@ -919,7 +919,7 @@ const TOY_FACTORY_PHASE6: Question[] = [
       { id: 'x2-s2', label: '{ x₂, s₂ }' },
     ],
     correctId: 's1-s2',
-    hint: 'Tight constraint → no leftover capacity → slack is 0 → non-basic. Both constraints are tight here.',
+    hint: 'Check the clue list in the Vertex Basis panel — it lists s₁ and s₂ as the slacks that equal 0 here (because C1 and C2 are tight). The meters under the Canvas show the same thing. Variables set to 0 are non-basic.',
     commit: { type: 's-reveal', key: 'basis-nonbasic-10,15' },
   },
 

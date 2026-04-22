@@ -121,7 +121,9 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars, reveals }: P
                 <span>
                   <span className="font-semibold" style={{ color }}>C{i + 1}</span>
                   {c?.label && <span className="text-muted-foreground"> ({c.label})</span>}
-                  {' '}is tight (the point is ON that line)
+                  {' '}is tight → its slack{' '}
+                  <span className="font-mono font-semibold" style={{ color }}>s{i + 1}</span>
+                  {' '}= 0 (no leftover capacity)
                 </span>
               </li>
             );
@@ -135,6 +137,9 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars, reveals }: P
               </span>
             </li>
           ))}
+          <li className="text-[10px] text-muted-foreground/80 italic pt-1">
+            (The inline capacity meters under the Canvas also show these s values directly.)
+          </li>
         </ul>
       </div>
 
