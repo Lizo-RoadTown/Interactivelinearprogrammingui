@@ -65,6 +65,113 @@ export function solveLP2D(draft: LPDraft, sense: 'max' | 'min' = 'max'): LPSolut
   );
 }
 
+/**
+ * Build the canonical basis ordering at a vertex: decision vars first
+ * (in index order), then slacks (in constraint-index order).
+ */
+export function basisLabelsAtVertex(
+  zeroDecisionVars: number[],
+  tightConstraints: number[],
+  nDecVars: number,
+  nConstraints: number,
+): string[] {
+  const basic: string[] = [];
+  for (let i = 0; i < nDecVars; i++) {
+    if (!zeroDecisionVars.includes(i)) basic.push(`x${i + 1}`);
+  }
+  for (let i = 0; i < nConstraints; i++) {
+    if (!tightConstraints.includes(i)) basic.push(`s${i + 1}`);
+  }
+  return basic;
+}
+
+/**
+ * Construct the full simplex tableau at an arbitrary vertex (basis).
+ * This is the Phase 6 core operation: every vertex of the feasible
+ * polygon IS a basis; every basis IS a tableau. Clicking a different
+ * vertex on the graph should produce a different tableau here.
+ *
+ * Returns { matrix, basis } in the same shape used by the pivot-applied
+ * commit: matrix is (m+1) × (n+1) with basic rows + z-row, columns in
+ * all-vars order (decision vars then slacks) followed by RHS; basis is
+ * length m.
+ *
+ * Only supports 2×2 basis for now (the Toy Factory problem). Larger
+ * bases need a general matrix inverse.
+ */
+export function tableauAtVertex(
+  draft: LPDraft,
+  vertex: { x: number; y: number; zeroDecisionVars: number[]; tightConstraints: number[] },
+  nDecVars: number,
+): { matrix: number[][]; basis: string[] } | null {
+  const nConstraints = draft.constraints.length;
+  const basis = basisLabelsAtVertex(
+    vertex.zeroDecisionVars,
+    vertex.tightConstraints,
+    nDecVars,
+    nConstraints,
+  );
+  const nBasis = basis.length;
+  if (nBasis !== 2 || nConstraints !== 2) return null;
+
+  // Get the column of A for any variable label (x_i or s_i).
+  const colForLabel = (label: string): number[] => {
+    if (label.startsWith('x')) {
+      const i = parseInt(label.slice(1), 10) - 1;
+      return draft.constraints.map(c => c.coefficients[i] ?? 0);
+    }
+    const i = parseInt(label.slice(1), 10) - 1;
+    return draft.constraints.map((_, r) => (r === i ? 1 : 0));
+  };
+
+  // B (m×m) with basic-variable columns
+  const BCols = basis.map(colForLabel);
+  const B: number[][] = Array.from({ length: nConstraints }, (_, r) =>
+    BCols.map(col => col[r]),
+  );
+  const a = B[0][0], b = B[0][1], c = B[1][0], d = B[1][1];
+  const det = a * d - b * c;
+  if (Math.abs(det) < 1e-9) return null;
+  const Binv: number[][] = [[d / det, -b / det], [-c / det, a / det]];
+
+  // RHS vector and B⁻¹·b
+  const bVec = draft.constraints.map(ci => ci.rhs ?? 0);
+  const Binvb = Binv.map(row => row.reduce((s, _v, i) => s + row[i] * bVec[i], 0));
+
+  // All variable columns in full-A order
+  const allLabels = [
+    ...Array.from({ length: nDecVars }, (_, i) => `x${i + 1}`),
+    ...Array.from({ length: nConstraints }, (_, i) => `s${i + 1}`),
+  ];
+  const allAColumns = allLabels.map(colForLabel);
+
+  // Each basic row r: tableau[r][col] = (B⁻¹ row r) · (A column col)
+  const basicRows: number[][] = Array.from({ length: nBasis }, (_, r) =>
+    allAColumns.map(aCol => Binv[r].reduce((s, v, j) => s + v * aCol[j], 0)),
+  );
+  // Append RHS (B⁻¹·b entry)
+  const basicRowsFull = basicRows.map((row, r) => [...row, Binvb[r]]);
+
+  // Z-row: for each column, C_B · (column c in basic-row tableau) − c_c
+  const objCoef = (label: string): number => {
+    if (label.startsWith('x')) {
+      const i = parseInt(label.slice(1), 10) - 1;
+      return draft.objectiveCoefficients[i] ?? 0;
+    }
+    return 0;
+  };
+  const CB = basis.map(objCoef);
+  const zRow = allLabels.map((label, cIdx) => {
+    const colValsInTableau = basicRows.map(row => row[cIdx]);
+    const CBdot = CB.reduce((s, v, i) => s + v * colValsInTableau[i], 0);
+    return CBdot - objCoef(label);
+  });
+  const zStar = CB.reduce((s, v, i) => s + v * Binvb[i], 0);
+  const zRowFull = [...zRow, zStar];
+
+  return { matrix: [...basicRowsFull, zRowFull], basis };
+}
+
 /** Apply per-constraint RHS deltas and per-variable objective-coefficient
  *  deltas to a draft, returning a new draft. Used to compute a "live"
  *  draft for the sensitivity playground without mutating the original. */

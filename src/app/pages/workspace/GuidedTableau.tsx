@@ -277,13 +277,13 @@ export default function GuidedTableau({
       {/* Click-mode hint strip */}
       {clickMode === 'entering-col' && (
         <p className="text-[11px] text-muted-foreground mt-2 pl-1">
-          <span className="text-orange-300 font-semibold">Click any negative number in the z-row.</span>
+          <span className="text-orange-300 font-semibold">Select the most negative value in the Z-row.</span>
           {' '}That variable will enter the basis and push z up the fastest.
         </p>
       )}
       {clickMode === 'leaving-row' && selectedCol != null && (
         <p className="text-[11px] text-muted-foreground mt-2 pl-1">
-          <span className="text-orange-300 font-semibold">Click the row with the smallest positive ratio.</span>
+          <span className="text-orange-300 font-semibold">Select the row with the smallest positive ratio.</span>
           {' '}That constraint binds first as {allLabels[selectedCol]} grows — so its basic variable leaves.
         </p>
       )}

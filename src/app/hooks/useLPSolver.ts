@@ -122,7 +122,7 @@ export function useLPSolver() {
     const initialStep = solverResponse.steps[0];
     setInteractiveState(buildInteractiveState(initialStep));
     setCellExplanation(
-      'Interactive mode: click a z-row cell with a negative coefficient to choose the entering variable.'
+      'Which variable should enter the basis? Find the most negative value in the Z-row.'
     );
   }, [solverResponse]);
 
@@ -144,7 +144,7 @@ export function useLPSolver() {
     // ── Phase: choose_entering ────────────────────────────────────────────────
     if (phase === 'choose_entering') {
       if (row !== m) {
-        setCellExplanation('In this phase, click a cell in the z-row (bottom row) with a negative coefficient.');
+        setCellExplanation('Choose the entering variable — look for a negative value in the Z-row (bottom row).');
         return;
       }
       if (col >= nCols - 1) {
@@ -177,7 +177,7 @@ export function useLPSolver() {
         setCellExplanation(
           `Good choice! ${varName} has the most negative z-row coefficient (${zVal.toFixed(4)}). ` +
           `Each unit of ${varName} added improves z by ${improvement} (Dantzig rule). ` +
-          `Now click a row cell in the ${varName} column to choose the leaving variable using the ratio test.`
+          `Now choose the leaving variable — apply the ratio test to the ${varName} column.`
         );
       } else {
         const bestName = liveVarNames[mostNegCol];
@@ -185,7 +185,7 @@ export function useLPSolver() {
         setCellExplanation(
           `${varName} is a valid entering variable (z-row = ${zVal.toFixed(4)}), but ${bestName} ` +
           `has a more negative value (${bestVal}) — the Dantzig rule would prefer ${bestName}. ` +
-          `Proceeding with ${varName}. Now click a row to choose the leaving variable.`
+          `Proceeding with ${varName}. Now choose the leaving variable using the ratio test.`
         );
       }
       return;
@@ -194,7 +194,7 @@ export function useLPSolver() {
     // ── Phase: choose_leaving ────────────────────────────────────────────────
     if (phase === 'choose_leaving' && livePivotCol !== null) {
       if (row === m) {
-        setCellExplanation('Click a constraint row (not the z-row) in the highlighted column.');
+        setCellExplanation('Choose a constraint row (not the Z-row) in the highlighted column.');
         return;
       }
 

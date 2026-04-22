@@ -1389,7 +1389,7 @@ function SolvingScreen({
                 </p>
                 <p className="text-xs text-primary leading-relaxed">
                   A basic artificial variable still has a nonzero coefficient in the Z-row.
-                  Click the row where this artificial is basic — that row will be used to
+                  Identify the row where this artificial is basic — that row will be used to
                   eliminate the coefficient via a row operation.
                 </p>
               </div>
@@ -1445,7 +1445,7 @@ function SolvingScreen({
                     : ' For MIN: positive values indicate improvement. Which variable should enter the basis?'}
                 </p>
                 <p className="text-xs text-primary mt-2 font-medium">
-                  Click a cell in the Z-row above.
+                  Which variable has the most potential to improve the objective?
                 </p>
               </div>
 
@@ -1463,8 +1463,8 @@ function SolvingScreen({
                   </summary>
                   <p className="px-3 pb-3 text-xs text-accent leading-relaxed whitespace-pre-line">
                     {problem.objectiveType === 'max'
-                      ? '1. Scan every value in the Z-row.\n2. A negative number means "increasing this variable would improve z."\n3. The MOST negative value gives the fastest improvement per unit.\n4. Click that cell.'
-                      : '1. Scan every value in the Z-row.\n2. A positive number means "increasing this variable would improve z."\n3. The MOST positive value gives the fastest improvement per unit.\n4. Click that cell.'}
+                      ? '1. Scan every value in the Z-row.\n2. A negative number means "increasing this variable would improve z."\n3. The MOST negative value gives the fastest improvement per unit.\n4. That variable should enter the basis.'
+                      : '1. Scan every value in the Z-row.\n2. A positive number means "increasing this variable would improve z."\n3. The MOST positive value gives the fastest improvement per unit.\n4. That variable should enter the basis.'}
                   </p>
                 </details>
               )}
@@ -1532,7 +1532,7 @@ function SolvingScreen({
                   The smallest ratio determines the leaving variable — it&apos;s the first constraint that would be violated.
                 </p>
                 <p className="text-xs text-primary mt-2 font-medium">
-                  Click a row in the highlighted blue column above.
+                  Which row has the smallest ratio? That constraint is the binding limit.
                 </p>
               </div>
 
@@ -1551,7 +1551,7 @@ function SolvingScreen({
                     2. Skip rows with zero or negative entries — those constraints don&apos;t limit the entering variable.{'\n'}
                     3. For rows with positive entries: divide RHS by the entry. That&apos;s the ratio.{'\n'}
                     4. The row with the smallest ratio is the first constraint that would be violated.{'\n'}
-                    5. Click that row — its basic variable leaves.
+                    5. That row’s basic variable leaves the basis.
                   </p>
                 </details>
               )}

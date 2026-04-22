@@ -52,7 +52,7 @@ export default function VertexBasisPanel({ draft, vertex, nDecVars, reveals }: P
     return (
       <div className="bg-card/40 border border-dashed border-border/60 rounded-xl p-4 text-center">
         <p className="text-[11px] text-muted-foreground italic">
-          Click any corner of the feasible region on the graph — each corner is a
+          Select a corner of the feasible region on the graph — each corner is a
           {' '}<span className="font-semibold not-italic">basis</span>.
         </p>
       </div>

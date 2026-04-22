@@ -101,7 +101,7 @@ export function useSimplexTutorial(
         if (feedback?.type === 'invalid') return { kind: 'wrong', text: feedback.text };
         return {
           kind: 'question',
-          text: `Clear artificial ${gs.state.currentArtificialIdx + 1}/${gs.state.artificialRows.length} — click the row where this artificial is basic.`,
+          text: `Clear artificial ${gs.state.currentArtificialIdx + 1}/${gs.state.artificialRows.length} — identify the row where this artificial is basic.`,
         };
       }
     }
@@ -118,8 +118,8 @@ export function useSimplexTutorial(
       if (phase === 'a2_attention' || phase === 'a3_commitment') {
         if (feedback?.type === 'invalid') return { kind: 'wrong', text: feedback.text };
         const hint = attemptCount >= 2
-          ? `Click a Z-row cell. Hint: for ${objectiveType.toUpperCase()}, look for the most ${objectiveType === 'max' ? 'negative' : 'positive'} value.`
-          : `Click a Z-row cell to choose the entering variable (${objectiveType === 'max' ? 'most negative improves z fastest' : 'most positive improves z fastest'}).`;
+          ? `Hint: for ${objectiveType.toUpperCase()}, look for the most ${objectiveType === 'max' ? 'negative' : 'positive'} value in the Z-row.`
+          : `Choose the entering variable — find the most ${objectiveType === 'max' ? 'negative' : 'positive'} value in the Z-row (that improves z fastest).`;
         return { kind: 'question', text: hint };
       }
       if (phase === 'a3b_suboptimal') {
@@ -139,8 +139,8 @@ export function useSimplexTutorial(
       if (phase === 'b1_attention' || phase === 'b3_commitment') {
         if (feedback?.type === 'invalid') return { kind: 'wrong', text: feedback.text };
         const hint = attemptCount >= 2
-          ? 'Click a row in the highlighted column. Hint: divide RHS by the column entry (only where entry is positive) — smallest ratio wins.'
-          : 'Ratio test: divide each positive entry in the pivot column into its RHS. Click the row with the smallest ratio.';
+          ? 'Hint: divide each RHS by the column entry (positive entries only) — the smallest ratio wins.'
+          : 'Ratio test: divide each positive entry in the pivot column into its RHS. The row with the smallest ratio leaves the basis.';
         return { kind: 'question', text: hint };
       }
       if (phase === 'b4_reveal') {

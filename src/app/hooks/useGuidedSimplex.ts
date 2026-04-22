@@ -446,7 +446,7 @@ function reducer(state: State, action: Action): State {
         enteringCol: action.col,
         suboptimalChoice: false,
         feedback: {
-          text: `The answer is ${action.colName} (Z = ${fmtN(action.zVal)}). This is the most negative Z-row entry.`,
+          text: `${action.colName} enters the basis — it has the most negative Z-row value (Z = ${fmtN(action.zVal)}).`,
           type: 'correct',
           nearCell: { row: -1, col: action.col },
         },
@@ -463,7 +463,7 @@ function reducer(state: State, action: Action): State {
         leavingRow: action.row,
         ratiosRevealed: true,
         feedback: {
-          text: `The answer is ${action.rowName} (ratio = ${action.ratio !== null ? fmtN(action.ratio) : '?'}).\n\n${ratioStr}`,
+          text: `${action.rowName} leaves the basis (ratio = ${action.ratio !== null ? fmtN(action.ratio) : '?'}).\n\n${ratioStr}`,
           type: 'correct',
           nearCell: { row: action.row, col: state.enteringCol ?? 0 },
         },

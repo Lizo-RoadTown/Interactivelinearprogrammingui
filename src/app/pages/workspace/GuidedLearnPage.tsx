@@ -30,7 +30,7 @@ import FormulasPanel from './FormulasPanel';
 import GuidedTableau, { TableauReveal } from './GuidedTableau';
 import ConstraintMeter from './ConstraintMeters';
 import SensitivityControls from './SensitivityControls';
-import { solveLP2D, applyPerturbation } from './lpSolve';
+import { solveLP2D, applyPerturbation, tableauAtVertex } from './lpSolve';
 import { LPDraft } from './guidedTypes';
 import {
   ArrowLeft, CheckCircle, Lightbulb, Eye, Sparkles, Compass, Flag,
@@ -60,6 +60,13 @@ function pickWarm(list: string[], seed: number): string {
 
 function normText(s: string): string {
   return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function fmtMaybe(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return '?';
+  if (Math.abs(v) < 1e-9) return '0';
+  if (Number.isInteger(v)) return String(v);
+  return v.toFixed(2).replace(/\.?0+$/, '');
 }
 
 /** Which extraction event just fired — drives a short pulse on the source
@@ -903,18 +910,47 @@ export default function GuidedLearnPage() {
                 row in the formulation canvas above, anchored to the equation
                 they visualize — so there's no standalone meter panel here. */}
             {tableauReveal.slacksAdded && (() => {
-              // Has the student reached optimal? That's when the phase of the
-              // current question is >= 5 (we're in the reveal/bridge phase) or
-              // the script is done.
               const atOptimal = isDone || (currentQ && currentQ.phase >= 5);
+
+              // Phase 6: if the student has clicked a vertex, the tableau
+              // shown is THAT vertex's tableau — computed on the fly via
+              // B⁻¹ applied to the problem data. This is the direct
+              // continuation of "one event in two languages" from Phase 4:
+              // every vertex IS a basis IS a tableau. Clicking a different
+              // corner on the graph shows the corresponding tableau here.
+              const liveTableau = (sensitivityActive && selectedVertex)
+                ? tableauAtVertex(
+                    sensitivityActive ? liveDraft : draft,
+                    selectedVertex,
+                    problem.numVars,
+                  )
+                : null;
+              const override = liveTableau
+                ? liveTableau
+                : latestPivot
+                  ? { matrix: latestPivot.matrix, basis: latestPivot.basis }
+                  : undefined;
+
+              // Compute z* from the current override (live tableau or
+              // pivot) for the header — the last row's last column.
+              const zStarShown = override
+                ? override.matrix[override.matrix.length - 1]?.[override.matrix[0].length - 1]
+                : null;
+
+              // Header text adapts to the state: Phase 6 vertex view,
+              // Phase 4/5 pivot view, or Phase 3 initial-build view.
+              const headerText = liveTableau && selectedVertex
+                ? `Tableau at vertex (${selectedVertex.x}, ${selectedVertex.y}) — basis { ${liveTableau.basis.join(', ')} }, z = ${fmtMaybe(zStarShown)}`
+                : atOptimal
+                  ? `Optimal tableau — z* = ${latestPivot?.zValue ?? '?'}`
+                  : latestPivot
+                    ? `Your tableau — after pivot ${latestPivot.pivotNumber} (z = ${latestPivot.zValue})`
+                    : 'Your initial tableau — fills in as you answer';
+
               return (
                 <div ref={tableauPanelRef} className="scroll-mt-6">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-3">
-                    {atOptimal
-                      ? `Optimal tableau — z* = ${latestPivot?.zValue ?? '?'}`
-                      : latestPivot
-                        ? `Your tableau — after pivot ${latestPivot.pivotNumber} (z = ${latestPivot.zValue})`
-                        : 'Your initial tableau — fills in as you answer'}
+                    {headerText}
                   </p>
                   <div className={`rounded-xl p-3 transition-all ${
                     atOptimal
@@ -924,9 +960,7 @@ export default function GuidedLearnPage() {
                     <GuidedTableau
                       draft={draft}
                       reveal={tableauReveal}
-                      override={latestPivot
-                        ? { matrix: latestPivot.matrix, basis: latestPivot.basis }
-                        : undefined}
+                      override={override}
                       highlight={activeHighlight}
                       clickMode={currentQ_pre?.kind === 'click-tableau'
                         ? currentQ_pre.pick
@@ -1065,10 +1099,9 @@ function QuestionCard({
         <div className="bg-orange-500/10 border-2 border-dashed border-orange-400/60 rounded-lg px-3 py-3 text-sm text-orange-100 flex items-start gap-2 animate-attention-pulse">
           <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-orange-300" />
           <span>
-            <strong>Click the tableau on the right.</strong>{' '}
             {(q as ClickTableauQuestion).pick === 'entering-col'
-              ? 'Tap the negative number in the z-row that you want to enter the basis.'
-              : 'Tap the row (the ratio cell on the right edge) that should leave the basis.'}
+              ? 'Select the negative Z-row value you want to enter the basis.'
+              : 'Select the row (using the ratio cell on the right edge) whose variable should leave the basis.'}
           </span>
         </div>
       )}
@@ -1077,7 +1110,7 @@ function QuestionCard({
         <div className="bg-orange-500/10 border-2 border-dashed border-orange-400/60 rounded-lg px-3 py-3 text-sm text-orange-100 flex items-start gap-2 animate-attention-pulse">
           <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-orange-300" />
           <span>
-            Click the pulsing corner on the graph to continue.
+            Select the corner on the graph that you identified as optimal.
           </span>
         </div>
       )}
@@ -1086,7 +1119,7 @@ function QuestionCard({
         <div className="bg-orange-500/10 border-2 border-dashed border-orange-400/60 rounded-lg px-3 py-3 text-sm text-orange-100 flex items-start gap-2 animate-attention-pulse">
           <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-orange-300" />
           <span>
-            Click the highlighted column in the A matrix to pull it into B.
+            Select the column of A that belongs in your basis.
           </span>
         </div>
       )}

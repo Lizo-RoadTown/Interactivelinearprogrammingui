@@ -359,13 +359,13 @@ export default function MatrixFormLens({ problem, response, isLoading, method }:
       {allAuxCorrect && (
         <section className="space-y-2">
           <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wider">
-            Step 2 — Click the columns of A that form B
+            Step 2 — Select the columns of A that form B
           </h3>
           <p className="text-xs text-muted-foreground leading-relaxed">
             B is the m × m matrix of columns corresponding to the <em>basic</em> variables at
             the current optimum. In this solution the basis is{' '}
             <span className="font-mono text-primary">{summary.basis_vars.join(', ')}</span>.
-            Click the columns below whose variable is in the basis.
+            Select the columns below whose variable is in the basis.
           </p>
           <div className="overflow-x-auto pb-1">
             <table className="text-xs font-mono border-collapse">

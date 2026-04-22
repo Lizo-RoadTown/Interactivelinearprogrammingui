@@ -180,7 +180,7 @@ export default function InteractiveMode() {
               <CardContent className="text-sm">
                 <p className="font-medium mb-2">Select the Pivot Element</p>
                 <p className="text-gray-700 mb-3">
-                  Click on a cell in the tableau to select it as the pivot element.
+                  Choose the pivot element in the tableau.
                   The system will provide feedback on your choice.
                 </p>
                 <div className="space-y-2">
