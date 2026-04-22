@@ -689,19 +689,23 @@ const PIVOT2_BASIS = ['x2', 'x1'];
 
 const TOY_FACTORY_PHASE4: Question[] = [
 
-  // ── Pivot 1: principle → click the tableau ─────────────────────────────
+  // ── Pivot 1: one event, two languages ───────────────────────────────────
+  //
+  // Every pivot the student does in this phase is ONE event described
+  // two ways. Row operation on the tableau ↔ walk along an edge to a
+  // neighboring vertex on the graph. The prompts explicitly name both
+  // descriptions so the student can see they are the same thing —
+  // before Phase 6 asks them to reason across the two languages.
   //
   // Column indices in the initial tableau: 0=x1, 1=x2, 2=s1, 3=s2. Rows: 0=C1, 1=C2.
-  // The picks use raw column/row indices because the student is clicking on the
-  // tableau itself — no option IDs, no typing.
   {
     kind: 'click-tableau',
     id: 'toy-p1-entering',
     phase: 4,
-    prompt: 'PRINCIPLE: every pivot picks the variable that will grow z the fastest — that\'s the MOST NEGATIVE value in the z-row. Find it in the tableau and click it.',
+    prompt: 'PRINCIPLE: you\'re about to pick which variable ENTERS the basis. That\'s one action described two ways:\n\n• In the TABLEAU: pick the column with the most negative z-row value (the variable that grows z the fastest per unit).\n• On the GRAPH: pick which direction to SLIDE from the current corner (origin) toward a neighboring corner.\n\nClick the most negative z-row number. The column you pick is the direction you\'ve chosen.',
     pick: 'entering-col',
     correctIndex: 1, // x2 column
-    hint: 'The z-row is (−15, −20, 0, 0). Which one is smallest? −20 wins → click the −20 under x₂.',
+    hint: 'The z-row is (−15, −20, 0, 0). −20 wins → click the −20 under x₂. Picking x₂ to enter = sliding UP the x₂ axis from the origin.',
     commit: { type: 'note', text: 'p1-entering-picked' },
     highlight: { target: 'tableau-z-row' },
   },
@@ -709,11 +713,11 @@ const TOY_FACTORY_PHASE4: Question[] = [
     kind: 'click-tableau',
     id: 'toy-p1-leaving',
     phase: 4,
-    prompt: 'PRINCIPLE: we can grow x₂ only until one of the constraints binds. The ratios RHS ÷ (x₂ coefficient) tell you how far each row can stretch before it binds. Click the row with the SMALLEST positive ratio — that constraint binds first, so its variable leaves.',
+    prompt: 'Now pick which variable LEAVES. Same action, two languages:\n\n• In the TABLEAU: the row with the smallest positive ratio RHS ÷ (x₂ coefficient). That row\'s basic variable drops out.\n• On the GRAPH: which constraint line do we hit first as we slide up the x₂ axis? That line becomes binding and stops us.\n\nClick the row with the smallest positive ratio.',
     pick: 'leaving-row',
-    enteringCol: 1,   // continue showing x₂ ratios
+    enteringCol: 1,
     correctIndex: 0,  // row C1 (s1 leaves at ratio 20)
-    hint: 'Ratios: row s₁ has 80/4 = 20, row s₂ has 60/2 = 30. 20 is smaller — that means s₁ leaves.',
+    hint: 'Row s₁ ratio 80/4 = 20, row s₂ ratio 60/2 = 30. 20 is smaller → s₁ leaves the tableau, and the C1 line is what we hit on the graph at x₂ = 20.',
     commit: {
       type: 'pivot-applied',
       pivotNumber: 1,
@@ -725,16 +729,31 @@ const TOY_FACTORY_PHASE4: Question[] = [
       bfs: { x1: 0, x2: 20 },
     },
   },
+  // After the pivot: pause to name the event in both languages.
+  {
+    kind: 'mc',
+    id: 'toy-p1-bridge',
+    phase: 4,
+    prompt: 'Watch what just happened: the tableau transformed AND the point on your graph moved from (0, 0) to (0, 20). These are not two things — they are ONE event in two languages. Which pair below describes that one event correctly?',
+    options: [
+      { id: 'pair-correct', label: '"Pivot: x₂ entered, s₁ left the basis" (tableau) = "We walked up the x₂ axis until we hit the C1 line at (0, 20)" (graph). Same event.' },
+      { id: 'pair-unrelated', label: 'They happened at the same time, but they\'re unrelated — the tableau changed for algebraic reasons, the graph moved because we picked a new point.' },
+      { id: 'pair-redundant', label: 'The graph just repeats what the tableau says, we don\'t really need both views.' },
+    ],
+    correctId: 'pair-correct',
+    hint: 'The row operation on the grid IS the step between vertices. Picking the entering variable picked the edge; picking the leaving variable picked where we stop along that edge. One move, shown simultaneously in two places.',
+    commit: { type: 'note', text: 'p1-bridge' },
+  },
 
   // ── Pivot 2 ─────────────────────────────────────────────────────────────
   {
     kind: 'click-tableau',
     id: 'toy-p2-entering',
     phase: 4,
-    prompt: 'The pivot moved us: new BFS (0, 20), z = 400. The z-row is now (−5, 0, 5, 0). Is z optimal yet? No — there\'s still a negative value, meaning some variable can still grow z. Click the most negative z-row entry.',
+    prompt: 'We\'re at (0, 20) with z = 400. The new z-row is (−5, 0, 5, 0). Same choice, same two languages:\n\n• TABLEAU: which column has the most negative z-row value?\n• GRAPH: from (0, 20), which edge do we slide along to the next neighbor corner?\n\nClick the entering column.',
     pick: 'entering-col',
     correctIndex: 0, // x1 column
-    hint: 'Only x₁ has a negative z-row entry (−5). Click the −5 under x₁.',
+    hint: 'Only x₁ has a negative z-row entry (−5). Click the −5 under x₁. Picking x₁ = sliding along the C1 edge toward (+x₁, shrinking x₂) to find the next corner.',
     commit: { type: 'note', text: 'p2-entering-picked' },
     highlight: { target: 'tableau-z-row' },
   },
@@ -742,11 +761,11 @@ const TOY_FACTORY_PHASE4: Question[] = [
     kind: 'click-tableau',
     id: 'toy-p2-leaving',
     phase: 4,
-    prompt: 'Same ratio test, now for the x₁ column. Click the row with the smallest positive ratio — that\'s the constraint that stops x₁ from growing further.',
+    prompt: 'Pick the leaving variable. Same event, two languages:\n\n• TABLEAU: smallest positive ratio in the x₁ column.\n• GRAPH: which constraint line stops the slide?',
     pick: 'leaving-row',
     enteringCol: 0,
     correctIndex: 1,  // row s2 (ratio 10 < 40)
-    hint: 'x₂ row: 20 / 0.5 = 40. s₂ row: 20 / 2 = 10. 10 < 40 → s₂ leaves.',
+    hint: 'x₂ row ratio: 20 / 0.5 = 40. s₂ row ratio: 20 / 2 = 10. 10 < 40 → s₂ leaves. On the graph that means C2 is the line we hit, landing at (10, 15).',
     commit: {
       type: 'pivot-applied',
       pivotNumber: 2,
@@ -758,19 +777,33 @@ const TOY_FACTORY_PHASE4: Question[] = [
       bfs: { x1: 10, x2: 15 },
     },
   },
+  {
+    kind: 'mc',
+    id: 'toy-p2-bridge',
+    phase: 4,
+    prompt: 'Again watch both views: tableau transformed, point moved (0, 20) → (10, 15). Which statement about those two changes is right?',
+    options: [
+      { id: 'same-move', label: 'They\'re the same move. Row operations + walking one edge over + binding-constraint change are three descriptions of a single pivot.' },
+      { id: 'extra-info', label: 'The graph is giving extra information the tableau doesn\'t contain.' },
+      { id: 'separate', label: 'They ran in parallel but describe separate decisions.' },
+    ],
+    correctId: 'same-move',
+    hint: 'Every pivot IS a vertex-to-vertex hop along an edge. The tableau writes it in numbers; the graph draws it in space. Two languages, same event.',
+    commit: { type: 'note', text: 'p2-bridge' },
+  },
 
   // ── Optimal check ────────────────────────────────────────────────────────
   {
     kind: 'mc',
     id: 'toy-p-optimal',
     phase: 4,
-    prompt: 'New Z-row is (0, 0, 3.75, 2.5). Are there ANY negative values left?',
+    prompt: 'New z-row is (0, 0, 3.75, 2.5). In BOTH languages: no column has a negative z-row value (tableau) = no edge leaving (10, 15) would improve z (graph). Are we optimal?',
     options: [
-      { id: 'no',  label: 'No — every Z-row entry is ≥ 0. We\'re OPTIMAL.' },
-      { id: 'yes', label: 'Yes, there are still negative entries' },
+      { id: 'no',  label: 'Yes — every z-row entry is ≥ 0 AND every neighboring corner on the graph gives a lower z. OPTIMAL.' },
+      { id: 'yes', label: 'No, there are still negative entries' },
     ],
     correctId: 'no',
-    hint: 'Check each Z-row value: 0 ≥ 0, 0 ≥ 0, 3.75 ≥ 0, 2.5 ≥ 0. All non-negative → no improvement possible → optimal.',
+    hint: 'Z-row all ≥ 0 and no neighbor vertex improves z are the same condition, expressed algebraically and geometrically. That\'s the stop signal.',
     commit: { type: 'note', text: 'optimal-recognized' },
   },
 ];
@@ -1340,11 +1373,11 @@ const TOY_FACTORY_PHASES_META: PhaseMeta[] = [
   },
   {
     phase: 4,
-    title: 'Walk the vertices with pivots',
-    goal: 'Each pivot picks the most profitable non-basic variable, moves it into the basis, and pushes out the constraint that hits its limit first — you slide along one edge of the feasible region to the next vertex.',
-    why: 'This is deterministic. The simplex will always land on the optimum in a finite number of pivots.',
-    tool: 'The tableau — each pivot is just row operations on the grid; scales to any size problem.',
-    wrap: 'Two pivots carried us from (0,0) with z = 0 to (10,15) with z = 450 — the same point you found by dragging.',
+    title: 'Each pivot is one event in two languages',
+    goal: 'Watch every pivot happen in the tableau AND on the graph at the same time. "Pivot" (row operations on a grid) and "walking to a neighbor vertex" (step across an edge of the feasible region) are not two linked things — they are the same event described two ways. Getting this is the foundation for every later phase.',
+    why: 'Sensitivity analysis later asks "what if a parameter changes?" The student can only reason across the tableau and the graph in that phase if they have already internalized that those two views are the same object. That happens here, by doing pivots while watching both views react together.',
+    tool: 'The tableau + the graph, treated as one. Each pivot is both a row operation on the grid and a walk between corners on the graph.',
+    wrap: 'Two pivots carried us from (0, 0) with z = 0 to (10, 15) with z = 450. Same path, shown simultaneously as row operations in the tableau and as steps between vertices on the graph. Remember this: every pivot is one event in two languages.',
   },
   {
     phase: 5,

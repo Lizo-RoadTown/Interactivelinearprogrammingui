@@ -50,6 +50,15 @@ interface Props {
   /** Constraint-wide highlight — emphasize one constraint line, dim the rest. */
   highlight?: QuestionHighlight | null;
 
+  /**
+   * Entering-variable direction arrow. When set, draw an arrow from the
+   * current BFS point along the axis of the named variable — so picking
+   * "x₂ enters" shows up as "slide up the x₂ axis from here" on the graph.
+   * This is the graph-language counterpart to the tableau's entering-column
+   * click in Phase 4 pivots: one action, two views.
+   */
+  enteringDirection?: 'x1' | 'x2' | null;
+
   // ── Vertex-selection props (Phase 6: basis = vertex) ──────────────────
   /** When true, the corners of the feasible polygon become clickable dots. */
   vertexSelectable?: boolean;
@@ -91,6 +100,7 @@ export default function DiscoveryGraph({
   slacksMode = false, highlight,
   vertexSelectable = false, selectedVertex = null, onVertexSelect,
   activeClickVertexTarget = null,
+  enteringDirection = null,
 }: Props) {
   const focusedConstraint =
     highlight?.target === 'constraint' ? highlight.constraintIndex : -1;
@@ -494,6 +504,62 @@ export default function DiscoveryGraph({
               cx={scaleX(px)} cy={scaleY(py)} r="6"
               fill="#f8fafc" stroke="#0f172a" strokeWidth="2"
             />
+          </g>
+        );
+      })()}
+
+      {/* Entering-direction arrow — when the student has picked an entering
+          variable in the tableau, draw an arrow from the current vertex in
+          that variable's axis direction on the graph. This is the graph-
+          language description of the same click: picking a column in the
+          z-row IS picking a direction to slide across the feasible region. */}
+      {bfsPoint && enteringDirection && (() => {
+        const px = bfsPoint.x;
+        const py = bfsPoint.y;
+        // Choose an end point that goes far along the named axis but stays
+        // visible on the graph (we'll clip to the viewport).
+        const endX = enteringDirection === 'x1' ? Math.min(px + 12, maxX) : px;
+        const endY = enteringDirection === 'x2' ? Math.min(py + 12, maxY) : py;
+        if (Math.abs(endX - px) < 0.1 && Math.abs(endY - py) < 0.1) return null;
+        const sx = scaleX(px);
+        const sy = scaleY(py);
+        const ex = scaleX(endX);
+        const ey = scaleY(endY);
+        // Small arrowhead
+        const dx = ex - sx;
+        const dy = ey - sy;
+        const len = Math.hypot(dx, dy);
+        if (len < 1) return null;
+        const ux = dx / len;
+        const uy = dy / len;
+        const headBack = 10;
+        const headSide = 5;
+        const hx1 = ex - ux * headBack - uy * headSide;
+        const hy1 = ey - uy * headBack + ux * headSide;
+        const hx2 = ex - ux * headBack + uy * headSide;
+        const hy2 = ey - uy * headBack - ux * headSide;
+        return (
+          <g className="animate-attention-pulse">
+            <line
+              x1={sx} y1={sy} x2={ex} y2={ey}
+              stroke="#fb923c" strokeWidth="3" strokeLinecap="round"
+              strokeDasharray="6,4"
+            />
+            <polygon
+              points={`${ex},${ey} ${hx1},${hy1} ${hx2},${hy2}`}
+              fill="#fb923c"
+            />
+            <rect
+              x={(sx + ex) / 2 - 40} y={(sy + ey) / 2 - 26}
+              width="80" height="18" rx="9"
+              fill="#fb923c" fillOpacity="0.9"
+            />
+            <text
+              x={(sx + ex) / 2} y={(sy + ey) / 2 - 13}
+              fontSize="11" fontWeight="700" textAnchor="middle" fill="#0f172a"
+            >
+              slide along {enteringDirection}
+            </text>
           </g>
         );
       })()}

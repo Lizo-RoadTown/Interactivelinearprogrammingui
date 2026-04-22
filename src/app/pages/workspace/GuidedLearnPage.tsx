@@ -729,6 +729,18 @@ export default function GuidedLearnPage() {
                         : bfsPoint}
                       slacksMode={tableauReveal.slacksAdded}
                       highlight={activeHighlight}
+                      enteringDirection={(() => {
+                        // During a click-tableau entering-col question (or right
+                        // after picking one, before the leaving-row pick), map
+                        // the selected column back to its variable and draw
+                        // the "slide along this axis" arrow on the graph.
+                        const col = pivotPick.col;
+                        if (col == null) return null;
+                        if (currentQ_pre?.kind !== 'click-tableau') return null;
+                        if (col === 0) return 'x1' as const;
+                        if (col === 1) return 'x2' as const;
+                        return null;
+                      })()}
                       vertexSelectable={sensitivityActive}
                       selectedVertex={selectedVertex}
                       activeClickVertexTarget={currentQ_pre?.kind === 'click-vertex'
