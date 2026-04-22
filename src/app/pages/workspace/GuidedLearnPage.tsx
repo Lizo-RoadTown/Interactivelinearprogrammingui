@@ -1065,7 +1065,7 @@ function QuestionCard({
         <div className="bg-orange-500/10 border-2 border-dashed border-orange-400/60 rounded-lg px-3 py-3 text-sm text-orange-100 flex items-start gap-2 animate-attention-pulse">
           <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-orange-300" />
           <span>
-            <strong>Click the pulsing vertex on the graph.</strong> The click IS the answer.
+            Click the pulsing corner on the graph to continue.
           </span>
         </div>
       )}
@@ -1074,7 +1074,7 @@ function QuestionCard({
         <div className="bg-orange-500/10 border-2 border-dashed border-orange-400/60 rounded-lg px-3 py-3 text-sm text-orange-100 flex items-start gap-2 animate-attention-pulse">
           <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-orange-300" />
           <span>
-            <strong>Click the highlighted column in the A matrix.</strong> Pulling it into B is the answer.
+            Click the highlighted column in the A matrix to pull it into B.
           </span>
         </div>
       )}
