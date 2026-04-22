@@ -631,11 +631,42 @@ export default function DiscoveryGraph({
         const isSelected = !!selectedVertex &&
           Math.abs(selectedVertex.x - v.x) < 1e-4 &&
           Math.abs(selectedVertex.y - v.y) < 1e-4;
-        // Is this vertex the target of an active click-vertex question?
-        // If so it gets an attention-pulse ring to invite the click.
         const isTarget = !!activeClickVertexTarget &&
           Math.abs(activeClickVertexTarget.x - v.x) < 0.5 &&
           Math.abs(activeClickVertexTarget.y - v.y) < 0.5;
+
+        // Every vertex IS a basis. Compute the basis label for this
+        // vertex so the graph literally shows "vertex = basis" —
+        // answering "what does basis mean on the graph?" without
+        // needing the student to open the basis panel.
+        const basicDec: string[] = [];
+        const nDec = draft.variables.length || 2;
+        const nCon = draft.constraints.length;
+        for (let k = 0; k < nDec; k++) {
+          if (!v.zeroDecisionVars.includes(k)) basicDec.push(`x${k + 1}`);
+        }
+        const basicSlack: string[] = [];
+        for (let k = 0; k < nCon; k++) {
+          if (!v.tightConstraints.includes(k)) basicSlack.push(`s${k + 1}`);
+        }
+        const basisText = `{${[...basicDec, ...basicSlack].join(', ')}}`;
+
+        // Decide label placement so it stays inside the viewport and
+        // doesn't overlap the axes. For corners on an axis, push the
+        // label into the feasible-region interior direction.
+        const onXAxis = Math.abs(v.y) < 1e-6;
+        const onYAxis = Math.abs(v.x) < 1e-6;
+        const labelDx = onYAxis ? 14 : 10;
+        const labelDy = onXAxis ? -12 : onYAxis ? -2 : -12;
+
+        // Is this the optimum vertex? Compute by matching optimumTarget
+        // z value if provided. Cheap heuristic: check if c·v ≈ target.
+        const c1 = draft.objectiveCoefficients[0];
+        const c2 = draft.objectiveCoefficients[1];
+        const zAtV = (c1 != null && c2 != null) ? c1 * v.x + c2 * v.y : null;
+        const isOptimum = optimumConfirmed && optimumTarget != null && zAtV != null &&
+          Math.abs(zAtV - optimumTarget) < 1e-4;
+
         return (
           <g
             key={`vx-${i}`}
@@ -646,7 +677,6 @@ export default function DiscoveryGraph({
               cx={scaleX(v.x)} cy={scaleY(v.y)} r="14"
               fill="transparent"
             />
-            {/* Target ring — pulses to invite the click */}
             {isTarget && !isSelected && (
               <circle
                 cx={scaleX(v.x)} cy={scaleY(v.y)} r="12"
@@ -655,7 +685,6 @@ export default function DiscoveryGraph({
                 className="animate-attention-pulse"
               />
             )}
-            {/* Selection ring — stays on after click */}
             {isSelected && (
               <circle
                 cx={scaleX(v.x)} cy={scaleY(v.y)} r="11"
@@ -664,11 +693,38 @@ export default function DiscoveryGraph({
               />
             )}
             <circle
-              cx={scaleX(v.x)} cy={scaleY(v.y)} r={isSelected || isTarget ? 7 : 5}
-              fill={isSelected ? '#fb923c' : isTarget ? '#fde68a' : '#f8fafc'}
-              stroke="#0f172a" strokeWidth="2"
+              cx={scaleX(v.x)} cy={scaleY(v.y)} r={isSelected || isTarget ? 7 : isOptimum ? 6 : 5}
+              fill={isSelected ? '#fb923c' : isTarget ? '#fde68a' : isOptimum ? '#10b981' : '#f8fafc'}
+              stroke={isOptimum ? '#064e3b' : '#0f172a'}
+              strokeWidth="2"
               style={{ transition: 'r 200ms ease, fill 200ms ease' }}
             />
+            {/* Basis label: the point of item #1 — every vertex on the
+                graph is tagged with its basis name so "basis = vertex"
+                is literally written on the picture. The optimum vertex
+                gets an extra tag reading Optimum + z*. */}
+            <text
+              x={scaleX(v.x) + labelDx}
+              y={scaleY(v.y) + labelDy}
+              fontSize="10"
+              fontWeight="700"
+              fill={isOptimum ? '#10b981' : isSelected ? '#fb923c' : '#e2e8f0'}
+              pointerEvents="none"
+            >
+              {basisText}
+            </text>
+            {isOptimum && (
+              <text
+                x={scaleX(v.x) + labelDx}
+                y={scaleY(v.y) + labelDy + 12}
+                fontSize="9"
+                fontWeight="600"
+                fill="#10b981"
+                pointerEvents="none"
+              >
+                Optimum · z* = {fmt(optimumTarget ?? 0)}
+              </text>
+            )}
           </g>
         );
       })}

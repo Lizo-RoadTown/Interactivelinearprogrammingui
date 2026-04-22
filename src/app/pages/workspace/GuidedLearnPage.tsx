@@ -860,40 +860,12 @@ export default function GuidedLearnPage() {
                                     reveals={sensitivityReveals}
                                   />
                                 )}
-                                {/* Piece 5: Sensitivity scenarios. Once the
-                                    toolkit is built and the Formulas panel
-                                    shows every slot, unlock the sliders.
-                                    A student action here propagates through
-                                    EVERY tool at once — graph, meters,
-                                    Formulas panel, reconstructed tableau. */}
-                                {allFormulaRevealed && (
-                                  <SensitivityControls
-                                    draft={draft}
-                                    rhsDelta={rhsDelta}
-                                    objDelta={objDelta}
-                                    onRhsDelta={(idx, delta) => {
-                                      setRhsDelta(prev => {
-                                        const arr = [...prev];
-                                        while (arr.length <= idx) arr.push(0);
-                                        arr[idx] = delta;
-                                        return arr;
-                                      });
-                                    }}
-                                    onObjDelta={(idx, delta) => {
-                                      setObjDelta(prev => {
-                                        const arr = [...prev];
-                                        while (arr.length <= idx) arr.push(0);
-                                        arr[idx] = delta;
-                                        return arr;
-                                      });
-                                    }}
-                                    onReset={() => {
-                                      setRhsDelta([]);
-                                      setObjDelta([]);
-                                    }}
-                                    baseline={baselineSolution}
-                                  />
-                                )}
+                                {/* (SensitivityControls was gated here behind
+                                    the full matrix orientation — moved out to
+                                    render unconditionally once Phase 6 is
+                                    active, so the student can perturb
+                                    parameters from the moment they enter the
+                                    phase and watch every tool react.) */}
                               </>
                             );
                           })()}
@@ -983,6 +955,41 @@ export default function GuidedLearnPage() {
                 </div>
               );
             })()}
+
+            {/* Sensitivity Playground — ungated from Phase 6 start.
+                Appears the instant the student enters Phase 6 so they can
+                perturb any constraint RHS or objective coefficient and
+                watch every tool (graph, meters, Formulas panel,
+                reconstructed tableau, vertex tableau) update at once.
+                No longer waits for the matrix orientation to complete. */}
+            {sensitivityActive && (
+              <SensitivityControls
+                draft={draft}
+                rhsDelta={rhsDelta}
+                objDelta={objDelta}
+                onRhsDelta={(idx, delta) => {
+                  setRhsDelta(prev => {
+                    const arr = [...prev];
+                    while (arr.length <= idx) arr.push(0);
+                    arr[idx] = delta;
+                    return arr;
+                  });
+                }}
+                onObjDelta={(idx, delta) => {
+                  setObjDelta(prev => {
+                    const arr = [...prev];
+                    while (arr.length <= idx) arr.push(0);
+                    arr[idx] = delta;
+                    return arr;
+                  });
+                }}
+                onReset={() => {
+                  setRhsDelta([]);
+                  setObjDelta([]);
+                }}
+                baseline={baselineSolution}
+              />
+            )}
           </div>
         </section>
       </div>
