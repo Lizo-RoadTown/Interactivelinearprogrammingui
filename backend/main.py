@@ -266,7 +266,27 @@ def _corner_points_to_out(corners: list[dict], optimal_z: float | None,
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    """Liveness + storage-backend probe.
+
+    Reports whether the bank storage layer is using Postgres (production
+    via DATABASE_URL) or SQLite (local dev fallback). Useful for quickly
+    confirming a Render deploy actually picked up the env var without
+    having to dig through deploy logs. Hit it in the browser at
+    /api/health.
+    """
+    backend = "postgres" if edu_db.is_postgres() else "sqlite"
+    db_ok = True
+    try:
+        # Cheap probe: just count the demo bank. If the connection is
+        # broken (wrong password, wrong host, network), this raises.
+        edu_db.list_banks()
+    except Exception:  # noqa: BLE001
+        db_ok = False
+    return {
+        "status": "ok",
+        "storage": backend,
+        "storage_connected": db_ok,
+    }
 
 
 @app.post("/api/solve", response_model=SolverResponse)
