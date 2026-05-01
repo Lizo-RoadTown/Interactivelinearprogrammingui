@@ -368,7 +368,7 @@ export default function MainWorkspace() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-slate-100">Explore freely</h3>
-                  <p className="text-slate-400 text-[11px] leading-snug mt-0.5">
+                  <p className="text-slate-400 text-xs leading-snug mt-0.5">
                     Open the workspace with no walkthrough. Useful when studying already-solved problems.
                   </p>
                 </div>
@@ -385,7 +385,7 @@ export default function MainWorkspace() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-slate-100">Free-form Solver</h3>
-                  <p className="text-slate-400 text-[11px] leading-snug mt-0.5">
+                  <p className="text-slate-400 text-xs leading-snug mt-0.5">
                     Enter any LP from scratch. Advanced.
                   </p>
                 </div>
@@ -393,14 +393,56 @@ export default function MainWorkspace() {
             </div>
           </div>
 
-          {/* Small footer — transition note */}
-          <p className="text-slate-600 text-[11px] mt-6 max-w-2xl text-center">
-            Looking for the old Practice Mode or Sensitivity page? They&apos;re being merged into the Workspace.
-            Direct links still work: <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/practice'); }}>Practice</a>{' · '}
-            <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/sensitivity'); }}>Sensitivity</a>{' · '}
-            <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/educator'); }}>Educator Portal</a> (team project demo){' · '}
-            <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/matrix-method/ch8-example-1'); }}>Matrix Method</a> (Chapter 8 gameboard){' · '}
-            <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/admin'); }}>Admin</a> (manage your problem bank).
+          {/* Tools row — Admin + the team-project demo, prominent enough
+              to find without squinting. These are the pages a professor
+              and a class presentation actually need to navigate to. */}
+          <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <div
+              onClick={() => navigate('/admin')}
+              className="cursor-pointer bg-slate-900 border border-emerald-500/30 rounded-xl p-4 hover:border-emerald-400/60 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-300">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-100">Manage problem bank (Admin)</h3>
+                  <p className="text-slate-400 text-xs leading-snug mt-0.5">
+                    Professor&apos;s workspace. Add, edit, delete LP word problems. Optional agent
+                    drafting with your own API key.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div
+              onClick={() => navigate('/educator')}
+              className="cursor-pointer bg-slate-900 border border-amber-500/30 rounded-xl p-4 hover:border-amber-400/60 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-300">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-100">Team demo (Educator)</h3>
+                  <p className="text-slate-400 text-xs leading-snug mt-0.5">
+                    Class presentation page. Three Python functions running live, one per
+                    teammate. Demos filter, validate, and export.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Small footer — peripheral pages only */}
+          <p className="text-slate-500 text-xs mt-6 max-w-2xl text-center">
+            Other pages:{' '}
+            <a className="underline underline-offset-2 hover:text-slate-300 cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate('/practice'); }}>Practice</a>
+            {' · '}
+            <a className="underline underline-offset-2 hover:text-slate-300 cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate('/sensitivity'); }}>Sensitivity</a>
+            {' · '}
+            <a className="underline underline-offset-2 hover:text-slate-300 cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate('/matrix-method/ch8-example-1'); }}>Matrix Method</a>
+            {' (Chapter 8 gameboard)'}
           </p>
         </div>
       )}
