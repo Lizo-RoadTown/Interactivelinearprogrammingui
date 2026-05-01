@@ -20,6 +20,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from .models import (
     LPProblemIn, PivotRequest, CellExplainRequest,
@@ -39,6 +40,12 @@ from .educator import bank as edu_bank
 from .educator import listing as edu_listing
 from .educator import validation as edu_validation
 from .educator import export as edu_export
+from .educator import db as edu_db
+
+# Initialize SQLite-backed bank store. Creates the schema on first run
+# and seeds the 'demo' bank from problems.json if it's empty. This is
+# idempotent — safe to call every startup.
+edu_db.init()
 
 app = FastAPI(title="LP Simulator API", version="1.0.0")
 
@@ -578,8 +585,12 @@ def sensitivity_analysis(req: SensitivityRequest):
 
 @app.post("/api/educator/list", response_model=EducatorProblemsResponse)
 def educator_list(req: ListProblemsRequest):
-    """List & filter the problem bank. Delegates to BEGINNER A's list_problems()."""
-    bank = edu_bank.load_bank()
+    """List & filter the problem bank. Delegates to BEGINNER A's list_problems().
+
+    Reads from the SQLite-backed 'demo' bank so the team-project demo page
+    sees the same data as the new admin tool.
+    """
+    bank = edu_db.list_problems('demo')
     try:
         result = edu_listing.list_problems(
             bank,
@@ -589,7 +600,6 @@ def educator_list(req: ListProblemsRequest):
         )
         return EducatorProblemsResponse(problems=result, implemented=True)
     except NotImplementedError:
-        # Beginner A hasn't finished yet — return the whole bank so the UI works
         return EducatorProblemsResponse(problems=bank, implemented=False)
 
 
@@ -606,20 +616,89 @@ def educator_validate(req: ValidateProblemRequest):
 @app.post("/api/educator/export", response_model=EducatorExportResponse)
 def educator_export(req: ExportProblemRequest):
     """Export a problem to Markdown. Delegates to BEGINNER C's export_to_markdown()."""
-    bank = edu_bank.load_bank()
-    problem = edu_bank.find_problem(bank, req.problem_id)
+    problem = edu_db.get_problem('demo', req.problem_id)
     if problem is None:
         raise HTTPException(status_code=404, detail=f"Problem {req.problem_id!r} not found")
     try:
         md = edu_export.export_to_markdown(problem)
         return EducatorExportResponse(markdown=md, implemented=True)
     except NotImplementedError:
-        # Fallback: return a minimal stub so the UI shows something
         stub = f"# {problem.get('title', req.problem_id)}\n\n(export_to_markdown not yet implemented)"
         return EducatorExportResponse(markdown=stub, implemented=False)
 
 
 @app.get("/api/educator/problems")
 def educator_all_problems():
-    """Unfiltered bank dump — useful for frontend to seed dropdowns."""
-    return {"problems": edu_bank.load_bank()}
+    """Unfiltered bank dump — useful for frontend to seed dropdowns.
+
+    The legacy team-demo /educator page expects this to return the demo
+    bank. Both that page and the new /admin page now read from SQLite.
+    """
+    return {"problems": edu_db.list_problems('demo')}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ADMIN — professor-facing CRUD on per-bank problems
+#  Each professor picks a bank_id and that's their personal bank, partitioned
+#  in SQLite. No authentication: bank_id is just a partitioning key, treated
+#  as a remembered preference rather than a secret.
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/admin/banks")
+def admin_list_banks():
+    """All bank ids currently in storage (for the admin's bank-picker UI)."""
+    return {"banks": edu_db.list_banks()}
+
+
+@app.get("/api/admin/banks/{bank_id}/problems")
+def admin_list_problems(bank_id: str):
+    """All problems in one bank."""
+    return {"bank_id": bank_id, "problems": edu_db.list_problems(bank_id)}
+
+
+@app.post("/api/admin/banks/{bank_id}/problems")
+def admin_save_problem(bank_id: str, problem: dict):
+    """Insert or update a problem in this bank.
+
+    Validation runs first (Beginner B's function). Save is rejected if
+    validation returns errors. The professor sees the error list in the
+    UI and fixes before retrying.
+    """
+    try:
+        errors = edu_validation.validate_problem(problem)
+    except NotImplementedError:
+        # Validator stub: be permissive so the admin can still save.
+        # In production with the validator implemented, errors block save.
+        errors = []
+    if errors:
+        return {"saved": False, "errors": errors}
+    try:
+        edu_db.upsert_problem(bank_id, problem)
+    except ValueError as e:
+        return {"saved": False, "errors": [str(e)]}
+    return {"saved": True, "errors": []}
+
+
+@app.delete("/api/admin/banks/{bank_id}/problems/{problem_id}")
+def admin_delete_problem(bank_id: str, problem_id: str):
+    """Remove one problem from a bank. Idempotent — already-gone is fine."""
+    deleted = edu_db.delete_problem(bank_id, problem_id)
+    return {"deleted": deleted}
+
+
+class ForkBankRequest(BaseModel):
+    source_bank: str
+    target_bank: str
+
+
+@app.post("/api/admin/banks/fork")
+def admin_fork_bank(req: ForkBankRequest):
+    """Copy every problem from one bank into another (overwrites conflicts).
+
+    Useful for a new professor to seed their bank from the demo bank as a
+    starting point, then customize.
+    """
+    if not req.target_bank.strip():
+        raise HTTPException(status_code=422, detail="target_bank is required")
+    count = edu_db.fork_bank(req.source_bank, req.target_bank)
+    return {"copied": count, "source": req.source_bank, "target": req.target_bank}

@@ -27,6 +27,10 @@ CLAUDE.md
 # Reference materials (copyrighted textbook PDFs — not for public repo)
 Instructions/
 
+# SQLite databases (per-professor problem banks live here at runtime)
+backend/educator/bank.db
+backend/educator/bank.db-journal
+
 # Editor / OS
 .DS_Store
 Thumbs.db

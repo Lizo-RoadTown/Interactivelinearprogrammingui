@@ -399,7 +399,8 @@ export default function MainWorkspace() {
             Direct links still work: <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/practice'); }}>Practice</a>{' · '}
             <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/sensitivity'); }}>Sensitivity</a>{' · '}
             <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/educator'); }}>Educator Portal</a> (team project demo){' · '}
-            <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/matrix-method/ch8-example-1'); }}>Matrix Method</a> (Chapter 8 gameboard).
+            <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/matrix-method/ch8-example-1'); }}>Matrix Method</a> (Chapter 8 gameboard){' · '}
+            <a className="underline underline-offset-2 hover:text-slate-400" onClick={(e) => { e.stopPropagation(); navigate('/admin'); }}>Admin</a> (manage your problem bank).
           </p>
         </div>
       )}

@@ -6,6 +6,7 @@ import WorkspacePage from "./pages/workspace/WorkspacePage";
 import GuidedLearnPage from "./pages/workspace/GuidedLearnPage";
 import EducatorPortal from "./pages/EducatorPortal";
 import MatrixMethodWorkspace from "./pages/workspace/matrixMethod/MatrixMethodWorkspace";
+import AdminPortal from "./pages/AdminPortal";
 
 export const router = createBrowserRouter([
   {
@@ -48,5 +49,12 @@ export const router = createBrowserRouter([
   {
     path: "/matrix-method",
     Component: MatrixMethodWorkspace,
+  },
+  {
+    // Professor's workspace: per-bank CRUD on the problem bank.
+    // Each professor picks a bank id, that's their personal partition
+    // in SQLite. List, add, edit, delete, with live validation on save.
+    path: "/admin",
+    Component: AdminPortal,
   },
 ]);
