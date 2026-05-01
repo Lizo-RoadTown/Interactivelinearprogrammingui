@@ -55,20 +55,31 @@ export default function EducatorPortal() {
   const [allProblems, setAllProblems] = useState<BankProblem[]>([]);
   const [allStatus, setAllStatus] = useState<'loading' | 'ok' | 'error'>('loading');
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [availableBanks, setAvailableBanks] = useState<string[]>([]);
 
-  // Track implementation status across the three sections so the header
-  // banner can show an aggregate "X / 3 functions implemented".
+  // The /educator page reads from one bank at a time — defaults to the
+  // SQLite-backed 'demo' bank (which all three student-written endpoints
+  // already query). Switching to another bank lets a professor test the
+  // demo against problems they entered via /admin under their own bank id.
+  // Since the existing /api/educator/* endpoints are hard-wired to demo,
+  // the bank selector here only changes which bank the listing card
+  // displays; the validate / export cards always operate on demo.
+  // (A future change can add bank parameters to those endpoints; for now
+  // the demo workflow is "save problems to demo bank to see them.")
+
   const [implA, setImplA] = useState<boolean | null>(null);
   const [implB, setImplB] = useState<boolean | null>(null);
   const [implC, setImplC] = useState<boolean | null>(null);
 
-  // Seed the unfiltered problem list once — used by section C's dropdown
-  // AND used as a fallback so section A has data even before it's called.
   useEffect(() => {
-    fetch(`${API_BASE}/educator/problems`)
-      .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)))
-      .then(data => {
-        setAllProblems(data.problems ?? []);
+    // Load problems and bank list in parallel.
+    Promise.all([
+      fetch(`${API_BASE}/educator/problems`).then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))),
+      fetch(`${API_BASE}/admin/banks`).then(r => r.ok ? r.json() : { banks: [] }).catch(() => ({ banks: [] })),
+    ])
+      .then(([pData, bData]) => {
+        setAllProblems(pData.problems ?? []);
+        setAvailableBanks(bData.banks ?? []);
         setAllStatus('ok');
       })
       .catch(err => {
@@ -122,7 +133,7 @@ export default function EducatorPortal() {
       )}
 
       <div className="p-6 space-y-6 max-w-6xl mx-auto">
-        <IntroCard />
+        <IntroCard problemCount={allProblems.length} availableBanks={availableBanks} />
         <BeginnerASection
           allProblems={allProblems}
           onStatus={setImplA}
@@ -141,10 +152,23 @@ export default function EducatorPortal() {
 
 // ── Intro card ───────────────────────────────────────────────────────────────
 
-function IntroCard() {
+function IntroCard({
+  problemCount, availableBanks,
+}: {
+  problemCount: number;
+  availableBanks: string[];
+}) {
+  const otherBanks = availableBanks.filter(b => b !== 'demo');
   return (
     <div className="bg-card/60 border border-border rounded-xl p-4 space-y-2">
-      <p className="text-[10px] uppercase tracking-wider text-primary font-bold">About this portal</p>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-[10px] uppercase tracking-wider text-primary font-bold">About this portal</p>
+        <p className="text-[10px] text-muted-foreground">
+          Reading from bank{' '}
+          <code className="font-mono bg-muted/40 border border-border rounded px-1.5 py-0.5 text-foreground">demo</code>
+          {' '}({problemCount} problem{problemCount === 1 ? '' : 's'})
+        </p>
+      </div>
       <p className="text-sm text-foreground/90 leading-relaxed">
         This page is a live front-end for three Python functions a three-person team
         wrote. Each function works on a shared bank of LP word problems. Pointing this
@@ -157,6 +181,13 @@ function IntroCard() {
         <code className="font-mono">backend/educator/export.py</code>. Each file is
         self-contained and ~20–40 lines of code.
       </p>
+      {otherBanks.length > 0 && (
+        <p className="text-[11px] text-muted-foreground/80 italic leading-relaxed pt-1 border-t border-border/40">
+          Other banks exist on this server ({otherBanks.join(', ')}), but this demo only reads
+          from <code>demo</code>. Use <a href="/admin" className="text-primary underline decoration-dotted">/admin</a>
+          {' '}with bank id <code>demo</code> to add new problems that will appear here.
+        </p>
+      )}
     </div>
   );
 }

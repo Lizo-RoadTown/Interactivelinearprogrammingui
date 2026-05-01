@@ -691,6 +691,27 @@ class ForkBankRequest(BaseModel):
     target_bank: str
 
 
+class AgentDraftRequest(BaseModel):
+    """Bring-your-own-agent draft request from /admin.
+
+    The professor pastes their API key in the UI; the browser sends it
+    here, we forward to the chosen provider, and never persist the key.
+    """
+    provider: str             # 'anthropic' | 'openai'
+    api_key: str
+    model: str | None = None  # falls back to a sensible default per provider
+    prompt: str               # the professor's natural-language request
+    curriculum_context: str | None = None  # optional course material
+    nDecVars_hint: int | None = None       # optional size suggestion
+
+
+class AgentDraftResponse(BaseModel):
+    problem: dict | None = None
+    raw: str | None = None       # raw model output for debugging
+    error: str | None = None
+    model: str | None = None
+
+
 @app.post("/api/admin/banks/fork")
 def admin_fork_bank(req: ForkBankRequest):
     """Copy every problem from one bank into another (overwrites conflicts).
@@ -702,3 +723,158 @@ def admin_fork_bank(req: ForkBankRequest):
         raise HTTPException(status_code=422, detail="target_bank is required")
     count = edu_db.fork_bank(req.source_bank, req.target_bank)
     return {"copied": count, "source": req.source_bank, "target": req.target_bank}
+
+
+# ── Agent passthrough — bring-your-own-key LLM drafts ──────────────────────
+
+_AGENT_SYSTEM_PROMPT = """You generate LP word problems for an Operations Research textbook.
+
+Output a SINGLE JSON object matching this schema, no prose, no Markdown fences:
+
+{
+  "id": "wp-<short-slug>",                    // unique slug, lowercase, dashes
+  "title": "<short human-readable title>",
+  "category": "<production|diet|transportation|finance|scheduling|...>",
+  "difficulty": "<beginner|intermediate|advanced>",
+  "scenario": "<the word problem the student reads, 3-6 sentences>",
+  "numVars": <positive integer, typically 2 or 3>,
+  "objectiveType": "<max|min>",
+  "variables": ["<name1>", "<name2>", ...],   // length must equal numVars
+  "objectiveCoefficients": [<n1>, <n2>, ...], // length must equal numVars
+  "constraints": [
+    {
+      "coefficients": [<n1>, <n2>, ...],      // length must equal numVars
+      "operator": "<<=|>=|=>",
+      "rhs": <number>,
+      "label": "<short label like 'flour' or 'budget'>"
+    },
+    ...                                        // 1 or more constraints
+  ]
+}
+
+Requirements:
+- Numbers are integers or simple decimals (no fractions in JSON).
+- The problem must be feasible (an obviously feasible point exists).
+- Scenarios should be realistic and concrete (specific resources, units).
+- Coefficients should yield a non-trivial optimum (not all-zeros).
+- Output only the JSON. No explanations, no Markdown fences."""
+
+
+def _coerce_agent_json(raw: str) -> dict | None:
+    """Try to extract a JSON object from the model's output.
+
+    Models sometimes wrap the JSON in ```json ... ``` fences or add a
+    leading sentence. Be lenient.
+    """
+    import json as _json
+    import re as _re
+    text = raw.strip()
+    # Strip code fences if present
+    fence = _re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+    if fence:
+        text = fence.group(1).strip()
+    # If there's still leading prose, find the first { and last }
+    if not text.startswith('{'):
+        first = text.find('{')
+        last = text.rfind('}')
+        if first != -1 and last > first:
+            text = text[first:last + 1]
+    try:
+        return _json.loads(text)
+    except _json.JSONDecodeError:
+        return None
+
+
+@app.post("/api/admin/agent/draft", response_model=AgentDraftResponse)
+async def admin_agent_draft(req: AgentDraftRequest):
+    """Forward a draft request to the chosen LLM provider.
+
+    The professor's API key is in `req.api_key`; we use it for one call
+    and never store it. If the provider returns valid JSON matching the
+    problem schema, we hand the dict back to the frontend so it can
+    pre-fill the editor.
+    """
+    import httpx as _httpx
+
+    provider = req.provider.lower().strip()
+    if provider not in {'anthropic', 'openai'}:
+        return AgentDraftResponse(error=f"Unknown provider {req.provider!r}")
+    if not req.api_key.strip():
+        return AgentDraftResponse(error="API key is required")
+
+    user_message = req.prompt.strip()
+    if req.curriculum_context:
+        user_message = (
+            "Curriculum context (use this to align the problem):\n"
+            f"{req.curriculum_context.strip()}\n\n"
+            f"Request: {user_message}"
+        )
+    if req.nDecVars_hint is not None:
+        user_message += f"\n\n(Generate a problem with {req.nDecVars_hint} decision variables.)"
+
+    try:
+        if provider == 'anthropic':
+            model = req.model or 'claude-opus-4-7'
+            async with _httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    'https://api.anthropic.com/v1/messages',
+                    headers={
+                        'x-api-key': req.api_key,
+                        'anthropic-version': '2023-06-01',
+                        'content-type': 'application/json',
+                    },
+                    json={
+                        'model': model,
+                        'max_tokens': 1500,
+                        'system': _AGENT_SYSTEM_PROMPT,
+                        'messages': [{'role': 'user', 'content': user_message}],
+                    },
+                )
+            if resp.status_code != 200:
+                return AgentDraftResponse(
+                    error=f"Anthropic API error {resp.status_code}: {resp.text[:300]}",
+                    model=model,
+                )
+            data = resp.json()
+            # content is a list of blocks; take the first text block
+            blocks = data.get('content') or []
+            raw = next((b.get('text', '') for b in blocks if b.get('type') == 'text'), '')
+
+        else:  # openai
+            model = req.model or 'gpt-4o-mini'
+            async with _httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'authorization': f'Bearer {req.api_key}',
+                        'content-type': 'application/json',
+                    },
+                    json={
+                        'model': model,
+                        'temperature': 0.7,
+                        'messages': [
+                            {'role': 'system', 'content': _AGENT_SYSTEM_PROMPT},
+                            {'role': 'user', 'content': user_message},
+                        ],
+                    },
+                )
+            if resp.status_code != 200:
+                return AgentDraftResponse(
+                    error=f"OpenAI API error {resp.status_code}: {resp.text[:300]}",
+                    model=model,
+                )
+            data = resp.json()
+            choices = data.get('choices') or []
+            raw = choices[0]['message']['content'] if choices else ''
+
+    except _httpx.RequestError as e:
+        return AgentDraftResponse(error=f"Network error talking to {provider}: {e}")
+
+    problem = _coerce_agent_json(raw)
+    if not problem:
+        return AgentDraftResponse(
+            error="The model didn't return valid JSON. See `raw` for what it sent.",
+            raw=raw,
+            model=model,
+        )
+    return AgentDraftResponse(problem=problem, raw=raw, model=model)

@@ -26,7 +26,7 @@ import { Link } from 'react-router';
 import { Button } from '../components/ui/button';
 import {
   ArrowLeft, AlertTriangle, CheckCircle2, Plus, Pencil, Trash2,
-  Sparkles, FolderTree, Save, X,
+  Sparkles, FolderTree, Save, X, Bot, Settings, Loader2,
 } from 'lucide-react';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,6 +36,10 @@ const API_BASE = _env.VITE_API_URL ? `${_env.VITE_API_URL}/api`
                                      : '/api';
 
 const BANK_ID_KEY = 'lp-admin.bankId';
+const AGENT_PROVIDER_KEY = 'lp-admin.agent.provider';
+const AGENT_KEY_KEY = 'lp-admin.agent.apiKey';
+const AGENT_MODEL_KEY = 'lp-admin.agent.model';
+const AGENT_CURRICULUM_KEY = 'lp-admin.agent.curriculum';
 
 // ── Types matching the bank schema ──────────────────────────────────────────
 
@@ -93,6 +97,10 @@ export default function AdminPortal() {
   const [editing, setEditing] = useState<Problem | null>(null);
   const [editingIsNew, setEditingIsNew] = useState<boolean>(false);
 
+  // Agent settings — bring-your-own-key, stored in localStorage.
+  const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
+  const [agentSettings, setAgentSettings] = useState<AgentSettings>(() => readAgentSettings());
+
   const persistBankId = (id: string) => {
     setBankId(id);
     if (typeof window !== 'undefined') {
@@ -140,7 +148,18 @@ export default function AdminPortal() {
           </div>
         </div>
         {bankId && (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setAgentSettingsOpen(true)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Settings className="w-3.5 h-3.5 mr-1" /> Agent
+              {agentSettings.apiKey
+                ? <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                : <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />}
+            </Button>
             <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Bank</span>
             <code className="text-[11px] bg-muted/40 border border-border rounded px-2 py-1 font-mono">{bankId}</code>
             <button
@@ -217,6 +236,8 @@ export default function AdminPortal() {
           isNew={editingIsNew}
           bankId={bankId}
           existingIds={problems.map(p => p.id)}
+          agentSettings={agentSettings}
+          onUpdateDraft={(p) => setEditing(p)}
           onCancel={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -224,8 +245,54 @@ export default function AdminPortal() {
           }}
         />
       )}
+
+      {agentSettingsOpen && (
+        <AgentSettingsOverlay
+          settings={agentSettings}
+          onSave={(s) => {
+            setAgentSettings(s);
+            writeAgentSettings(s);
+            setAgentSettingsOpen(false);
+          }}
+          onClose={() => setAgentSettingsOpen(false)}
+        />
+      )}
     </div>
   );
+}
+
+// ── Agent settings: types + storage helpers ────────────────────────────────
+
+interface AgentSettings {
+  provider: 'anthropic' | 'openai';
+  apiKey: string;
+  model: string;
+  curriculum: string;
+}
+
+const DEFAULT_AGENT_SETTINGS: AgentSettings = {
+  provider: 'anthropic',
+  apiKey: '',
+  model: '',
+  curriculum: '',
+};
+
+function readAgentSettings(): AgentSettings {
+  if (typeof window === 'undefined') return DEFAULT_AGENT_SETTINGS;
+  return {
+    provider: ((localStorage.getItem(AGENT_PROVIDER_KEY) as AgentSettings['provider']) || 'anthropic'),
+    apiKey: localStorage.getItem(AGENT_KEY_KEY) || '',
+    model: localStorage.getItem(AGENT_MODEL_KEY) || '',
+    curriculum: localStorage.getItem(AGENT_CURRICULUM_KEY) || '',
+  };
+}
+
+function writeAgentSettings(s: AgentSettings) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(AGENT_PROVIDER_KEY, s.provider);
+  localStorage.setItem(AGENT_KEY_KEY, s.apiKey);
+  localStorage.setItem(AGENT_MODEL_KEY, s.model);
+  localStorage.setItem(AGENT_CURRICULUM_KEY, s.curriculum);
 }
 
 // ── Sub-components ──────────────────────────────────────────────────────────
@@ -254,7 +321,11 @@ function BankPickerOverlay({
   onPick: (id: string) => void;
   onCancel?: () => void;
 }) {
-  const [text, setText] = useState(currentId);
+  // Default to "demo" so a fresh visit lands the professor in the same
+  // bank the team-project /educator page reads from. Anything they save
+  // shows up there immediately. They can change it if they want a
+  // private bank.
+  const [text, setText] = useState(currentId || 'demo');
   const [forkFromDemo, setForkFromDemo] = useState(false);
 
   const submit = async () => {
@@ -292,6 +363,12 @@ function BankPickerOverlay({
           another professor's. <strong>Lowercase letters, numbers, and dashes only.</strong> Saved
           in your browser; you don't enter it again unless you switch.
         </p>
+        <div className="bg-primary/10 border border-primary/30 rounded-md px-3 py-2 text-[11px] text-primary/90 leading-relaxed">
+          <strong>For the live demo:</strong> use <code className="font-mono">demo</code> (the default).
+          That's the bank the team-project page at <code>/educator</code> reads from. Anything you
+          save here will appear there. Pick a different name if you want a private bank for your
+          own course.
+        </div>
         <input
           autoFocus
           aria-label="Bank id"
@@ -326,6 +403,105 @@ function BankPickerOverlay({
           >
             Use this bank
           </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentSettingsOverlay({
+  settings, onSave, onClose,
+}: {
+  settings: AgentSettings;
+  onSave: (s: AgentSettings) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<AgentSettings>(settings);
+  const modelPlaceholder = draft.provider === 'anthropic'
+    ? 'claude-opus-4-7'
+    : 'gpt-4o-mini';
+
+  return (
+    <div className="fixed inset-0 z-30 bg-background/80 backdrop-blur flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-card border-2 border-primary/40 rounded-2xl p-6 max-w-xl w-full space-y-4 shadow-2xl my-8">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/40 flex items-center justify-center">
+            <Bot className="w-4 h-4 text-primary" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] uppercase tracking-wider text-primary font-bold">Agent settings</p>
+            <p className="text-sm font-semibold">Bring your own API key</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Your API key is stored only in <strong>this browser&apos;s localStorage</strong>. It never goes anywhere
+          except directly to the provider you choose, via this app&apos;s backend, for one request at a time. Clear
+          your browser data to remove it.
+        </p>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Provider">
+            <select
+              aria-label="Provider"
+              value={draft.provider}
+              onChange={e => setDraft({ ...draft, provider: e.target.value as AgentSettings['provider'] })}
+              className="w-full text-sm bg-muted/40 border border-border rounded-md px-3 py-1.5 focus:outline-none focus:border-primary"
+            >
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (GPT)</option>
+            </select>
+          </Field>
+          <Field label={`Model (default: ${modelPlaceholder})`}>
+            <input
+              aria-label="Model"
+              type="text"
+              value={draft.model}
+              placeholder={modelPlaceholder}
+              onChange={e => setDraft({ ...draft, model: e.target.value })}
+              className="w-full text-sm bg-muted/40 border border-border rounded-md px-3 py-1.5 font-mono focus:outline-none focus:border-primary"
+            />
+          </Field>
+        </div>
+
+        <Field label={`${draft.provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key`}>
+          <input
+            aria-label="API key"
+            type="password"
+            value={draft.apiKey}
+            onChange={e => setDraft({ ...draft, apiKey: e.target.value })}
+            placeholder={draft.provider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+            className="w-full text-sm bg-muted/40 border border-border rounded-md px-3 py-1.5 font-mono focus:outline-none focus:border-primary"
+          />
+        </Field>
+
+        <Field label="Curriculum context (optional, included with every draft request)">
+          <textarea
+            aria-label="Curriculum context"
+            rows={5}
+            value={draft.curriculum}
+            placeholder="Paste your syllabus, chapter, or specific constraints. Example: 'Chapter 4 covers transportation and assignment problems. All problems should be solvable in under 10 minutes by hand and use only ≤ constraints.'"
+            onChange={e => setDraft({ ...draft, curriculum: e.target.value })}
+            className="w-full text-sm bg-muted/40 border border-border rounded-md px-3 py-2 focus:outline-none focus:border-primary"
+          />
+        </Field>
+
+        <div className="flex justify-between items-center pt-2 border-t border-border/40">
+          <button
+            type="button"
+            onClick={() => { setDraft({ ...DEFAULT_AGENT_SETTINGS }); }}
+            className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-dotted"
+          >
+            Clear all
+          </button>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button onClick={() => onSave(draft)} className="bg-primary hover:bg-primary/90 text-white">
+              <Save className="w-4 h-4 mr-1" /> Save settings
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -381,12 +557,15 @@ function Pill({ children, tone }: { children: React.ReactNode; tone: 'primary' |
 // ── Editor ───────────────────────────────────────────────────────────────────
 
 function ProblemEditor({
-  problem, isNew, bankId, existingIds, onCancel, onSaved,
+  problem, isNew, bankId, existingIds, agentSettings,
+  onUpdateDraft, onCancel, onSaved,
 }: {
   problem: Problem;
   isNew: boolean;
   bankId: string;
   existingIds: string[];
+  agentSettings: AgentSettings;
+  onUpdateDraft: (p: Problem) => void;
   onCancel: () => void;
   onSaved: () => void;
 }) {
@@ -394,6 +573,84 @@ function ProblemEditor({
   const [errors, setErrors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+
+  // Agent drafting state
+  const [agentPanelOpen, setAgentPanelOpen] = useState(false);
+  const [agentPrompt, setAgentPrompt] = useState('');
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentErr, setAgentErr] = useState<string | null>(null);
+  const [agentRaw, setAgentRaw] = useState<string | null>(null);
+
+  const runAgentDraft = async () => {
+    if (!agentSettings.apiKey) {
+      setAgentErr('Set an API key in the Agent settings (header) first.');
+      return;
+    }
+    if (!agentPrompt.trim()) {
+      setAgentErr('Type a prompt — e.g. "a transportation problem with 3 variables".');
+      return;
+    }
+    setAgentBusy(true);
+    setAgentErr(null);
+    setAgentRaw(null);
+    try {
+      const res = await fetch(`${API_BASE}/admin/agent/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: agentSettings.provider,
+          api_key: agentSettings.apiKey,
+          model: agentSettings.model || null,
+          prompt: agentPrompt,
+          curriculum_context: agentSettings.curriculum || null,
+          nDecVars_hint: draft.numVars || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setAgentErr(data.error);
+        if (data.raw) setAgentRaw(data.raw);
+        return;
+      }
+      if (!data.problem) {
+        setAgentErr('Agent returned no problem.');
+        return;
+      }
+      // Coerce the problem dict into our local shape and pre-fill the
+      // form. Missing fields fall back to the existing draft values.
+      const p = data.problem;
+      const next: Problem = {
+        id: String(p.id ?? draft.id ?? ''),
+        title: String(p.title ?? draft.title ?? ''),
+        category: String(p.category ?? draft.category ?? 'production'),
+        difficulty: ['beginner', 'intermediate', 'advanced'].includes(p.difficulty)
+          ? p.difficulty as Problem['difficulty']
+          : draft.difficulty,
+        scenario: String(p.scenario ?? ''),
+        numVars: Number(p.numVars ?? draft.numVars) || 2,
+        objectiveType: ['max', 'min'].includes(p.objectiveType) ? p.objectiveType : 'max',
+        variables: Array.isArray(p.variables) ? p.variables.map(String) : draft.variables,
+        objectiveCoefficients: Array.isArray(p.objectiveCoefficients)
+          ? p.objectiveCoefficients.map(Number)
+          : draft.objectiveCoefficients,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        constraints: Array.isArray(p.constraints) ? p.constraints.map((c: any) => ({
+          coefficients: Array.isArray(c.coefficients) ? c.coefficients.map(Number) : [],
+          operator: ['<=', '>=', '='].includes(c.operator) ? c.operator : '<=',
+          rhs: Number(c.rhs ?? 0),
+          label: c.label ? String(c.label) : '',
+        })) : draft.constraints,
+      };
+      setDraft(next);
+      onUpdateDraft(next);
+      setAgentPanelOpen(false);
+      setAgentPrompt('');
+    } catch (e) {
+      setAgentErr(`Network error: ${e}`);
+    } finally {
+      setAgentBusy(false);
+    }
+  };
 
   // Live validation: every time the draft changes, ask the backend.
   // Debounced lightly so we don't spam.
@@ -496,10 +753,76 @@ function ProblemEditor({
               </p>
               <p className="text-sm font-semibold">{draft.title || '(untitled)'}</p>
             </div>
-            <Button variant="ghost" onClick={onCancel} className="text-muted-foreground">
-              <X className="w-4 h-4 mr-1" /> Close without saving
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setAgentPanelOpen(o => !o)}
+                className={`${agentSettings.apiKey ? 'text-primary hover:text-primary/80' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Bot className="w-4 h-4 mr-1" />
+                {agentPanelOpen ? 'Hide agent' : 'Draft with agent'}
+              </Button>
+              <Button variant="ghost" onClick={onCancel} className="text-muted-foreground">
+                <X className="w-4 h-4 mr-1" /> Close
+              </Button>
+            </div>
           </div>
+
+          {agentPanelOpen && (
+            <div className="bg-primary/5 border-2 border-primary/30 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Bot className="w-4 h-4 text-primary" />
+                <p className="text-[11px] uppercase tracking-wider text-primary font-bold">Ask the agent to draft this problem</p>
+              </div>
+              {!agentSettings.apiKey && (
+                <p className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/40 rounded px-2 py-1.5">
+                  No API key set. Open <strong>Agent</strong> in the page header to add one.
+                </p>
+              )}
+              <textarea
+                aria-label="Agent prompt"
+                rows={3}
+                placeholder='e.g. "A transportation problem with 3 variables and a budget constraint, intermediate difficulty"'
+                value={agentPrompt}
+                onChange={e => setAgentPrompt(e.target.value)}
+                className="w-full text-sm bg-muted/40 border border-border rounded-md px-3 py-2 focus:outline-none focus:border-primary"
+              />
+              <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
+                <span>Provider: <strong>{agentSettings.provider}</strong></span>
+                <span>·</span>
+                <span>Model: <strong>{agentSettings.model || (agentSettings.provider === 'anthropic' ? 'claude-opus-4-7' : 'gpt-4o-mini')}</strong></span>
+                {agentSettings.curriculum && (
+                  <>
+                    <span>·</span>
+                    <span>Curriculum context: <strong>{agentSettings.curriculum.length} chars</strong> attached</span>
+                  </>
+                )}
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => void runAgentDraft()}
+                  disabled={agentBusy || !agentSettings.apiKey || !agentPrompt.trim()}
+                  className="bg-primary hover:bg-primary/90 text-white"
+                >
+                  {agentBusy
+                    ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Drafting…</>
+                    : <><Sparkles className="w-4 h-4 mr-1" /> Generate</>}
+                </Button>
+              </div>
+              {agentErr && (
+                <div className="bg-rose-500/10 border border-rose-500/40 rounded px-3 py-2 text-[11px] text-rose-100 space-y-1">
+                  <p><AlertTriangle className="inline w-3 h-3 mr-1" />{agentErr}</p>
+                  {agentRaw && (
+                    <details className="text-rose-200/80">
+                      <summary className="cursor-pointer">Raw model output</summary>
+                      <pre className="text-[10px] whitespace-pre-wrap mt-1 max-h-40 overflow-y-auto">{agentRaw}</pre>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Top-level fields ──────────────────────────────────────────── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
