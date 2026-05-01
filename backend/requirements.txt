@@ -2,3 +2,7 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
 numpy>=1.26.0
 pydantic>=2.0.0
+# httpx is used directly by /api/admin/agent/draft to forward to
+# Anthropic / OpenAI. It's transitively pulled in by FastAPI today,
+# but listing it explicitly so a clean Render install definitely has it.
+httpx>=0.27.0
