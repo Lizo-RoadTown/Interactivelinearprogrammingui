@@ -638,6 +638,30 @@ function AgentSettingsOverlay({
             placeholder={draft.provider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
             className="w-full text-sm bg-muted/40 border border-border rounded-md px-3 py-1.5 font-mono focus:outline-none focus:border-primary"
           />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Don&apos;t have one yet? Get an API key from{' '}
+            {draft.provider === 'anthropic' ? (
+              <a
+                href="https://console.anthropic.com/settings/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 underline decoration-dotted"
+              >
+                console.anthropic.com/settings/keys
+              </a>
+            ) : (
+              <a
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 underline decoration-dotted"
+              >
+                platform.openai.com/api-keys
+              </a>
+            )}
+            . You&apos;ll need a billable account on the provider — the key
+            is just an authentication token, it doesn&apos;t carry credit.
+          </p>
         </Field>
 
         <Field label="Curriculum context (optional, included with every draft request)">
@@ -944,9 +968,31 @@ function ProblemEditor({
                 <p className="text-[11px] uppercase tracking-wider text-primary font-bold">Ask the agent to draft this problem</p>
               </div>
               {!agentSettings.apiKey && (
-                <p className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/40 rounded px-2 py-1.5">
-                  No API key set. Open <strong>Agent</strong> in the page header to add one.
-                </p>
+                <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/40 rounded px-2 py-1.5 space-y-1">
+                  <p>
+                    No API key set. Open <strong>Agent</strong> in the page header to add one.
+                  </p>
+                  <p className="text-amber-200/80">
+                    Get a key from{' '}
+                    <a
+                      href="https://console.anthropic.com/settings/keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-dotted hover:text-amber-100"
+                    >
+                      Anthropic
+                    </a>{' '}
+                    or{' '}
+                    <a
+                      href="https://platform.openai.com/api-keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-dotted hover:text-amber-100"
+                    >
+                      OpenAI
+                    </a>.
+                  </p>
+                </div>
               )}
               <textarea
                 aria-label="Agent prompt"

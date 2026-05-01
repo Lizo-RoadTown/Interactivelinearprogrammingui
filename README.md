@@ -1,37 +1,86 @@
 # Interactive Linear Programming UI
 
-An interactive educational tool for teaching the **Simplex Method** in Linear Programming. Students work through word problems, build formulations, watch the graphical and algebraic solution unfold step by step, and make their own pivot choices — with immediate feedback on both correct and incorrect decisions.
+A web app for teaching the Simplex Method, Big-M, and Two-Phase methods. Students work through word problems by formulating the LP, watching the graphical and algebraic solutions develop step by step, and choosing pivots themselves. Professors can sign in to manage their own bank of word problems, which appears for any student who picks the bank slug they share with the class.
 
 **Live demo:** [interactivelinearprogrammingui-1.onrender.com](https://interactivelinearprogrammingui-1.onrender.com/)
 
-> Note: The demo runs on Render's free tier — the first load may take 30–60 seconds while the backend wakes up.
+The first load on Render's free tier can take 30–60 seconds while the backend wakes up.
 
----
+## What it does
 
-## Quick Start
+**For students** (no account required):
+
+- Pick a class problem bank from a dropdown on the splash, or skip it and use the built-in problems.
+- **Practice Mode** — pick a difficulty, get a random word problem, formulate the LP step by step, then solve it interactively. Wrong pivot choices are executed and explained rather than blocked.
+- **Free-form Solver** — enter any LP from scratch (MAX or MIN, mixed `≤` `≥` `=` constraints, any number of variables). Tableau, graphical view, and click-for-explanation on any cell.
+- **Guided Lessons** — six structured walkthroughs covering Graphical, Simplex MAX/MIN, Big-M, Two-Phase, and special cases (alternative optima, degeneracy, unbounded, infeasible).
+- **Matrix Method gameboard** — Chapter 8 walkthrough that builds the simplex tableau in three zones (problem, identification, Table 8.1).
+
+**For professors** (sign in at `/admin`):
+
+- Claim a globally unique bank slug (e.g. `jenkins-orie310-fall26`) — that's what students type to find your problems.
+- Add, edit, and delete LP word problems. Schema validation runs on save.
+- Optional: paste your own Anthropic or OpenAI API key in the Agent panel to draft problems with an LLM. The key stays in your browser's localStorage and is forwarded one request at a time to the provider — never persisted on the backend.
+- Optional curriculum context — paste your syllabus and the agent uses it for context on every draft request.
+
+## How it works
+
+```text
+                ┌────────────────┐
+                │     Browser    │
+                │  React + Vite  │
+                └────────┬───────┘
+                         │
+        ┌────────────────┼─────────────────────────────────┐
+        │                │                                 │
+   reads problem   FastAPI on Render                  Supabase
+   bank directly   /api/solve, /api/pivot,            (Postgres + Auth)
+   via supabase-js /api/sensitivity, /api/educator/   • banks table
+                   validate, /api/admin/agent/draft   • problems table
+                                                      • RLS: anyone reads,
+                                                        only owner writes
+```
+
+- Bank reads/writes go directly from the browser to Supabase. Postgres Row-Level Security enforces that a professor can only mutate banks they own.
+- The FastAPI backend handles the math (LP solving, sensitivity, pivots) and the LLM proxy. It has no Supabase credentials.
+- LLM API keys (the professor's BYO key) live only in the professor's browser localStorage and are forwarded once per draft request.
+
+## Local setup
 
 ### Prerequisites
 
-- **Python 3.10+** — [python.org/downloads](https://www.python.org/downloads/)
-- **Node.js 18+** — [nodejs.org](https://nodejs.org/)
+- Python 3.10+
+- Node.js 18+
+- A Supabase project (free tier). The `banks` and `problems` tables and the RLS policies are created by [backend/educator/migrations/001_supabase_auth_schema.sql](backend/educator/migrations/001_supabase_auth_schema.sql) — run it once in the Supabase SQL editor.
+
+### Environment variables
+
+Copy [.env.example](.env.example) to `.env.local` and fill in the two Supabase values from your project's API settings (Dashboard → Project Settings → API):
+
+```dotenv
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon public key, also called "publishable">
+```
+
+Both are safe to commit if you choose to — the anon key is designed for browser code, and RLS policies do the actual security.
 
 ### One-command launch
 
-**Windows** — double-click `start.bat` or run:
-```
+**Windows:**
+
+```bat
 start.bat
 ```
 
 **Mac / Linux:**
+
 ```bash
 ./start.sh
 ```
 
-This creates a virtual environment, installs all dependencies, and starts both servers. Open **http://localhost:5173** when ready.
+Creates a Python venv, installs dependencies, and starts both servers. Open [http://localhost:5173](http://localhost:5173).
 
 ### Manual setup
-
-If you prefer to run the servers separately:
 
 ```bash
 # Terminal 1 — Backend
@@ -45,98 +94,79 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). The Vite dev server proxies `/api` requests to the backend.
+The Vite dev server proxies `/api/*` to the FastAPI backend on port 8000.
 
----
+## Deployment
 
-## What's Inside
+The repo is set up to deploy as a single Render service that runs FastAPI and serves the built React bundle from `dist/`. On Render:
 
-### Practice Mode
+1. Connect the GitHub repo. Build command: `npm install && npm run build && pip install -r backend/requirements.txt`. Start command: `python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT`.
+2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the service's Environment tab. **Vite inlines these at build time**, so adding them after the deploy starts means the next deploy picks them up — use *Manual Deploy → Clear build cache & deploy* if needed.
+3. Push to `main`. Render auto-builds and deploys.
 
-- Choose from **Beginner**, **Intermediate**, or **Advanced** word problems
-- **Formulation wizard**: identify decision variables, objective, and constraints from the word problem — relevant text highlights as you answer
-- **Graphical phase** (2-variable problems): build the feasible region interactively
-- **Guided simplex**: the tableau itself is interactive — click Z-row cells to choose the entering variable, click pivot-column rows for the leaving variable
-- Feedback follows the **Attention → Question → Commitment → Feedback → Reveal** pattern from educational design research
-- Supports standard Simplex, Big-M, and Two-Phase methods
+## API endpoints
 
-### Free-form Solver
+The backend keeps a small surface — anything bank-related now goes directly to Supabase from the browser.
 
-- Enter any LP problem: MAX or MIN, any number of variables, mixed constraint types (≤, ≥, =)
-- 4-tab tableau: **Current · Select Pivot · After Pivot · Final**
-- Graphical view with feasible region, corner points, and simplex path
-- Click any cell for a plain-English explanation
+| Method | Path                     | Description                                          |
+| ------ | ------------------------ | ---------------------------------------------------- |
+| GET    | `/api/health`            | Liveness check                                       |
+| POST   | `/api/solve`             | Full solve → all simplex steps, graphical data, path |
+| POST   | `/api/pivot`             | Apply one interactive pivot to a live tableau        |
+| POST   | `/api/explain-cell`      | Plain-English explanation of a tableau cell          |
+| POST   | `/api/sensitivity`       | Sensitivity analysis (objective + RHS ranges)        |
+| POST   | `/api/educator/validate` | Schema check for a proposed word problem             |
+| POST   | `/api/admin/agent/draft` | BYO-key LLM proxy for /admin's draft button          |
 
-### Guided Lessons
+## Project structure
 
-Six structured lessons covering the LP curriculum (Chapters 3–7):
-Graphical Method · Simplex MAX · Simplex MIN · Big-M · Two-Phase · Special Cases
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS v4, Radix UI |
-| Backend | Python 3.11, FastAPI, NumPy |
-
----
-
-## Project Structure
-
-```
+```text
 InteractiveLPUI/
 ├── backend/
-│   ├── main.py            ← API endpoints
-│   ├── solver_core.py     ← Simplex, Big-M, Two-Phase solvers
-│   ├── models.py          ← Request/response models
-│   └── requirements.txt
+│   ├── main.py                          FastAPI endpoints
+│   ├── solver_core.py                   Simplex, Big-M, Two-Phase
+│   ├── sensitivity.py                   Sensitivity analysis
+│   ├── models.py                        Request/response schemas
+│   ├── requirements.txt
+│   └── educator/
+│       ├── validation.py                Problem-schema validator
+│       └── migrations/
+│           └── 001_supabase_auth_schema.sql
 ├── src/app/
-│   ├── types.ts
-│   ├── hooks/
-│   │   ├── useLPSolver.ts         ← API calls + solver state
-│   │   └── useGuidedSimplex.ts    ← Practice mode state machine
+│   ├── lib/supabase.ts                  Supabase JS client singleton
+│   ├── auth/
+│   │   ├── AuthProvider.tsx             Session context
+│   │   ├── RequireAuth.tsx              Route gate
+│   │   └── AdminGuarded.tsx             /admin wrapper
 │   ├── data/
-│   │   ├── wordProblems.ts        ← Word problems by difficulty
-│   │   └── lessons.ts             ← Guided lesson curriculum
+│   │   ├── wordProblems.ts              Built-in problems (rich pedagogy)
+│   │   └── bankProblems.ts              useAllProblems / useAllBanks hooks
 │   ├── components/
-│   │   ├── TableauWorkspace.tsx   ← Interactive tableau
-│   │   ├── GraphView.tsx          ← SVG feasible region
-│   │   └── ...
+│   │   ├── BankPickerStudent.tsx        Splash dropdown
+│   │   ├── TableauWorkspace.tsx         Interactive tableau
+│   │   ├── GraphView.tsx                SVG feasible region
+│   │   └── …
 │   └── pages/
-│       ├── MainWorkspace.tsx      ← Solver + landing page
-│       └── PracticeMode.tsx       ← Practice mode flow
-├── start.bat                       ← Windows launcher
-├── start.sh                        ← Mac/Linux launcher
+│       ├── MainWorkspace.tsx            Splash + free-form solver
+│       ├── PracticeMode.tsx             Guided practice
+│       ├── SignInPage.tsx               Professor sign-in / sign-up
+│       ├── AdminPortal.tsx              Per-professor bank CRUD
+│       └── workspace/                   Guided learn + Matrix Method
+├── start.bat / start.sh                 One-command local launch
 └── package.json
 ```
 
-### API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/solve` | Full solve → all steps, graph data, simplex path |
-| `POST` | `/api/pivot` | Apply one interactive pivot |
-| `POST` | `/api/explain-cell` | Plain-English cell explanation |
-| `GET`  | `/api/health` | Health check |
-
----
-
-## Supported Problem Types
+## Supported problem types
 
 - MAX and MIN objectives
-- Constraint types: `≤`, `≥`, `=`
+- Constraint operators: `≤`, `≥`, `=`
 - Methods: standard Simplex, Big-M, Two-Phase
-- Special case detection: alternative optima, degeneracy, unbounded, infeasible
-- Bland's Rule tie-breaking for degenerate problems
+- Special-case detection: alternative optima, degeneracy, unbounded, infeasible
+- Bland's Rule tie-breaking for degeneracy
 
----
+## Design notes
 
-## Design Philosophy
-
-> **Learning clarity over computational efficiency.** Every number on screen should be explainable.
-
-- Wrong pivot choices are **executed and explained**, not blocked
-- The interaction model enforces reasoning before revealing answers
-- Word problem text highlights connect formulation choices back to the source
+- The `banks` table holds bank slugs (one row per claimed slug, owned by one professor). The `problems` table is keyed on `(bank_name, problem_id)` and stores the LP word problem as a JSONB blob.
+- Built-in `WORD_PROBLEMS` (in [src/app/data/wordProblems.ts](src/app/data/wordProblems.ts)) carry rich pedagogy data — formulation hints, scenario highlights, solving hints. Bank-saved problems carry the LP shape only; the coercer in [bankProblems.ts](src/app/data/bankProblems.ts) fills the missing fields with empty defaults so student pages render without crashing.
+- When a bank-saved problem has the same id as a built-in, the bank version wins — that's intentional, so a professor can override a built-in by saving with the same id.
+- Wrong pivot choices in Practice Mode are executed and explained, not blocked. The interaction model enforces reasoning before revealing the answer.
