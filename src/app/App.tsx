@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { RouterProvider } from 'react-router';
 import { router } from './routes';
+import { AuthProvider } from './auth/AuthProvider';
 
 // Render free tier sleeps the backend after 15 min idle; cold-start is 30-60s.
 // Hit /api/health as soon as the app loads so the backend is warm by the time
@@ -20,5 +21,9 @@ function warmBackend() {
 
 export default function App() {
   useEffect(() => { warmBackend(); }, []);
-  return <RouterProvider router={router} />;
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  );
 }

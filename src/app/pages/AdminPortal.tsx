@@ -1,33 +1,29 @@
 /**
  * AdminPortal — the professor-facing UI for managing a problem bank.
  *
- * This is the actual product surface for the OR professor who's going
- * to use this tool in their classroom. They open /admin, pick a bank
- * id (which is just a remembered partition key, not a credential), see
- * the problems already in it, add new ones, edit them, delete them.
+ * Authenticated professors only (gated by RequireAuth). Each professor
+ * owns one or more banks scoped to their Supabase user_id. A bank is
+ * identified by a globally unique slug (e.g. "jenkins-orie310-fall26")
+ * that students type to find it.
  *
- * The /educator page is a different beast — it's the team-project
- * demo where three Python functions are shown live. /admin is the
- * tool a professor actually uses.
+ * Data layer: writes/reads talk to Supabase directly. Row-Level Security
+ * policies (see migrations/001_supabase_auth_schema.sql) enforce that
+ * professors can only mutate their own banks.
  *
- * Storage is per-bank in SQLite on the backend. Each professor picks
- * a bank_id (e.g. "prof-jenkins-orie310") and that's their personal
- * bank. The bank_id is remembered in localStorage so they don't
- * re-enter it every visit.
- *
- * Future slices (per ROADMAP):
- *   * Bring-your-own-agent button to draft problems with Claude/GPT.
- *   * Curriculum profiles (paste a syllabus, agent uses it for context).
- *   * Multi-turn conversation to refine drafts before saving.
+ * The agent-draft endpoint stays on FastAPI — that one proxies the
+ * professor's BYO API key to Anthropic/OpenAI without persisting it,
+ * which can't move to the browser without leaking the key path.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Button } from '../components/ui/button';
 import {
   ArrowLeft, AlertTriangle, CheckCircle2, Plus, Pencil, Trash2,
-  Sparkles, FolderTree, Save, X, Bot, Settings, Loader2,
+  Sparkles, FolderTree, Save, X, Bot, Settings, Loader2, LogOut,
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../auth/AuthProvider';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const _env = (import.meta as any).env ?? {};
@@ -35,7 +31,8 @@ const API_BASE = _env.VITE_API_URL ? `${_env.VITE_API_URL}/api`
                : _env.DEV            ? 'http://localhost:8000/api'
                                      : '/api';
 
-const BANK_ID_KEY = 'lp-admin.bankId';
+// Active-bank pick is per-account, so localStorage scoping uses user.id.
+const ACTIVE_BANK_KEY = (userId: string) => `lp-admin.activeBank.${userId}`;
 const AGENT_PROVIDER_KEY = 'lp-admin.agent.provider';
 const AGENT_KEY_KEY = 'lp-admin.agent.apiKey';
 const AGENT_MODEL_KEY = 'lp-admin.agent.model';
@@ -80,20 +77,24 @@ const EMPTY_PROBLEM: Problem = {
 
 // ── Page component ──────────────────────────────────────────────────────────
 
+interface BankRow {
+  bank_name: string;
+  display_label: string | null;
+}
+
 export default function AdminPortal() {
-  // Bank identity. If nothing is in localStorage, prompt for one.
-  const [bankId, setBankId] = useState<string>(() => {
-    return typeof window !== 'undefined'
-      ? (localStorage.getItem(BANK_ID_KEY) ?? '')
-      : '';
-  });
-  const [showBankPrompt, setShowBankPrompt] = useState<boolean>(!bankId);
+  const { user, signOut } = useAuth();
+  const userId = user?.id ?? '';
+
+  const [myBanks, setMyBanks] = useState<BankRow[]>([]);
+  const [activeBank, setActiveBank] = useState<string>('');
+  const [showBankPicker, setShowBankPicker] = useState<boolean>(false);
 
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  // Editing state. null = no editor open. {} fields = editing a problem.
+  // Editing state. null = no editor open.
   const [editing, setEditing] = useState<Problem | null>(null);
   const [editingIsNew, setEditingIsNew] = useState<boolean>(false);
 
@@ -101,32 +102,117 @@ export default function AdminPortal() {
   const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(() => readAgentSettings());
 
-  const persistBankId = (id: string) => {
-    setBankId(id);
+  // Load this professor's banks. If they signed up with a pending bank
+  // claim (email-confirmation flow), claim it now.
+  const loadMyBanks = async (): Promise<BankRow[]> => {
+    if (!supabase || !userId) return [];
+
+    // First-sign-in claim of a slug they picked at signup.
     if (typeof window !== 'undefined') {
-      localStorage.setItem(BANK_ID_KEY, id);
+      const pending = localStorage.getItem('lp.pendingBankClaim');
+      const pendingLabel = localStorage.getItem('lp.pendingDisplayName');
+      if (pending) {
+        const { error } = await supabase.from('banks').insert({
+          bank_name: pending,
+          user_id: userId,
+          display_label: pendingLabel || pending,
+        });
+        // Even if it fails (slug taken, etc.), clear the pending so we
+        // don't keep retrying. The professor can claim from the picker.
+        localStorage.removeItem('lp.pendingBankClaim');
+        localStorage.removeItem('lp.pendingDisplayName');
+        if (error) {
+          console.warn('Pending bank claim failed:', error.message);
+        }
+      }
     }
-    setShowBankPrompt(false);
+
+    const { data, error } = await supabase
+      .from('banks')
+      .select('bank_name, display_label')
+      .eq('user_id', userId)
+      .order('bank_name');
+    if (error) {
+      setLoadErr(`Couldn't load your banks: ${error.message}`);
+      return [];
+    }
+    const rows = (data ?? []) as BankRow[];
+    setMyBanks(rows);
+    return rows;
   };
 
-  const loadProblems = async (id: string) => {
-    if (!id) return;
+  const loadProblems = async (bankName: string) => {
+    if (!supabase || !bankName) return;
     setLoading(true);
     setLoadErr(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/banks/${encodeURIComponent(id)}/problems`);
-      if (!res.ok) throw new Error(`${res.status}`);
-      const data = await res.json();
-      setProblems(data.problems ?? []);
+      const { data, error } = await supabase
+        .from('problems')
+        .select('data')
+        .eq('bank_name', bankName)
+        .order('problem_id');
+      if (error) throw error;
+      setProblems(((data ?? []) as { data: Problem }[]).map(r => r.data));
     } catch (e) {
-      setLoadErr(`Could not reach the backend at ${API_BASE}. Make sure uvicorn is running on port 8000.`);
+      setLoadErr(`Couldn't load problems: ${e instanceof Error ? e.message : String(e)}`);
       console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { if (bankId) void loadProblems(bankId); }, [bankId]);
+  // Initial load: fetch my banks, pick the remembered active one (or first).
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    void (async () => {
+      const rows = await loadMyBanks();
+      if (cancelled) return;
+      const remembered = typeof window !== 'undefined'
+        ? localStorage.getItem(ACTIVE_BANK_KEY(userId))
+        : null;
+      const initial = rows.find(b => b.bank_name === remembered)?.bank_name
+                   ?? rows[0]?.bank_name
+                   ?? '';
+      if (initial) {
+        setActiveBank(initial);
+      } else {
+        // No banks yet — show the picker so the professor can claim one.
+        setShowBankPicker(true);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // Reload problems whenever active bank changes.
+  useEffect(() => {
+    if (!activeBank) return;
+    if (typeof window !== 'undefined' && userId) {
+      localStorage.setItem(ACTIVE_BANK_KEY(userId), activeBank);
+    }
+    void loadProblems(activeBank);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBank]);
+
+  const handleSelectBank = (bankName: string) => {
+    setActiveBank(bankName);
+    setShowBankPicker(false);
+  };
+
+  const handleClaimNewBank = async (slug: string, label: string): Promise<string | null> => {
+    if (!supabase || !userId) return 'Not signed in.';
+    const { error } = await supabase.from('banks').insert({
+      bank_name: slug,
+      user_id: userId,
+      display_label: label || slug,
+    });
+    if (error) return error.message;
+    await loadMyBanks();
+    setActiveBank(slug);
+    setShowBankPicker(false);
+    return null;
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -143,45 +229,57 @@ export default function AdminPortal() {
           <div>
             <h1 className="text-sm font-semibold leading-tight">Bank Admin — Professor's Workspace</h1>
             <p className="text-[10px] text-muted-foreground leading-tight">
-              Manage your personal problem bank
+              {user?.email ?? ''}
             </p>
           </div>
         </div>
-        {bankId && (
-          <div className="ml-auto flex items-center gap-3">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setAgentSettingsOpen(true)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Settings className="w-3.5 h-3.5 mr-1" /> Agent
-              {agentSettings.apiKey
-                ? <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                : <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />}
-            </Button>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Bank</span>
-            <code className="text-[11px] bg-muted/40 border border-border rounded px-2 py-1 font-mono">{bankId}</code>
-            <button
-              type="button"
-              onClick={() => setShowBankPrompt(true)}
-              className="text-[10px] text-primary hover:text-primary/80 underline decoration-dotted"
-            >
-              switch
-            </button>
-          </div>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setAgentSettingsOpen(true)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Settings className="w-3.5 h-3.5 mr-1" /> Agent
+            {agentSettings.apiKey
+              ? <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              : <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />}
+          </Button>
+          {activeBank && (
+            <>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Bank</span>
+              <code className="text-[11px] bg-muted/40 border border-border rounded px-2 py-1 font-mono">{activeBank}</code>
+              <button
+                type="button"
+                onClick={() => setShowBankPicker(true)}
+                className="text-[10px] text-primary hover:text-primary/80 underline decoration-dotted"
+              >
+                switch
+              </button>
+            </>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void signOut()}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="w-3.5 h-3.5 mr-1" /> Sign out
+          </Button>
+        </div>
       </header>
 
-      {showBankPrompt && (
+      {showBankPicker && (
         <BankPickerOverlay
-          currentId={bankId}
-          onPick={persistBankId}
-          onCancel={bankId ? () => setShowBankPrompt(false) : undefined}
+          myBanks={myBanks}
+          activeBank={activeBank}
+          onSelect={handleSelectBank}
+          onClaim={handleClaimNewBank}
+          onCancel={activeBank ? () => setShowBankPicker(false) : undefined}
         />
       )}
 
-      {!bankId ? null : (
+      {!activeBank ? null : (
         <div className="p-6 max-w-5xl mx-auto space-y-4">
           {loadErr && (
             <div className="bg-rose-500/10 border border-rose-500/40 rounded-lg px-4 py-3 text-sm text-rose-100 flex items-start gap-2">
@@ -207,8 +305,8 @@ export default function AdminPortal() {
           <div className="bg-card/40 border border-border rounded-xl divide-y divide-border overflow-hidden">
             {problems.length === 0 && !loading && (
               <div className="p-6 text-center text-sm text-muted-foreground italic">
-                This bank is empty. Click <strong>New problem</strong> to add the first one,
-                or use the <em>switch</em> link in the header to fork the demo bank as a starting point.
+                This bank is empty. Click <strong>New problem</strong> to add the first one.
+                Whatever you save here will appear to any student who picks <code className="font-mono">{activeBank}</code> from the splash.
               </div>
             )}
             {problems.map(p => (
@@ -217,12 +315,18 @@ export default function AdminPortal() {
                 problem={p}
                 onEdit={() => { setEditing({ ...p }); setEditingIsNew(false); }}
                 onDelete={async () => {
+                  if (!supabase) return;
                   if (!confirm(`Delete ${p.id}?`)) return;
-                  await fetch(
-                    `${API_BASE}/admin/banks/${encodeURIComponent(bankId)}/problems/${encodeURIComponent(p.id)}`,
-                    { method: 'DELETE' },
-                  );
-                  void loadProblems(bankId);
+                  const { error } = await supabase
+                    .from('problems')
+                    .delete()
+                    .eq('bank_name', activeBank)
+                    .eq('problem_id', p.id);
+                  if (error) {
+                    setLoadErr(`Delete failed: ${error.message}`);
+                    return;
+                  }
+                  void loadProblems(activeBank);
                 }}
               />
             ))}
@@ -234,14 +338,14 @@ export default function AdminPortal() {
         <ProblemEditor
           problem={editing}
           isNew={editingIsNew}
-          bankId={bankId}
+          bankName={activeBank}
           existingIds={problems.map(p => p.id)}
           agentSettings={agentSettings}
           onUpdateDraft={(p) => setEditing(p)}
           onCancel={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
-            void loadProblems(bankId);
+            void loadProblems(activeBank);
           }}
         />
       )}
@@ -314,36 +418,33 @@ function IntroCard({ problemCount }: { problemCount: number }) {
   );
 }
 
+
 function BankPickerOverlay({
-  currentId, onPick, onCancel,
+  myBanks, activeBank, onSelect, onClaim, onCancel,
 }: {
-  currentId: string;
-  onPick: (id: string) => void;
+  myBanks: BankRow[];
+  activeBank: string;
+  onSelect: (bankName: string) => void;
+  onClaim: (slug: string, label: string) => Promise<string | null>;
   onCancel?: () => void;
 }) {
-  // Default to "demo" so a fresh visit lands the professor in the same
-  // bank the team-project /educator page reads from. Anything they save
-  // shows up there immediately. They can change it if they want a
-  // private bank.
-  const [text, setText] = useState(currentId || 'demo');
-  const [forkFromDemo, setForkFromDemo] = useState(false);
+  const [mode, setMode] = useState<'pick' | 'claim'>(myBanks.length === 0 ? 'claim' : 'pick');
+  const [slug, setSlug] = useState('');
+  const [label, setLabel] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
-    const trimmed = text.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
-    if (!trimmed) return;
-    if (forkFromDemo && trimmed !== 'demo') {
-      // Tell the backend to copy the demo bank into the new bank id.
-      try {
-        await fetch(`${API_BASE}/admin/banks/fork`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source_bank: 'demo', target_bank: trimmed }),
-        });
-      } catch (e) {
-        console.error('fork failed', e);
-      }
+    setErr(null);
+    const cleaned = slug.trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{2,}$/.test(cleaned)) {
+      setErr('Bank slug: lowercase letters, digits, dashes only (min 3 chars).');
+      return;
     }
-    onPick(trimmed);
+    setBusy(true);
+    const error = await onClaim(cleaned, label.trim());
+    setBusy(false);
+    if (error) setErr(error);
   };
 
   return (
@@ -354,56 +455,118 @@ function BankPickerOverlay({
             <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-primary font-bold">Pick a bank id</p>
-            <p className="text-sm font-semibold">Your bank is your workspace</p>
+            <p className="text-[10px] uppercase tracking-wider text-primary font-bold">Your banks</p>
+            <p className="text-sm font-semibold">
+              {mode === 'pick' ? 'Pick a bank to manage' : 'Claim a new bank slug'}
+            </p>
           </div>
         </div>
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Type a short id you'll remember — it's how this tool tells your problems apart from
-          another professor's. <strong>Lowercase letters, numbers, and dashes only.</strong> Saved
-          in your browser; you don't enter it again unless you switch.
-        </p>
-        <div className="bg-primary/10 border border-primary/30 rounded-md px-3 py-2 text-[11px] text-primary/90 leading-relaxed">
-          <strong>For the live demo:</strong> use <code className="font-mono">demo</code> (the default).
-          That's the bank the team-project page at <code>/educator</code> reads from. Anything you
-          save here will appear there. Pick a different name if you want a private bank for your
-          own course.
-        </div>
-        <input
-          autoFocus
-          aria-label="Bank id"
-          placeholder="e.g. prof-jenkins-orie310"
-          value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') void submit(); }}
-          className="w-full text-sm bg-muted/40 border border-border rounded-md px-3 py-2 font-mono focus:outline-none focus:border-primary"
-        />
-        <label className="flex items-start gap-2 text-[11px] text-foreground/90 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={forkFromDemo}
-            onChange={e => setForkFromDemo(e.target.checked)}
-            className="mt-0.5"
-          />
-          <span>
-            Start from the <strong>demo</strong> bank as a copy. Useful if you want the existing
-            problems as a starting point and plan to customize them. Leave unchecked to start empty.
-          </span>
-        </label>
-        <div className="flex gap-2 justify-end">
-          {onCancel && (
-            <Button variant="ghost" onClick={onCancel} className="text-muted-foreground">
-              Cancel
-            </Button>
-          )}
-          <Button
-            onClick={() => void submit()}
-            disabled={!text.trim()}
-            className="bg-primary hover:bg-primary/90 text-white"
-          >
-            Use this bank
-          </Button>
-        </div>
+
+        {mode === 'pick' && (
+          <>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              These are the bank slugs you own. Students type one of these on the splash to find your problems.
+            </p>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {myBanks.map(b => (
+                <button
+                  key={b.bank_name}
+                  onClick={() => onSelect(b.bank_name)}
+                  className={`w-full text-left px-3 py-2 rounded-md border transition ${
+                    b.bank_name === activeBank
+                      ? 'bg-primary/15 border-primary/50'
+                      : 'bg-muted/20 border-border hover:bg-muted/40'
+                  }`}
+                >
+                  <code className="text-sm font-mono font-semibold">{b.bank_name}</code>
+                  {b.display_label && b.display_label !== b.bank_name && (
+                    <span className="block text-[11px] text-muted-foreground mt-0.5">{b.display_label}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-between items-center pt-2 border-t border-border/40">
+              <button
+                type="button"
+                onClick={() => { setMode('claim'); setErr(null); }}
+                className="text-[11px] text-primary hover:text-primary/80 underline decoration-dotted"
+              >
+                + Claim a new slug
+              </button>
+              {onCancel && (
+                <Button variant="ghost" onClick={onCancel} className="text-muted-foreground">
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+
+        {mode === 'claim' && (
+          <>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Pick a globally unique slug your students will type to find your problems.
+              <strong> Lowercase letters, digits, and dashes only.</strong>
+            </p>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+                Bank slug
+              </label>
+              <input
+                autoFocus
+                aria-label="Bank slug"
+                placeholder="jenkins-orie310-fall26"
+                value={slug}
+                onChange={e => setSlug(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') void submit(); }}
+                className="w-full text-sm bg-muted/40 border border-border rounded-md px-3 py-2 font-mono focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
+                Display label (optional)
+              </label>
+              <input
+                aria-label="Display label"
+                placeholder="ORIE 310 — Fall 2026"
+                value={label}
+                onChange={e => setLabel(e.target.value)}
+                className="w-full text-sm bg-muted/40 border border-border rounded-md px-3 py-2 focus:outline-none focus:border-primary"
+              />
+            </div>
+            {err && (
+              <div className="bg-rose-500/10 border border-rose-500/40 rounded px-3 py-2 text-[11px] text-rose-100">
+                {err}
+              </div>
+            )}
+            <div className="flex gap-2 justify-between items-center pt-2 border-t border-border/40">
+              {myBanks.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setMode('pick'); setErr(null); }}
+                  className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-dotted"
+                >
+                  ← Back to my banks
+                </button>
+              )}
+              <div className="flex gap-2 ml-auto">
+                {onCancel && (
+                  <Button variant="ghost" onClick={onCancel} className="text-muted-foreground">
+                    Cancel
+                  </Button>
+                )}
+                <Button
+                  onClick={() => void submit()}
+                  disabled={busy || !slug.trim()}
+                  className="bg-primary hover:bg-primary/90 text-white"
+                >
+                  {busy && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                  Claim slug
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -557,12 +720,12 @@ function Pill({ children, tone }: { children: React.ReactNode; tone: 'primary' |
 // ── Editor ───────────────────────────────────────────────────────────────────
 
 function ProblemEditor({
-  problem, isNew, bankId, existingIds, agentSettings,
+  problem, isNew, bankName, existingIds, agentSettings,
   onUpdateDraft, onCancel, onSaved,
 }: {
   problem: Problem;
   isNew: boolean;
-  bankId: string;
+  bankName: string;
   existingIds: string[];
   agentSettings: AgentSettings;
   onUpdateDraft: (p: Problem) => void;
@@ -677,22 +840,27 @@ function ProblemEditor({
   }, [draft, isNew, existingIds]);
 
   const save = async () => {
+    if (!supabase) {
+      setSaveErr('Supabase not configured.');
+      return;
+    }
     setSaving(true);
     setSaveErr(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/banks/${encodeURIComponent(bankId)}/problems`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
-      });
-      const data = await res.json();
-      if (!data.saved) {
-        setErrors(data.errors ?? ['Save failed']);
+      const { error } = await supabase
+        .from('problems')
+        .upsert({
+          bank_name: bankName,
+          problem_id: draft.id,
+          data: draft,
+        }, { onConflict: 'bank_name,problem_id' });
+      if (error) {
+        setSaveErr(error.message);
         return;
       }
       onSaved();
     } catch (e) {
-      setSaveErr(String(e));
+      setSaveErr(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }

@@ -4,9 +4,9 @@ import PracticeMode from "./pages/PracticeMode";
 import SensitivityMode from "./pages/SensitivityMode";
 import WorkspacePage from "./pages/workspace/WorkspacePage";
 import GuidedLearnPage from "./pages/workspace/GuidedLearnPage";
-import EducatorPortal from "./pages/EducatorPortal";
 import MatrixMethodWorkspace from "./pages/workspace/matrixMethod/MatrixMethodWorkspace";
-import AdminPortal from "./pages/AdminPortal";
+import AdminGuarded from "./auth/AdminGuarded";
+import SignInPage from "./pages/SignInPage";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -35,12 +35,6 @@ export const router = createBrowserRouter([
     Component: SensitivityMode,
   },
   {
-    // Team-project portal: three Python functions the beginners wrote,
-    // demoed end-to-end. Three cards, one per teammate.
-    path: "/educator",
-    Component: EducatorPortal,
-  },
-  {
     // Chapter 8 Matrix Method gameboard. Three zones: the LP problem,
     // the identification workspace, and the Table 8.1 tableau being
     // assembled. Step 12 ends with the two-language z* payoff.
@@ -53,10 +47,15 @@ export const router = createBrowserRouter([
   },
   {
     // Professor's workspace: per-bank CRUD on the problem bank.
-    // Each professor picks a bank id, that's their personal partition
-    // in SQLite. List, add, edit, delete, with live validation on save.
+    // Auth-gated — anonymous visitors are redirected to /signin.
+    // Each authenticated professor owns banks scoped to their user_id.
     path: "/admin",
-    Component: AdminPortal,
+    Component: AdminGuarded,
+  },
+  {
+    // Professor sign-in / sign-up. Students don't sign in.
+    path: "/signin",
+    Component: SignInPage,
   },
   {
     // Catch-all — keeps the React Router default error screen from

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Method, LPProblem, TableauCell, Tableau, VariableSign } from '../types';
 import { useLPSolver } from '../hooks/useLPSolver';
 import { BookOpen, Zap, AlertCircle, Loader2, Plus, Trash2, Info } from 'lucide-react';
+import BankPickerStudent from '../components/BankPickerStudent';
 
 const DEFAULT_PROBLEM: LPProblem = {
   objectiveType: 'max',
@@ -393,10 +394,12 @@ export default function MainWorkspace() {
             </div>
           </div>
 
-          {/* Tools row — Admin + the team-project demo, prominent enough
-              to find without squinting. These are the pages a professor
-              and a class presentation actually need to navigate to. */}
-          <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          {/* Student bank picker — choose your professor's bank. */}
+          <BankPickerStudent />
+
+          {/* Professor-facing entry point. Whatever a professor saves
+              into their bank shows up for students who pick it above. */}
+          <div className="w-full max-w-2xl mt-3">
             <div
               onClick={() => navigate('/admin')}
               className="cursor-pointer bg-slate-900 border border-emerald-500/30 rounded-xl p-4 hover:border-emerald-400/60 transition-all"
@@ -408,26 +411,8 @@ export default function MainWorkspace() {
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-slate-100">Manage problem bank (Admin)</h3>
                   <p className="text-slate-400 text-xs leading-snug mt-0.5">
-                    Professor&apos;s workspace. Add, edit, delete LP word problems. Optional agent
-                    drafting with your own API key.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => navigate('/educator')}
-              className="cursor-pointer bg-slate-900 border border-amber-500/30 rounded-xl p-4 hover:border-amber-400/60 transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-300">
-                  <Zap className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-slate-100">Team demo (Educator)</h3>
-                  <p className="text-slate-400 text-xs leading-snug mt-0.5">
-                    Class presentation page. Three Python functions running live, one per
-                    teammate. Demos filter, validate, and export.
+                    Professor&apos;s workspace. Sign in, claim a bank slug, add problems —
+                    they appear for any student who picks your bank above.
                   </p>
                 </div>
               </div>

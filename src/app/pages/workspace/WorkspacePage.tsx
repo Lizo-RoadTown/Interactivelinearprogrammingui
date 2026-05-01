@@ -25,7 +25,8 @@ import MatrixFormLens from './lenses/MatrixFormLens';
 import ShadowPricesLens from './lenses/ShadowPricesLens';
 import { useSimplexTutorial } from './tutorials/SimplexTutorial';
 import { useLPWorkspace, LensId } from '../../hooks/useLPWorkspace';
-import { WORD_PROBLEMS, WordProblem } from '../../data/wordProblems';
+import { WordProblem } from '../../data/wordProblems';
+import { useAllProblems } from '../../data/bankProblems';
 import { LPProblem } from '../../types';
 import {
   ArrowLeft, Loader2, AlertCircle, BookOpen,
@@ -48,12 +49,13 @@ function wordProblemToLP(w: WordProblem): LPProblem {
 export default function WorkspacePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { problems: allProblems } = useAllProblems();
 
   // Accept ?problem=wp-xxx in the URL so tutorials can deep-link later
   const seedProblemId = searchParams.get('problem') ?? DEFAULT_PROBLEM_ID;
   const seedProblem = useMemo(
-    () => WORD_PROBLEMS.find(w => w.id === seedProblemId) ?? WORD_PROBLEMS[0],
-    [seedProblemId],
+    () => allProblems.find(w => w.id === seedProblemId) ?? allProblems[0],
+    [seedProblemId, allProblems],
   );
 
   const ws = useLPWorkspace();
@@ -159,7 +161,7 @@ export default function WorkspacePage() {
             </Button>
             {pickerOpen && (
               <div className="absolute top-full right-0 mt-1 w-72 max-h-96 overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-50 py-1">
-                {WORD_PROBLEMS.map(w => (
+                {allProblems.map(w => (
                   <button
                     key={w.id}
                     onClick={() => {

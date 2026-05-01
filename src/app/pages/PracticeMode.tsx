@@ -23,11 +23,11 @@ import { Badge } from '../components/ui/badge';
 import { useLPSolver } from '../hooks/useLPSolver';
 import { useGuidedSimplex } from '../hooks/useGuidedSimplex';
 import {
-  WORD_PROBLEMS,
   WordProblem,
   WPDifficulty,
   WPCategory,
 } from '../data/wordProblems';
+import { useAllProblems } from '../data/bankProblems';
 import { Constraint, LPProblem, SimplexStep, StepType } from '../types';
 import { normVar, sameVar, indexOfVar } from '../utils/varName';
 import {
@@ -217,15 +217,18 @@ const DIFFICULTY_TIERS: { level: WPDifficulty; desc: string; icon: string; borde
 ];
 
 function ProblemBrowser({ onSelect }: { onSelect: (p: WordProblem) => void }) {
+  const { problems: allProblems } = useAllProblems();
+
   const pickRandom = (level: WPDifficulty) => {
-    const pool = WORD_PROBLEMS.filter(p => p.difficulty === level);
+    const pool = allProblems.filter(p => p.difficulty === level);
+    if (pool.length === 0) return;
     onSelect(pool[Math.floor(Math.random() * pool.length)]);
   };
 
   const counts: Record<WPDifficulty, number> = {
-    Beginner: WORD_PROBLEMS.filter(p => p.difficulty === 'Beginner').length,
-    Intermediate: WORD_PROBLEMS.filter(p => p.difficulty === 'Intermediate').length,
-    Advanced: WORD_PROBLEMS.filter(p => p.difficulty === 'Advanced').length,
+    Beginner: allProblems.filter(p => p.difficulty === 'Beginner').length,
+    Intermediate: allProblems.filter(p => p.difficulty === 'Intermediate').length,
+    Advanced: allProblems.filter(p => p.difficulty === 'Advanced').length,
   };
 
   return (

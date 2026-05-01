@@ -27,8 +27,8 @@ from .models import (
     SolverResponse, PivotResponse, CellExplainResponse,
     SimplexStepOut, TableauOut, TableauCellOut, PointOut,
     SensitivityRequest, SensitivityResponse,
-    ListProblemsRequest, ValidateProblemRequest, ExportProblemRequest,
-    EducatorProblemsResponse, EducatorValidationResponse, EducatorExportResponse,
+    ValidateProblemRequest,
+    EducatorValidationResponse,
 )
 from .solver_core import (
     SimplexSolver, TwoPhaseSolver, compute_graphical_data,
@@ -36,16 +36,13 @@ from .solver_core import (
     _fmt_cell, BIG_M,
 )
 from . import sensitivity as sa
-from .educator import bank as edu_bank
-from .educator import listing as edu_listing
 from .educator import validation as edu_validation
-from .educator import export as edu_export
-from .educator import db as edu_db
 
-# Initialize SQLite-backed bank store. Creates the schema on first run
-# and seeds the 'demo' bank from problems.json if it's empty. This is
-# idempotent — safe to call every startup.
-edu_db.init()
+# Bank storage now lives in Supabase. The frontend reads/writes it
+# directly via the supabase-js client; nothing on the backend touches
+# the `banks` or `problems` tables anymore. The two endpoints we still
+# expose are pure: /api/educator/validate (problem schema check) and
+# /api/admin/agent/draft (LLM proxy that never persists keys).
 
 app = FastAPI(title="LP Simulator API", version="1.0.0")
 
@@ -266,27 +263,10 @@ def _corner_points_to_out(corners: list[dict], optimal_z: float | None,
 
 @app.get("/api/health")
 def health():
-    """Liveness + storage-backend probe.
-
-    Reports whether the bank storage layer is using Postgres (production
-    via DATABASE_URL) or SQLite (local dev fallback). Useful for quickly
-    confirming a Render deploy actually picked up the env var without
-    having to dig through deploy logs. Hit it in the browser at
-    /api/health.
-    """
-    backend = "postgres" if edu_db.is_postgres() else "sqlite"
-    db_ok = True
-    try:
-        # Cheap probe: just count the demo bank. If the connection is
-        # broken (wrong password, wrong host, network), this raises.
-        edu_db.list_banks()
-    except Exception:  # noqa: BLE001
-        db_ok = False
-    return {
-        "status": "ok",
-        "storage": backend,
-        "storage_connected": db_ok,
-    }
+    """Liveness probe. The bank storage now lives in Supabase and is
+    accessed directly from the browser; this backend no longer owns
+    that data path."""
+    return {"status": "ok"}
 
 
 @app.post("/api/solve", response_model=SolverResponse)
@@ -597,35 +577,15 @@ def sensitivity_analysis(req: SensitivityRequest):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  EDUCATOR PORTAL — word problem bank
-#  Endpoints delegate to student-written functions in backend/educator/.
-#  When a beginner function is not yet implemented, the endpoint returns
-#  `implemented: false` and a fallback so the UI stays functional.
+#  PROBLEM VALIDATION — pure schema check, used by /admin before save.
+#  Delegates to a student-written function in backend/educator/validation.py.
+#  When the function isn't implemented yet, the endpoint returns no errors
+#  so the admin save still succeeds.
 # ══════════════════════════════════════════════════════════════════════════════
-
-@app.post("/api/educator/list", response_model=EducatorProblemsResponse)
-def educator_list(req: ListProblemsRequest):
-    """List & filter the problem bank. Delegates to BEGINNER A's list_problems().
-
-    Reads from the SQLite-backed 'demo' bank so the team-project demo page
-    sees the same data as the new admin tool.
-    """
-    bank = edu_db.list_problems('demo')
-    try:
-        result = edu_listing.list_problems(
-            bank,
-            difficulty=req.difficulty,
-            category=req.category,
-            search=req.search,
-        )
-        return EducatorProblemsResponse(problems=result, implemented=True)
-    except NotImplementedError:
-        return EducatorProblemsResponse(problems=bank, implemented=False)
-
 
 @app.post("/api/educator/validate", response_model=EducatorValidationResponse)
 def educator_validate(req: ValidateProblemRequest):
-    """Validate a proposed problem. Delegates to BEGINNER B's validate_problem()."""
+    """Validate a proposed problem. Delegates to validate_problem()."""
     try:
         errors = edu_validation.validate_problem(req.problem)
         return EducatorValidationResponse(errors=list(errors), implemented=True)
@@ -633,83 +593,11 @@ def educator_validate(req: ValidateProblemRequest):
         return EducatorValidationResponse(errors=[], implemented=False)
 
 
-@app.post("/api/educator/export", response_model=EducatorExportResponse)
-def educator_export(req: ExportProblemRequest):
-    """Export a problem to Markdown. Delegates to BEGINNER C's export_to_markdown()."""
-    problem = edu_db.get_problem('demo', req.problem_id)
-    if problem is None:
-        raise HTTPException(status_code=404, detail=f"Problem {req.problem_id!r} not found")
-    try:
-        md = edu_export.export_to_markdown(problem)
-        return EducatorExportResponse(markdown=md, implemented=True)
-    except NotImplementedError:
-        stub = f"# {problem.get('title', req.problem_id)}\n\n(export_to_markdown not yet implemented)"
-        return EducatorExportResponse(markdown=stub, implemented=False)
-
-
-@app.get("/api/educator/problems")
-def educator_all_problems():
-    """Unfiltered bank dump — useful for frontend to seed dropdowns.
-
-    The legacy team-demo /educator page expects this to return the demo
-    bank. Both that page and the new /admin page now read from SQLite.
-    """
-    return {"problems": edu_db.list_problems('demo')}
-
-
 # ══════════════════════════════════════════════════════════════════════════════
-#  ADMIN — professor-facing CRUD on per-bank problems
-#  Each professor picks a bank_id and that's their personal bank, partitioned
-#  in SQLite. No authentication: bank_id is just a partitioning key, treated
-#  as a remembered preference rather than a secret.
+#  AGENT DRAFT — bring-your-own-key LLM proxy for the /admin draft button.
+#  The professor's API key lives in their browser's localStorage and is sent
+#  per-request. We forward to Anthropic / OpenAI and never persist the key.
 # ══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/admin/banks")
-def admin_list_banks():
-    """All bank ids currently in storage (for the admin's bank-picker UI)."""
-    return {"banks": edu_db.list_banks()}
-
-
-@app.get("/api/admin/banks/{bank_id}/problems")
-def admin_list_problems(bank_id: str):
-    """All problems in one bank."""
-    return {"bank_id": bank_id, "problems": edu_db.list_problems(bank_id)}
-
-
-@app.post("/api/admin/banks/{bank_id}/problems")
-def admin_save_problem(bank_id: str, problem: dict):
-    """Insert or update a problem in this bank.
-
-    Validation runs first (Beginner B's function). Save is rejected if
-    validation returns errors. The professor sees the error list in the
-    UI and fixes before retrying.
-    """
-    try:
-        errors = edu_validation.validate_problem(problem)
-    except NotImplementedError:
-        # Validator stub: be permissive so the admin can still save.
-        # In production with the validator implemented, errors block save.
-        errors = []
-    if errors:
-        return {"saved": False, "errors": errors}
-    try:
-        edu_db.upsert_problem(bank_id, problem)
-    except ValueError as e:
-        return {"saved": False, "errors": [str(e)]}
-    return {"saved": True, "errors": []}
-
-
-@app.delete("/api/admin/banks/{bank_id}/problems/{problem_id}")
-def admin_delete_problem(bank_id: str, problem_id: str):
-    """Remove one problem from a bank. Idempotent — already-gone is fine."""
-    deleted = edu_db.delete_problem(bank_id, problem_id)
-    return {"deleted": deleted}
-
-
-class ForkBankRequest(BaseModel):
-    source_bank: str
-    target_bank: str
-
 
 class AgentDraftRequest(BaseModel):
     """Bring-your-own-agent draft request from /admin.
@@ -731,21 +619,6 @@ class AgentDraftResponse(BaseModel):
     error: str | None = None
     model: str | None = None
 
-
-@app.post("/api/admin/banks/fork")
-def admin_fork_bank(req: ForkBankRequest):
-    """Copy every problem from one bank into another (overwrites conflicts).
-
-    Useful for a new professor to seed their bank from the demo bank as a
-    starting point, then customize.
-    """
-    if not req.target_bank.strip():
-        raise HTTPException(status_code=422, detail="target_bank is required")
-    count = edu_db.fork_bank(req.source_bank, req.target_bank)
-    return {"copied": count, "source": req.source_bank, "target": req.target_bank}
-
-
-# ── Agent passthrough — bring-your-own-key LLM drafts ──────────────────────
 
 _AGENT_SYSTEM_PROMPT = """You generate LP word problems for an Operations Research textbook.
 
