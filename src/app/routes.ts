@@ -7,6 +7,7 @@ import GuidedLearnPage from "./pages/workspace/GuidedLearnPage";
 import EducatorPortal from "./pages/EducatorPortal";
 import MatrixMethodWorkspace from "./pages/workspace/matrixMethod/MatrixMethodWorkspace";
 import AdminPortal from "./pages/AdminPortal";
+import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
   {
@@ -56,5 +57,11 @@ export const router = createBrowserRouter([
     // in SQLite. List, add, edit, delete, with live validation on save.
     path: "/admin",
     Component: AdminPortal,
+  },
+  {
+    // Catch-all — keeps the React Router default error screen from
+    // ever appearing. Shows a friendly 'page not found' instead.
+    path: "*",
+    Component: NotFound,
   },
 ]);
