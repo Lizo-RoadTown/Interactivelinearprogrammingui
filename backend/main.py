@@ -37,6 +37,7 @@ from .solver_core import (
 )
 from . import sensitivity as sa
 from .educator import validation as edu_validation
+from .educator import agent_validation as edu_agent_validation
 
 # Bank storage now lives in Supabase. The frontend reads/writes it
 # directly via the supabase-js client; nothing on the backend touches
@@ -618,6 +619,7 @@ class AgentDraftResponse(BaseModel):
     raw: str | None = None       # raw model output for debugging
     error: str | None = None
     model: str | None = None
+    agent_validation_errors: list[str] | None = None  # caught by Beginner D's checker
 
 
 _AGENT_SYSTEM_PROMPT = """You generate LP word problems for an Operations Research textbook.
@@ -770,4 +772,18 @@ async def admin_agent_draft(req: AgentDraftRequest):
             raw=raw,
             model=model,
         )
-    return AgentDraftResponse(problem=problem, raw=raw, model=model)
+
+    # Beginner D's check: did the LLM produce a structurally valid problem?
+    # When the function isn't implemented yet, fall back to permissive (no
+    # extra errors) so the agent flow keeps working during development.
+    try:
+        agent_errors = edu_agent_validation.validate_agent_output(problem)
+    except NotImplementedError:
+        agent_errors = []
+
+    return AgentDraftResponse(
+        problem=problem,
+        raw=raw,
+        model=model,
+        agent_validation_errors=agent_errors or None,
+    )

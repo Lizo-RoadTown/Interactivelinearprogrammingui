@@ -144,6 +144,58 @@ def test_export():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# BEGINNER D — agent_validation.py
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_agent_validation():
+    from backend.educator.agent_validation import validate_agent_output
+
+    print("  Test 1: valid problem returns empty list")
+    valid = dict(VALID_PROBLEM)
+    errors = validate_agent_output(valid)
+    assert errors == [], f"valid problem should have no errors, got {errors}"
+
+    print("  Test 2: non-dict input is rejected with one error")
+    for bad in [None, 'just a string', ['list', 'instead'], 42]:
+        errors = validate_agent_output(bad)
+        assert len(errors) == 1, f"non-dict {bad!r} should produce exactly one error"
+
+    print("  Test 3: missing scenario flagged")
+    bad = dict(VALID_PROBLEM)
+    bad.pop('scenario')
+    errors = validate_agent_output(bad)
+    assert any('scenario' in e for e in errors), f"missing scenario not flagged: {errors}"
+
+    print("  Test 4: numVars=0 flagged")
+    bad = dict(VALID_PROBLEM)
+    bad['numVars'] = 0
+    errors = validate_agent_output(bad)
+    assert any('numVars' in e for e in errors), f"numVars=0 not flagged: {errors}"
+
+    print("  Test 5: variables length mismatch flagged")
+    bad = dict(VALID_PROBLEM)
+    bad['numVars'] = 3
+    # variables stays at length 2
+    errors = validate_agent_output(bad)
+    assert any('variables' in e for e in errors), \
+        f"variables length mismatch not flagged: {errors}"
+
+    print("  Test 6: bad operator flagged")
+    bad = dict(VALID_PROBLEM)
+    bad['constraints'] = [{'coefficients': [1, 1], 'operator': '≤', 'rhs': 10}]
+    errors = validate_agent_output(bad)
+    assert any('operator' in e for e in errors), \
+        f"unicode operator not flagged: {errors}"
+
+    print("  Test 7: empty constraints list flagged")
+    bad = dict(VALID_PROBLEM)
+    bad['constraints'] = []
+    errors = validate_agent_output(bad)
+    assert any('constraints' in e for e in errors), \
+        f"empty constraints not flagged: {errors}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Runner
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -171,9 +223,10 @@ def main():
     print("=" * 60)
 
     results = {
-        'BEGINNER A (listing.py)':    _run('BEGINNER A — listing.py', test_listing),
-        'BEGINNER B (validation.py)': _run('BEGINNER B — validation.py', test_validation),
-        'BEGINNER C (export.py)':     _run('BEGINNER C — export.py', test_export),
+        'BEGINNER A (listing.py)':         _run('BEGINNER A — listing.py', test_listing),
+        'BEGINNER B (validation.py)':      _run('BEGINNER B — validation.py', test_validation),
+        'BEGINNER C (export.py)':          _run('BEGINNER C — export.py', test_export),
+        'BEGINNER D (agent_validation.py)': _run('BEGINNER D — agent_validation.py', test_agent_validation),
     }
 
     print("\n" + "=" * 60)
@@ -188,7 +241,7 @@ def main():
             print(f"  ⚠ {name}  (not implemented yet)")
 
     done = sum(1 for v in results.values() if v is True)
-    print(f"\n{done}/3 complete.")
+    print(f"\n{done}/{len(results)} complete.")
 
 
 if __name__ == '__main__':

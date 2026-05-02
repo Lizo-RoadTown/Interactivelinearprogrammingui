@@ -767,6 +767,7 @@ function ProblemEditor({
   const [agentBusy, setAgentBusy] = useState(false);
   const [agentErr, setAgentErr] = useState<string | null>(null);
   const [agentRaw, setAgentRaw] = useState<string | null>(null);
+  const [agentValidationErrors, setAgentValidationErrors] = useState<string[]>([]);
 
   const runAgentDraft = async () => {
     if (!agentSettings.apiKey) {
@@ -780,6 +781,7 @@ function ProblemEditor({
     setAgentBusy(true);
     setAgentErr(null);
     setAgentRaw(null);
+    setAgentValidationErrors([]);
     try {
       const res = await fetch(`${API_BASE}/admin/agent/draft`, {
         method: 'POST',
@@ -801,6 +803,14 @@ function ProblemEditor({
       }
       if (!data.problem) {
         setAgentErr('Agent returned no problem.');
+        return;
+      }
+      // Beginner D's check: if the LLM produced a structurally bad
+      // problem, surface those errors and DO NOT pre-fill the form
+      // (so the professor isn't tricked into saving garbage by reflex).
+      if (Array.isArray(data.agent_validation_errors) && data.agent_validation_errors.length > 0) {
+        setAgentValidationErrors(data.agent_validation_errors);
+        if (data.raw) setAgentRaw(data.raw);
         return;
       }
       // Coerce the problem dict into our local shape and pre-fill the
@@ -1029,6 +1039,24 @@ function ProblemEditor({
                   <p><AlertTriangle className="inline w-3 h-3 mr-1" />{agentErr}</p>
                   {agentRaw && (
                     <details className="text-rose-200/80">
+                      <summary className="cursor-pointer">Raw model output</summary>
+                      <pre className="text-[10px] whitespace-pre-wrap mt-1 max-h-40 overflow-y-auto">{agentRaw}</pre>
+                    </details>
+                  )}
+                </div>
+              )}
+              {agentValidationErrors.length > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/40 rounded px-3 py-2 text-[11px] text-amber-100 space-y-1">
+                  <p>
+                    <AlertTriangle className="inline w-3 h-3 mr-1" />
+                    The agent returned a structurally invalid problem.
+                    The form was <strong>not</strong> pre-filled — fix your prompt or try again.
+                  </p>
+                  <ul className="list-disc pl-5">
+                    {agentValidationErrors.map((e, i) => <li key={i}>{e}</li>)}
+                  </ul>
+                  {agentRaw && (
+                    <details className="text-amber-200/80">
                       <summary className="cursor-pointer">Raw model output</summary>
                       <pre className="text-[10px] whitespace-pre-wrap mt-1 max-h-40 overflow-y-auto">{agentRaw}</pre>
                     </details>

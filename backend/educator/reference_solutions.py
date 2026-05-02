@@ -101,6 +101,78 @@ def validate_problem_ref(problem: dict[str, Any]) -> list[str]:
     return errors
 
 
+def validate_agent_output_ref(problem: Any) -> list[str]:
+    """Reference solution for Beginner D's agent-output validator."""
+    errors: list[str] = []
+
+    if not isinstance(problem, dict):
+        return ['agent did not return an object']
+
+    def require_nonempty_string(key: str) -> None:
+        val = problem.get(key)
+        if not isinstance(val, str) or not val.strip():
+            errors.append(f"{key} is missing or empty")
+
+    require_nonempty_string('id')
+    require_nonempty_string('title')
+    require_nonempty_string('scenario')
+
+    diff = problem.get('difficulty')
+    if diff not in VALID_DIFFICULTIES:
+        errors.append(f"difficulty {diff!r} is invalid "
+                      f"(must be {', '.join(sorted(VALID_DIFFICULTIES))})")
+
+    obj_type = problem.get('objectiveType')
+    if obj_type not in VALID_OBJECTIVE_TYPES:
+        errors.append(f"objectiveType {obj_type!r} is invalid "
+                      f"(must be 'max' or 'min')")
+
+    num_vars = problem.get('numVars')
+    if not isinstance(num_vars, int) or isinstance(num_vars, bool) or num_vars < 1:
+        errors.append(f"numVars must be a positive integer, got {num_vars!r}")
+        num_vars = None
+
+    variables = problem.get('variables')
+    if not isinstance(variables, list):
+        errors.append("variables must be a list")
+    elif num_vars is not None and len(variables) != num_vars:
+        errors.append(f"variables has {len(variables)} entries "
+                      f"but numVars is {num_vars}")
+
+    obj_coeffs = problem.get('objectiveCoefficients')
+    if not isinstance(obj_coeffs, list):
+        errors.append("objectiveCoefficients must be a list")
+    elif num_vars is not None and len(obj_coeffs) != num_vars:
+        errors.append(f"objectiveCoefficients has {len(obj_coeffs)} entries "
+                      f"but numVars is {num_vars}")
+
+    cons = problem.get('constraints')
+    if not isinstance(cons, list):
+        errors.append("constraints must be a list")
+    elif not cons:
+        errors.append("constraints is empty (the agent must produce at least one)")
+    else:
+        for i, c in enumerate(cons, start=1):
+            if not isinstance(c, dict):
+                errors.append(f"constraint #{i} is not an object")
+                continue
+            coefs = c.get('coefficients')
+            if not isinstance(coefs, list):
+                errors.append(f"constraint #{i}: coefficients must be a list")
+            elif num_vars is not None and len(coefs) != num_vars:
+                errors.append(f"constraint #{i}: coefficients has {len(coefs)} "
+                              f"entries but numVars is {num_vars}")
+            op = c.get('operator')
+            if op not in VALID_OPERATORS:
+                errors.append(f"constraint #{i}: operator {op!r} is invalid "
+                              f"(must be <=, >=, or =)")
+            rhs = c.get('rhs')
+            if not isinstance(rhs, (int, float)) or isinstance(rhs, bool):
+                errors.append(f"constraint #{i}: rhs must be a number, got {rhs!r}")
+
+    return errors
+
+
 def export_to_markdown_ref(problem: dict[str, Any]) -> str:
     lines = []
     lines.append(f"# {problem.get('title', 'Untitled Problem')}")
