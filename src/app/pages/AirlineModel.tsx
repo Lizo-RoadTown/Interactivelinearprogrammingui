@@ -357,56 +357,51 @@ export default function AirlineModel() {
 
           {/* Sliders column — cost (with profit shown inline) then RHS */}
           <div className="lg:col-span-5 space-y-4">
-            <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 space-y-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">
-                  Per-unit cost (drives profit)
-                </p>
-                <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
-                  Drag cost up, profit drops because <span className="font-mono">profit = revenue − cost</span>.
-                </p>
-              </div>
-              {VAR_NAMES.map((n, i) => {
-                const r = sliderRange(BASE_COSTS[i]);
-                return (
+            {/* One paired box per variable: the cost slider sits above
+                the profit slider it drives, with an explicit arrow
+                connecting them. Cost up → profit down, in the same box. */}
+            {VAR_NAMES.map((n, i) => {
+              const costR = sliderRange(BASE_COSTS[i]);
+              const objR = sliderRange(BASE_OBJECTIVE[i]);
+              return (
+                <div
+                  key={`pair-${n}`}
+                  className="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 space-y-3"
+                >
+                  <p className="text-[10px] uppercase tracking-wider text-slate-300 font-bold">
+                    {n} — {VAR_LABELS[i]}
+                  </p>
+
                   <SliderRow
-                    key={`cost-${n}`}
-                    label={`${VAR_LABELS[i]}`}
+                    label="Cost"
                     baseValue={BASE_COSTS[i]}
                     value={costs[i]}
-                    min={r.min}
-                    max={r.max}
-                    step={r.step}
+                    min={costR.min}
+                    max={costR.max}
+                    step={costR.step}
                     onChange={v => setCostFor(i as 0 | 1 | 2, v)}
                   />
-                );
-              })}
-            </div>
 
-            <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 space-y-3">
-              <p className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">
-                Profit per unit (objective function — drag directly to override)
-              </p>
-              {VAR_NAMES.map((n, i) => {
-                const r = sliderRange(BASE_OBJECTIVE[i]);
-                return (
+                  <p className="text-[10px] text-amber-300/80 italic text-center -my-1">
+                    ↓ drives ↓
+                  </p>
+
                   <SliderRow
-                    key={n}
-                    label={`${n} — ${VAR_LABELS[i]}`}
+                    label="Profit (objective coefficient)"
                     baseValue={BASE_OBJECTIVE[i]}
                     value={obj[i]}
-                    min={r.min}
-                    max={r.max}
-                    step={r.step}
+                    min={objR.min}
+                    max={objR.max}
+                    step={objR.step}
                     onChange={v => setObj(prev => {
                       const next: [number, number, number] = [...prev];
                       next[i] = v;
                       return next;
                     })}
                   />
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
