@@ -403,16 +403,39 @@ export default function AirlineModel() {
               );
             })}
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                Constraint right-hand sides
-              </p>
-              {CONSTRAINTS.map((c, i) => {
-                const r = sliderRange(c.baseRhs);
-                return (
+          </div>
+        </div>
+
+        {/* ── Constraints — RHS slider paired with its utilization bar ── */}
+        {/* Same paired-box pattern as the cost/profit pairs above. Each
+            constraint gets its own box: slider on top (drag to change
+            the resource limit), utilization bar below (LHS / RHS,
+            BINDING badge when the optimum hits the limit). */}
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-3 ml-1">
+            Constraints — drag the RHS to change the resource limit, watch the bar fill
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {CONSTRAINTS.map((c, i) => {
+              const r = sliderRange(c.baseRhs);
+              const lhs = c.coefficients.reduce((s, a, k) => s + a * (result.x[k] ?? 0), 0);
+              const limit = rhs[i];
+              const pct = limit > 0 ? Math.min(100, (lhs / limit) * 100) : 0;
+              const binding = result.bindingConstraints[i];
+              return (
+                <div
+                  key={c.label}
+                  className={`bg-slate-900 border rounded-2xl p-4 space-y-3 ${
+                    binding ? 'border-amber-500/40' : 'border-slate-800'
+                  }`}
+                >
+                  <p className="text-[10px] uppercase tracking-wider text-slate-300 font-bold">
+                    {c.label}
+                    {binding && <span className="ml-2 text-amber-300 normal-case">BINDING</span>}
+                  </p>
+
                   <SliderRow
-                    key={c.label}
-                    label={c.label}
+                    label="RHS (resource limit)"
                     baseValue={c.baseRhs}
                     value={rhs[i]}
                     min={r.min}
@@ -424,37 +447,20 @@ export default function AirlineModel() {
                       return next;
                     })}
                   />
-                );
-              })}
-            </div>
-          </div>
-        </div>
 
-        {/* ── Constraint utilization chart (full-width below) ──────────── */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-3">
-            Constraint utilization (LHS ÷ RHS)
-          </p>
-          <div className="space-y-3">
-            {CONSTRAINTS.map((c, i) => {
-              const lhs = c.coefficients.reduce((s, a, k) => s + a * (result.x[k] ?? 0), 0);
-              const limit = rhs[i];
-              const pct = limit > 0 ? Math.min(100, (lhs / limit) * 100) : 0;
-              const binding = result.bindingConstraints[i];
-              return (
-                <div key={c.label}>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-slate-300 font-semibold">{c.label}</span>
-                    <span className="font-mono text-slate-400 tabular-nums">
-                      {fmtRound(lhs)} / {fmtRound(limit)}
-                      {binding && <span className="ml-2 text-amber-300 font-semibold">BINDING</span>}
-                    </span>
-                  </div>
-                  <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all ${binding ? 'bg-amber-500' : 'bg-cyan-500'}`}
-                      style={{ width: `${pct}%` }}
-                    />
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-slate-400">Utilization (LHS / RHS)</span>
+                      <span className="font-mono text-slate-300 tabular-nums">
+                        {fmtRound(lhs)} / {fmtRound(limit)}
+                      </span>
+                    </div>
+                    <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${binding ? 'bg-amber-500' : 'bg-cyan-500'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
               );
