@@ -9,23 +9,20 @@
  *               x2                 ≤ 22         (business demand)
  *        x1, x2, x3 ≥ 0
  *
- * 3-variable LP, so we can't draw a 2D feasible region. Instead the page
- * shows a constraint-utilization chart: one horizontal bar per constraint,
- * filled to (LHS / RHS) with a "BINDING" badge when LHS == RHS. Sliders
- * for objective coefficients and RHS values trigger a debounced re-solve
- * via /api/solve, and the chart + optimum readout update live.
+ * Self-contained: solves the LP entirely in the browser via a small
+ * embedded simplex routine — no backend roundtrip, no /api/solve call.
+ * Works on the static-only Render deployment.
+ *
+ * UI: a constraint-utilization chart (one horizontal bar per constraint,
+ * filled to LHS / RHS with a BINDING badge when at the limit) takes the
+ * place of a 2D feasible-region graph (which doesn't apply to a 3-variable
+ * LP). Sliders for objective coefficients and RHS values re-solve live.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router';
 import { Button } from '../components/ui/button';
-import { ArrowLeft, RotateCcw, Loader2 } from 'lucide-react';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const _env = (import.meta as any).env ?? {};
-const API_BASE = _env.VITE_API_URL ? `${_env.VITE_API_URL}/api`
-               : _env.DEV            ? 'http://localhost:8000/api'
-                                     : '/api';
+import { ArrowLeft, RotateCcw } from 'lucide-react';
 
 // ── The LP, as code ─────────────────────────────────────────────────────────
 
@@ -48,13 +45,9 @@ const CONSTRAINTS: ConstraintDef[] = [
   { label: 'Business demand', coefficients: [0, 1, 0],      baseRhs: 22 },
 ];
 
-// Slider ranges: ±50% around baseline (rounded so the number on the
-// slider doesn't look noisy). RHS sliders skip "Cargo capacity" because
-// it's already huge and the optimum is bounded elsewhere.
 function sliderRange(value: number): { min: number; max: number; step: number } {
   const span = Math.max(Math.abs(value) * 0.5, 1);
-  const step = span > 100 ? 1 : span > 10 ? 0.1 : 0.01;
-  const niceStep = step >= 1 ? Math.max(1, Math.round(span / 100)) : step;
+  const niceStep = span > 100 ? Math.max(1, Math.round(span / 100)) : span > 10 ? 0.1 : 0.01;
   return {
     min: Math.max(0, +(value - span).toFixed(2)),
     max: +(value + span).toFixed(2),
@@ -62,76 +55,130 @@ function sliderRange(value: number): { min: number; max: number; step: number } 
   };
 }
 
+// ── Embedded simplex solver ─────────────────────────────────────────────────
+// Standard simplex for: max c·x  subject to  A·x ≤ b,  x ≥ 0,  b ≥ 0.
+// Initial basis is the slack variables (one per constraint), so the all-zero
+// origin is a feasible BFS as long as every b_i ≥ 0 (which it always is for
+// this airline model — RHS sliders are clamped to ≥ 0).
+
+interface SimplexResult {
+  status: 'optimal' | 'unbounded' | 'infeasible';
+  x: number[];   // length n (decision variables)
+  z: number;     // objective value
+}
+
+function simplex(
+  c: number[],
+  A: number[][],
+  b: number[],
+): SimplexResult {
+  const n = c.length;
+  const m = b.length;
+
+  // Reject negative RHS — origin no longer a feasible BFS.
+  for (let i = 0; i < m; i++) {
+    if (b[i] < -1e-9) return { status: 'infeasible', x: [], z: 0 };
+  }
+
+  // Build tableau:
+  //   m constraint rows + 1 objective row
+  //   n decision cols + m slack cols + 1 RHS col
+  const T: number[][] = [];
+  for (let i = 0; i < m; i++) {
+    const row = new Array(n + m + 1).fill(0);
+    for (let j = 0; j < n; j++) row[j] = A[i][j];
+    row[n + i] = 1;             // identity slack
+    row[n + m] = b[i];          // RHS
+    T.push(row);
+  }
+  const zRow = new Array(n + m + 1).fill(0);
+  for (let j = 0; j < n; j++) zRow[j] = -c[j];   // maximization → negate
+  T.push(zRow);
+
+  const basis = new Array(m);
+  for (let i = 0; i < m; i++) basis[i] = n + i;
+
+  const MAX_ITER = 200;
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    // Bland's rule (avoids cycling): pick LOWEST-index column with negative
+    // entry in the z-row.
+    let enterCol = -1;
+    for (let j = 0; j < n + m; j++) {
+      if (T[m][j] < -1e-9) { enterCol = j; break; }
+    }
+    if (enterCol === -1) {
+      // Optimal — extract solution
+      const x = new Array(n).fill(0);
+      for (let i = 0; i < m; i++) {
+        if (basis[i] < n) x[basis[i]] = T[i][n + m];
+      }
+      return { status: 'optimal', x, z: T[m][n + m] };
+    }
+
+    // Min-ratio test for leaving variable. Bland's rule again for ties.
+    let leaveRow = -1;
+    let minRatio = Infinity;
+    for (let i = 0; i < m; i++) {
+      const a = T[i][enterCol];
+      if (a > 1e-9) {
+        const ratio = T[i][n + m] / a;
+        if (ratio < minRatio - 1e-12 ||
+            (Math.abs(ratio - minRatio) < 1e-12 && (leaveRow === -1 || basis[i] < basis[leaveRow]))) {
+          minRatio = ratio;
+          leaveRow = i;
+        }
+      }
+    }
+    if (leaveRow === -1) return { status: 'unbounded', x: [], z: 0 };
+
+    // Pivot
+    const piv = T[leaveRow][enterCol];
+    for (let j = 0; j <= n + m; j++) T[leaveRow][j] /= piv;
+    for (let i = 0; i <= m; i++) {
+      if (i === leaveRow) continue;
+      const f = T[i][enterCol];
+      if (Math.abs(f) < 1e-12) continue;
+      for (let j = 0; j <= n + m; j++) T[i][j] -= f * T[leaveRow][j];
+    }
+    basis[leaveRow] = enterCol;
+  }
+  // Should never hit MAX_ITER for this small LP, but guard anyway.
+  return { status: 'unbounded', x: [], z: 0 };
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
-interface SolveResult {
+interface SolveView {
   status: 'optimal' | 'infeasible' | 'unbounded';
-  z: number | null;
-  x: number[];           // length 3
-  bindingConstraints: boolean[]; // length CONSTRAINTS.length
+  z: number;
+  x: number[];
+  bindingConstraints: boolean[];
 }
 
 export default function AirlineModel() {
   const [obj, setObj] = useState<[number, number, number]>([...BASE_OBJECTIVE]);
   const [rhs, setRhs] = useState<number[]>(CONSTRAINTS.map(c => c.baseRhs));
-  const [result, setResult] = useState<SolveResult | null>(null);
-  const [solving, setSolving] = useState(false);
-  const [errMsg, setErrMsg] = useState<string | null>(null);
 
-  // Debounced solve. Each slider drag fires many setObj/setRhs in quick
-  // succession; we wait 250ms after the last change before hitting the
-  // backend, so we don't blast the solver on every tick.
-  const debounceRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(() => { void solve(); }, 250);
-    return () => {
-      if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [obj, rhs]);
-
-  const solve = async () => {
-    setSolving(true);
-    setErrMsg(null);
-    try {
-      const body = {
-        objectiveType: 'max',
-        objectiveCoefficients: obj,
-        variables: [...VAR_NAMES],
-        variableSigns: VAR_NAMES.map(() => 'nonneg'),
-        constraints: CONSTRAINTS.map((c, i) => ({
-          id: `c${i + 1}`,
-          coefficients: [...c.coefficients],
-          operator: '<=',
-          rhs: rhs[i],
-        })),
+  // Solve synchronously on every render — the LP is tiny (3 vars, 5
+  // constraints), simplex converges in a handful of iterations,
+  // browser does it imperceptibly fast on slider drags.
+  const result = useMemo<SolveView>(() => {
+    const A = CONSTRAINTS.map(c => [c.coefficients[0], c.coefficients[1], c.coefficients[2]]);
+    const r = simplex([...obj], A, [...rhs]);
+    if (r.status !== 'optimal') {
+      return {
+        status: r.status,
+        z: 0,
+        x: [0, 0, 0],
+        bindingConstraints: CONSTRAINTS.map(() => false),
       };
-      const res = await fetch(`${API_BASE}/solve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error(`Solver returned ${res.status}`);
-      const data = await res.json();
-      const x: number[] = VAR_NAMES.map(name => data.optimalSolution?.[name] ?? 0);
-      const binding = CONSTRAINTS.map((c, i) => {
-        const lhs = c.coefficients.reduce((s, a, k) => s + a * x[k], 0);
-        return Math.abs(lhs - rhs[i]) < 1e-4 * Math.max(1, rhs[i]);
-      });
-      setResult({
-        status: data.status,
-        z: data.optimalValue ?? null,
-        x,
-        bindingConstraints: binding,
-      });
-    } catch (e) {
-      setErrMsg(e instanceof Error ? e.message : String(e));
-      setResult(null);
-    } finally {
-      setSolving(false);
     }
-  };
+    const binding = CONSTRAINTS.map((c, i) => {
+      const lhs = c.coefficients.reduce((s, a, k) => s + a * (r.x[k] ?? 0), 0);
+      return Math.abs(lhs - rhs[i]) < 1e-4 * Math.max(1, rhs[i]);
+    });
+    return { status: 'optimal', z: r.z, x: r.x, bindingConstraints: binding };
+  }, [obj, rhs]);
 
   const reset = () => {
     setObj([...BASE_OBJECTIVE]);
@@ -151,48 +198,18 @@ export default function AirlineModel() {
           </Button>
         </div>
 
-        <header>
-          <p className="text-[10px] uppercase tracking-wider text-cyan-400 font-bold">Final presentation — airline model</p>
-          <h1 className="text-2xl font-bold mt-1">The Model</h1>
-          <pre className="mt-3 text-sm font-mono text-slate-300 leading-relaxed whitespace-pre-wrap">
-{`Max z = ${fmt(obj[0])} x1 + ${fmt(obj[1])} x2 + ${fmt(obj[2])} x3
-
-  3.8 x1 + 11.1 x2            ≤ ${fmt(rhs[0])}        (cabin space)
-  240 x1 + 340 x2 +    x3     ≤ ${fmt(rhs[1])}    (weight)
-                       x3     ≤ ${fmt(rhs[2])}    (cargo capacity)
-  x1 + x2                     ≤ ${fmt(rhs[3])}         (passenger limit)
-        x2                    ≤ ${fmt(rhs[4])}          (business demand)
-  x1, x2, x3 ≥ 0`}
-          </pre>
-        </header>
-
-        {/* ── Optimum readout ─────────────────────────────────────────── */}
-        <div className="bg-slate-900 border border-cyan-500/30 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] uppercase tracking-wider text-cyan-300 font-bold">Current optimum</p>
-            {solving && <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />}
+        {/* Compact optimum strip — just so you can see what the sliders
+            are doing. Kept tiny so it doesn't compete with the chart. */}
+        {result.status === 'optimal' ? (
+          <div className="text-sm font-mono text-slate-300 tabular-nums flex flex-wrap gap-4">
+            <span>x1*={fmtRound(result.x[0])}</span>
+            <span>x2*={fmtRound(result.x[1])}</span>
+            <span>x3*={fmtRound(result.x[2])}</span>
+            <span className="text-emerald-300 font-bold">z*={fmtRound(result.z)}</span>
           </div>
-          {errMsg ? (
-            <p className="text-rose-300 text-sm">Couldn&apos;t solve: {errMsg}</p>
-          ) : result == null ? (
-            <p className="text-slate-400 text-sm">Solving…</p>
-          ) : result.status !== 'optimal' ? (
-            <p className="text-amber-300 text-sm">Status: <strong>{result.status}</strong></p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              {VAR_NAMES.map((n, i) => (
-                <div key={n} className="bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">{VAR_LABELS[i]}</p>
-                  <p className="text-xl font-bold text-slate-100 tabular-nums">{n}* = {fmtRound(result.x[i])}</p>
-                </div>
-              ))}
-              <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-3 font-mono">
-                <p className="text-[10px] text-emerald-300 uppercase tracking-wider">Profit</p>
-                <p className="text-xl font-bold text-emerald-200 tabular-nums">z* = {fmtRound(result.z ?? 0)}</p>
-              </div>
-            </div>
-          )}
-        </div>
+        ) : (
+          <p className="text-amber-300 text-sm">Status: <strong>{result.status}</strong></p>
+        )}
 
         {/* ── Constraint utilization chart ─────────────────────────────── */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
@@ -201,12 +218,10 @@ export default function AirlineModel() {
           </p>
           <div className="space-y-3">
             {CONSTRAINTS.map((c, i) => {
-              const lhs = result
-                ? c.coefficients.reduce((s, a, k) => s + a * (result.x[k] ?? 0), 0)
-                : 0;
+              const lhs = c.coefficients.reduce((s, a, k) => s + a * (result.x[k] ?? 0), 0);
               const limit = rhs[i];
               const pct = limit > 0 ? Math.min(100, (lhs / limit) * 100) : 0;
-              const binding = result?.bindingConstraints[i] ?? false;
+              const binding = result.bindingConstraints[i];
               return (
                 <div key={c.label}>
                   <div className="flex items-center justify-between text-xs mb-1">
@@ -280,12 +295,6 @@ export default function AirlineModel() {
           })}
         </div>
 
-        <p className="text-xs text-slate-500 italic leading-relaxed">
-          Drag a single slider in a small range and watch z* change at a constant rate — that rate
-          is the shadow price (RHS sliders) or the reduced-cost margin (objective sliders). When the
-          rate visibly changes, you&apos;ve crossed the allowable range and the optimal basis has
-          flipped.
-        </p>
       </div>
     </div>
   );
