@@ -331,12 +331,14 @@ export default function AirlineModel() {
           <p className="text-amber-300 text-sm">Status: <strong>{result.status}</strong></p>
         )}
 
-        {/* ── Side-by-side: graph (left) + slider panels stacked (right) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* ── Side-by-side: graph (left, wider) + slider panels (right) ── */}
+        {/* 12-col grid so we can give the graph more room than 50/50 — */}
+        {/* graph is 7/12, sliders 5/12 on lg+ screens. */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-          {/* Graph — sticks to top while you scroll the sliders on tall pages */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 lg:sticky lg:top-4">
-            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-3">
+          {/* Graph — sticks to top while you scroll the sliders */}
+          <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 lg:sticky lg:top-4">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">
               Feasible region — x₁ vs x₂ (x₃ projected at optimum)
             </p>
             <DiscoveryGraph
@@ -348,22 +350,20 @@ export default function AirlineModel() {
               optimumConfirmed={result.status === 'optimal'}
               optimumTarget={result.z}
             />
-            <p className="text-[10px] text-slate-500 italic mt-2">
-              x₃ fixed at {Math.round(result.x[2] ?? 0).toLocaleString()} (current optimum). Drag any
-              slider on the right and watch the constraint lines and the green optimum point shift.
+            <p className="text-[10px] text-slate-500 italic mt-1">
+              x₃ fixed at {Math.round(result.x[2] ?? 0).toLocaleString()} (current optimum).
             </p>
           </div>
 
-          {/* Sliders column — costs (drives profit) then objective then RHS */}
-          <div className="space-y-6">
-            <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 space-y-4">
+          {/* Sliders column — cost (with profit shown inline) then RHS */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 space-y-3">
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">
-                  Per-unit total cost — drives profit (sliders below)
+                  Per-unit cost (drives profit)
                 </p>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                  From the cost-breakdown slide. Drag a cost up — the matching profit slider
-                  drops automatically because <span className="font-mono">profit = revenue − cost</span>.
+                <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                  Drag cost up, profit drops because <span className="font-mono">profit = revenue − cost</span>.
                 </p>
               </div>
               {VAR_NAMES.map((n, i) => {
@@ -371,7 +371,7 @@ export default function AirlineModel() {
                 return (
                   <SliderRow
                     key={`cost-${n}`}
-                    label={`${VAR_LABELS[i]} — total cost`}
+                    label={`${VAR_LABELS[i]}  →  profit ${fmt(obj[i])}`}
                     baseValue={BASE_COSTS[i]}
                     value={costs[i]}
                     min={r.min}
@@ -383,34 +383,9 @@ export default function AirlineModel() {
               })}
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
               <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                Objective coefficients — profit per unit (auto-driven by cost above; can also be dragged directly)
-              </p>
-              {VAR_NAMES.map((n, i) => {
-                const r = sliderRange(BASE_OBJECTIVE[i]);
-                return (
-                  <SliderRow
-                    key={n}
-                    label={`${n} — ${VAR_LABELS[i]}`}
-                    baseValue={BASE_OBJECTIVE[i]}
-                    value={obj[i]}
-                    min={r.min}
-                    max={r.max}
-                    step={r.step}
-                    onChange={v => setObj(prev => {
-                      const next: [number, number, number] = [...prev];
-                      next[i] = v;
-                      return next;
-                    })}
-                  />
-                );
-              })}
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                Constraint right-hand sides — resource availability
+                Constraint right-hand sides
               </p>
               {CONSTRAINTS.map((c, i) => {
                 const r = sliderRange(c.baseRhs);
