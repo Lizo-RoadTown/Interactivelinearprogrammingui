@@ -258,9 +258,17 @@ export default function DiscoveryGraph({
   const feasiblePolygon = feasibleData?.pointsStr ?? null;
   const feasibleVertices = feasibleData?.vertices ?? [];
 
-  // Tick marks
-  const xStep = maxX <= 15 ? 2 : maxX <= 40 ? 5 : 10;
-  const yStep = maxY <= 15 ? 2 : maxY <= 40 ? 5 : 10;
+  // Tick marks. Step ladder so axis labels don't crowd at large ranges
+  // (the airline demo's passenger axis goes to ~420, weight to ~700+).
+  const chooseStep = (m: number) =>
+    m <= 15 ? 2 :
+    m <= 40 ? 5 :
+    m <= 100 ? 10 :
+    m <= 300 ? 25 :
+    m <= 800 ? 50 :
+    100;
+  const xStep = chooseStep(maxX);
+  const yStep = chooseStep(maxY);
   const xTicks = Array.from({ length: Math.floor(maxX / xStep) + 1 }, (_, i) => i * xStep);
   const yTicks = Array.from({ length: Math.floor(maxY / yStep) + 1 }, (_, i) => i * yStep);
 
