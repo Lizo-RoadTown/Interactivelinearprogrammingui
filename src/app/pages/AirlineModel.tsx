@@ -269,7 +269,7 @@ export default function AirlineModel() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="max-w-6xl mx-auto p-6 sm:p-8 space-y-6">
+      <div className="max-w-7xl mx-auto p-6 sm:p-8 space-y-6">
 
         <div className="flex items-center justify-between">
           <Link to="/" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200">
@@ -293,32 +293,84 @@ export default function AirlineModel() {
           <p className="text-amber-300 text-sm">Status: <strong>{result.status}</strong></p>
         )}
 
-        {/* ── 2D feasible-region projection (x1 vs x2, x3 fixed) ──────── */}
-        {/* Uses the same DiscoveryGraph component the rest of the app uses
-            so colors, calibration, and the optimum marker match. We project
-            the 3-var LP onto the (x1, x2) plane by substituting x3 = x3*
-            into the weight constraint and dropping constraints that don't
-            involve x1 or x2 (e.g. cargo capacity becomes 0 ≤ const). */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-3">
-            Feasible region — x₁ vs x₂ (x₃ projected at optimum)
-          </p>
-          <DiscoveryGraph
-            draft={projectTo2D(obj, rhs, result.x[2] ?? 0)}
-            linesDrawn={ALL_LINES_2D}
-            sideDrawnFor={ALL_LINES_2D}
-            feasibleRegionRevealed
-            bfsPoint={result.status === 'optimal' ? { x: result.x[0] ?? 0, y: result.x[1] ?? 0 } : null}
-            optimumConfirmed={result.status === 'optimal'}
-            optimumTarget={result.z}
-          />
-          <p className="text-[10px] text-slate-500 italic mt-2">
-            x₃ fixed at {Math.round(result.x[2] ?? 0).toLocaleString()} (current optimum). Drag any
-            slider above to see how the constraint lines and the green optimum point shift.
-          </p>
+        {/* ── Side-by-side: graph (left) + slider panels stacked (right) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+          {/* Graph — sticks to top while you scroll the sliders on tall pages */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 lg:sticky lg:top-4">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-3">
+              Feasible region — x₁ vs x₂ (x₃ projected at optimum)
+            </p>
+            <DiscoveryGraph
+              draft={projectTo2D(obj, rhs, result.x[2] ?? 0)}
+              linesDrawn={ALL_LINES_2D}
+              sideDrawnFor={ALL_LINES_2D}
+              feasibleRegionRevealed
+              bfsPoint={result.status === 'optimal' ? { x: result.x[0] ?? 0, y: result.x[1] ?? 0 } : null}
+              optimumConfirmed={result.status === 'optimal'}
+              optimumTarget={result.z}
+            />
+            <p className="text-[10px] text-slate-500 italic mt-2">
+              x₃ fixed at {Math.round(result.x[2] ?? 0).toLocaleString()} (current optimum). Drag any
+              slider on the right and watch the constraint lines and the green optimum point shift.
+            </p>
+          </div>
+
+          {/* Sliders column — objective then RHS */}
+          <div className="space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                Objective coefficients — what each variable contributes to profit
+              </p>
+              {VAR_NAMES.map((n, i) => {
+                const r = sliderRange(BASE_OBJECTIVE[i]);
+                return (
+                  <SliderRow
+                    key={n}
+                    label={`${n} — ${VAR_LABELS[i]}`}
+                    baseValue={BASE_OBJECTIVE[i]}
+                    value={obj[i]}
+                    min={r.min}
+                    max={r.max}
+                    step={r.step}
+                    onChange={v => setObj(prev => {
+                      const next: [number, number, number] = [...prev];
+                      next[i] = v;
+                      return next;
+                    })}
+                  />
+                );
+              })}
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                Constraint right-hand sides — resource availability
+              </p>
+              {CONSTRAINTS.map((c, i) => {
+                const r = sliderRange(c.baseRhs);
+                return (
+                  <SliderRow
+                    key={c.label}
+                    label={c.label}
+                    baseValue={c.baseRhs}
+                    value={rhs[i]}
+                    min={r.min}
+                    max={r.max}
+                    step={r.step}
+                    onChange={v => setRhs(prev => {
+                      const next = [...prev];
+                      next[i] = v;
+                      return next;
+                    })}
+                  />
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* ── Constraint utilization chart ─────────────────────────────── */}
+        {/* ── Constraint utilization chart (full-width below) ──────────── */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-3">
             Constraint utilization (LHS ÷ RHS)
@@ -348,58 +400,6 @@ export default function AirlineModel() {
               );
             })}
           </div>
-        </div>
-
-        {/* ── Sliders — Objective coefficients ─────────────────────────── */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-            Objective coefficients — what each variable contributes to profit
-          </p>
-          {VAR_NAMES.map((n, i) => {
-            const r = sliderRange(BASE_OBJECTIVE[i]);
-            return (
-              <SliderRow
-                key={n}
-                label={`${n} — ${VAR_LABELS[i]}`}
-                baseValue={BASE_OBJECTIVE[i]}
-                value={obj[i]}
-                min={r.min}
-                max={r.max}
-                step={r.step}
-                onChange={v => setObj(prev => {
-                  const next: [number, number, number] = [...prev];
-                  next[i] = v;
-                  return next;
-                })}
-              />
-            );
-          })}
-        </div>
-
-        {/* ── Sliders — Constraint RHS ────────────────────────────────── */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-            Constraint right-hand sides — resource availability
-          </p>
-          {CONSTRAINTS.map((c, i) => {
-            const r = sliderRange(c.baseRhs);
-            return (
-              <SliderRow
-                key={c.label}
-                label={c.label}
-                baseValue={c.baseRhs}
-                value={rhs[i]}
-                min={r.min}
-                max={r.max}
-                step={r.step}
-                onChange={v => setRhs(prev => {
-                  const next = [...prev];
-                  next[i] = v;
-                  return next;
-                })}
-              />
-            );
-          })}
         </div>
 
       </div>
