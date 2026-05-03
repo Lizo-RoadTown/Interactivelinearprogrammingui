@@ -7,6 +7,7 @@ import GuidedLearnPage from "./pages/workspace/GuidedLearnPage";
 import MatrixMethodWorkspace from "./pages/workspace/matrixMethod/MatrixMethodWorkspace";
 import AdminGuarded from "./auth/AdminGuarded";
 import SignInPage from "./pages/SignInPage";
+import AirlineModel from "./pages/AirlineModel";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -56,6 +57,12 @@ export const router = createBrowserRouter([
     // Professor sign-in / sign-up. Students don't sign in.
     path: "/signin",
     Component: SignInPage,
+  },
+  {
+    // One-off page for the team's final-presentation airline model.
+    // 3-variable LP with a constraint-utilization chart + live sliders.
+    path: "/airline-demo",
+    Component: AirlineModel,
   },
   {
     // Catch-all — keeps the React Router default error screen from

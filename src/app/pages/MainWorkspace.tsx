@@ -9,7 +9,7 @@ import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Method, LPProblem, TableauCell, Tableau, VariableSign } from '../types';
 import { useLPSolver } from '../hooks/useLPSolver';
-import { BookOpen, Zap, AlertCircle, Loader2, Plus, Trash2, Info } from 'lucide-react';
+import { BookOpen, Zap, AlertCircle, Loader2, Plus, Trash2, Info, Sliders, Grid3x3 } from 'lucide-react';
 import BankPickerStudent from '../components/BankPickerStudent';
 
 const DEFAULT_PROBLEM: LPProblem = {
@@ -394,6 +394,53 @@ export default function MainWorkspace() {
             </div>
           </div>
 
+          {/* Chapter 8 — sensitivity analysis. The "what happens when
+              something changes?" follow-on once a student can solve LPs.
+              Sliders shows how Δ ripples through the optimal table and
+              feasible region; Matrix Method is the §8.2 algebra prep. */}
+          <div className="w-full max-w-2xl mt-3">
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5 ml-1">
+              Chapter 8 — what if the inputs change?
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div
+                onClick={() => navigate('/sensitivity')}
+                className="cursor-pointer bg-slate-900 border border-violet-500/30 rounded-xl p-4 hover:border-violet-400/60 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-violet-500/10 border border-violet-500/30 flex items-center justify-center shrink-0 text-violet-300">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-slate-100">Sensitivity analysis (§8.3)</h3>
+                    <p className="text-slate-400 text-xs leading-snug mt-0.5">
+                      Drag a slider, watch the feasible region and optimum shift.
+                      Six "what-if" operations from the textbook.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onClick={() => navigate('/matrix-method/ch8-example-1')}
+                className="cursor-pointer bg-slate-900 border border-violet-500/30 rounded-xl p-4 hover:border-violet-400/60 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-violet-500/10 border border-violet-500/30 flex items-center justify-center shrink-0 text-violet-300">
+                    <Grid3x3 className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-slate-100">Matrix method (§8.2)</h3>
+                    <p className="text-slate-400 text-xs leading-snug mt-0.5">
+                      Build the optimal simplex table from B⁻¹, C_B, C_N.
+                      The algebra §8.3 builds on.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Student bank picker — choose your professor's bank. */}
           <BankPickerStudent />
 
@@ -419,15 +466,11 @@ export default function MainWorkspace() {
             </div>
           </div>
 
-          {/* Small footer — peripheral pages only */}
+          {/* Small footer — peripheral pages only (Sensitivity and
+              Matrix Method are now promoted to cards above). */}
           <p className="text-slate-500 text-xs mt-6 max-w-2xl text-center">
             Other pages:{' '}
             <a className="underline underline-offset-2 hover:text-slate-300 cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate('/practice'); }}>Practice</a>
-            {' · '}
-            <a className="underline underline-offset-2 hover:text-slate-300 cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate('/sensitivity'); }}>Sensitivity</a>
-            {' · '}
-            <a className="underline underline-offset-2 hover:text-slate-300 cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate('/matrix-method/ch8-example-1'); }}>Matrix Method</a>
-            {' (Chapter 8 gameboard)'}
           </p>
         </div>
       )}

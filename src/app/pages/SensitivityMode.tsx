@@ -1,16 +1,14 @@
 /**
- * SensitivityMode.tsx — Chapter 8 learning environment (rebuilt).
+ * SensitivityMode.tsx — Chapter 8 learning environment.
  *
  * Five-layer pedagogy parallel to PracticeMode:
  *   1. Browse → pick a sensitivity problem (extends an existing Simplex problem)
  *   2. Arrive → read the word problem, see the "management asks" twist
  *   3. Identify operation → which §8.3.X does this change map to?
  *   4. Solve (tableau-driven) → student-driven matrix math, checked step by step
- *   5. Reveal → graphical slider / before-after
- *   6. Debrief → plain-English answer
- *
- * Phase 1 of the rebuild ships layers 1-3 + a placeholder for 4-6.
- * Phase 2+ fills in operation-specific solving.
+ *      (still a Phase-2 placeholder — wired per-operation in a later slice)
+ *   5. Reveal → graphical slider + live recomputed optimum
+ *   6. Debrief → plain-English answer with the actual numbers filled in
  */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -29,10 +27,31 @@ import { WORD_PROBLEMS, WordProblem } from '../data/wordProblems';
 import { LPProblem } from '../types';
 import { useLPSolver } from '../hooks/useLPSolver';
 import { useGuidedSensitivity } from '../hooks/useGuidedSensitivity';
+import { LPDraft } from './workspace/guidedTypes';
+import { solveLP2D, applyPerturbation, LPSolution } from './workspace/lpSolve';
+import SensitivityControls from './workspace/SensitivityControls';
+import DiscoveryGraph from './workspace/DiscoveryGraph';
 import {
   ArrowLeft, BookOpen, Loader2, AlertCircle, CheckCircle,
   XCircle, Lightbulb, Eye,
 } from 'lucide-react';
+
+// ── Word-problem → LPDraft converter (used by Reveal/Debrief sliders) ───────
+
+function wordProblemToDraft(p: WordProblem): LPDraft {
+  return {
+    variables: p.variables.map(v => ({ name: v.name, description: v.description })),
+    objectiveType: p.objectiveType,
+    objectiveCoefficients: [...p.objectiveCoefficients],
+    constraints: p.constraints.map(c => ({
+      started: true,
+      label: c.label ?? '',
+      coefficients: [...c.coefficients],
+      operator: c.operator,
+      rhs: c.rhs,
+    })),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page shell — routes between the six layers
@@ -209,9 +228,9 @@ function SensitivityRunner({
     <div className="flex-1 flex flex-col overflow-hidden">
       {layer === 'arrive'      && <ArriveLayer problem={problem} baseProblem={baseProblem} guided={guided} />}
       {layer === 'identify_op' && <IdentifyOpLayer problem={problem} guided={guided} />}
-      {layer === 'solve'       && <SolvePlaceholder problem={problem} solver={solver} />}
-      {layer === 'reveal'      && <RevealPlaceholder problem={problem} guided={guided} />}
-      {layer === 'debrief'     && <DebriefPlaceholder problem={problem} guided={guided} onExit={onExit} />}
+      {layer === 'solve'       && <SolvePlaceholder problem={problem} solver={solver} guided={guided} />}
+      {layer === 'reveal'      && <RevealLayer problem={problem} baseProblem={baseProblem} guided={guided} />}
+      {layer === 'debrief'     && <DebriefLayer problem={problem} baseProblem={baseProblem} guided={guided} onExit={onExit} />}
     </div>
   );
 }
@@ -396,10 +415,11 @@ function IdentifyOpLayer({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SolvePlaceholder({
-  problem, solver,
+  problem, solver, guided,
 }: {
   problem: SensitivityProblem;
   solver: ReturnType<typeof useLPSolver>;
+  guided: ReturnType<typeof useGuidedSensitivity>;
 }) {
   const { solverResponse, steps, isLoading } = solver;
   const optimalTableau = useMemo(() => {
@@ -453,61 +473,261 @@ function SolvePlaceholder({
             {' '}z* = <span className="font-mono">{solverResponse?.optimalValue?.toFixed(4) ?? '—'}</span>
           </p>
         </div>
+
+        <div className="flex justify-end">
+          <Button
+            onClick={() => guided.finishSolve()}
+            className="bg-primary hover:bg-primary/90 text-white"
+          >
+            Skip to graphical reveal →
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Layer 5 — Reveal (graphical slider — Phase 4)
+// Layer 5 — Reveal: live sliders + recomputed optimum + (when 2-var) graph
+//
+// The student drags the perturbation slider for the change the problem
+// describes, watches the feasible region and optimum shift, and sees Δz
+// update against the baseline. The slope of Δz over the slider's range IS
+// the shadow price (RHS) or the reduced-cost margin (objective coeff).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function RevealPlaceholder({
-  problem, guided,
+function RevealLayer({
+  problem, baseProblem, guided,
 }: {
   problem: SensitivityProblem;
+  baseProblem: WordProblem;
   guided: ReturnType<typeof useGuidedSensitivity>;
 }) {
+  const draft = useMemo(() => wordProblemToDraft(baseProblem), [baseProblem]);
+  const baseline: LPSolution | null = useMemo(
+    () => solveLP2D(draft, baseProblem.objectiveType === 'min' ? 'min' : 'max'),
+    [draft, baseProblem.objectiveType],
+  );
+
+  const [rhsDelta, setRhsDelta] = useState<number[]>([]);
+  const [objDelta, setObjDelta] = useState<number[]>([]);
+
+  // Pre-set the slider that matches this problem's specific change so the
+  // student lands on the "after" state and can drag back/forward to compare.
+  useEffect(() => {
+    if (problem.change.delta == null) return;
+    const t = problem.change.target?.name;
+    if (!t) return;
+    if (problem.operation === 'rhs_range') {
+      // target.name is the 1-based constraint index as a string ("1", "2", ...)
+      const idx = parseInt(t, 10) - 1;
+      if (idx >= 0) {
+        setRhsDelta(arr => {
+          const a = [...arr];
+          while (a.length <= idx) a.push(0);
+          a[idx] = problem.change.delta!;
+          return a;
+        });
+      }
+    } else if (problem.operation === 'of_coeff_basic' || problem.operation === 'of_coeff_nonbasic') {
+      // target.name is the variable name ("x1", "x2", ...)
+      const idx = baseProblem.variables.findIndex(v => v.name === t);
+      if (idx >= 0) {
+        setObjDelta(arr => {
+          const a = [...arr];
+          while (a.length <= idx) a.push(0);
+          a[idx] = problem.change.delta!;
+          return a;
+        });
+      }
+    }
+    // For add_activity / add_constraint / tech_coeff_nonbasic, the slider
+    // panel doesn't apply directly — the student gets a static "before/after"
+    // banner instead (handled below).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [problem.id]);
+
+  const liveDraft = useMemo(
+    () => applyPerturbation(draft, rhsDelta, objDelta),
+    [draft, rhsDelta, objDelta],
+  );
+  const liveSolution: LPSolution | null = useMemo(
+    () => solveLP2D(liveDraft, baseProblem.objectiveType === 'min' ? 'min' : 'max'),
+    [liveDraft, baseProblem.objectiveType],
+  );
+
+  const sliderApplies =
+    problem.operation === 'of_coeff_basic' ||
+    problem.operation === 'of_coeff_nonbasic' ||
+    problem.operation === 'rhs_range';
+
+  const continueToDebrief = () => {
+    // Commit the current optimum so the debrief layer can reference it.
+    guided.solveCorrect({
+      revealBaseline: baseline,
+      revealCurrent: liveSolution,
+    });
+    guided.acknowledgeReveal();
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <div className="max-w-3xl mx-auto space-y-5">
-        <div className="bg-card border border-border rounded-xl p-5">
-          <h3 className="text-lg font-semibold text-foreground mb-2">Reveal</h3>
-          <p className="text-sm text-muted-foreground">
-            The graphical slider reveal for {SECTION_LABEL[problem.operation]} is Phase 4 of the rebuild.
+      <div className="max-w-6xl mx-auto space-y-5">
+        <div className="bg-violet-500/10 border border-violet-500/40 rounded-xl p-4">
+          <p className="text-xs font-semibold text-violet-300 uppercase tracking-wider mb-1">
+            Reveal — drag the slider, watch the optimum move
+          </p>
+          <p className="text-sm text-foreground/90">
+            {sliderApplies ? (
+              <>
+                The slider for <code className="font-mono">{problem.change.target?.name}</code> is
+                pre-set to the value the problem asks about. Slide it back to <strong>0</strong> to
+                see the baseline, then forward to compare. The slope of Δz is the shadow price (RHS) or
+                the reduced-cost margin (objective coefficient).
+              </>
+            ) : (
+              <>
+                This operation ({SECTION_LABEL[problem.operation]}) doesn&apos;t map to a single slider —
+                the change is structural (a new variable or constraint). Continue to the debrief
+                for the worked answer.
+              </>
+            )}
           </p>
         </div>
-        <Button onClick={guided.acknowledgeReveal} className="bg-primary hover:bg-primary/90 text-white">
-          Continue to debrief →
-        </Button>
+
+        {sliderApplies ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Graph: only meaningful for 2-variable LPs */}
+            {baseProblem.numVars === 2 && (
+              <div className="bg-card/40 border border-border rounded-xl p-3">
+                <DiscoveryGraph
+                  draft={liveDraft}
+                  linesDrawn={new Set(baseProblem.constraints.map((_, i) => i))}
+                  sideDrawnFor={new Set(baseProblem.constraints.map((_, i) => i))}
+                  feasibleRegionRevealed
+                  bfsPoint={liveSolution ? { x: liveSolution.x1, y: liveSolution.x2 } : null}
+                  optimumConfirmed={!!liveSolution}
+                  optimumTarget={liveSolution?.z}
+                />
+              </div>
+            )}
+
+            <SensitivityControls
+              draft={draft}
+              rhsDelta={rhsDelta}
+              objDelta={objDelta}
+              onRhsDelta={(idx, delta) => {
+                setRhsDelta(prev => {
+                  const arr = [...prev];
+                  while (arr.length <= idx) arr.push(0);
+                  arr[idx] = delta;
+                  return arr;
+                });
+              }}
+              onObjDelta={(idx, delta) => {
+                setObjDelta(prev => {
+                  const arr = [...prev];
+                  while (arr.length <= idx) arr.push(0);
+                  arr[idx] = delta;
+                  return arr;
+                });
+              }}
+              onReset={() => {
+                setRhsDelta([]);
+                setObjDelta([]);
+              }}
+              baseline={baseline}
+            />
+          </div>
+        ) : (
+          <div className="bg-card/40 border border-border rounded-xl p-5 space-y-2">
+            <p className="text-sm text-foreground">
+              <strong>Change requested:</strong> {problem.change.description}
+            </p>
+            {baseline && (
+              <p className="text-xs text-muted-foreground">
+                Baseline optimum: (x₁, x₂) = ({baseline.x1.toFixed(2)}, {baseline.x2.toFixed(2)}),
+                {' '}z* = {baseline.z.toFixed(2)}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button onClick={continueToDebrief} className="bg-primary hover:bg-primary/90 text-white">
+            Continue to debrief →
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Layer 6 — Debrief
+// Layer 6 — Debrief: plain-English answer with the actual numbers filled in
 // ─────────────────────────────────────────────────────────────────────────────
 
-function DebriefPlaceholder({
-  problem, guided, onExit,
+function DebriefLayer({
+  problem, baseProblem, guided, onExit,
 }: {
   problem: SensitivityProblem;
+  baseProblem: WordProblem;
   guided: ReturnType<typeof useGuidedSensitivity>;
   onExit: () => void;
 }) {
+  const baseline = guided.state.committed.revealBaseline as LPSolution | null | undefined;
+  const current = guided.state.committed.revealCurrent as LPSolution | null | undefined;
+  const dz = baseline && current ? current.z - baseline.z : null;
+  const direction = baseProblem.objectiveType === 'min' ? 'min' : 'max';
+  const improved =
+    dz == null ? null
+    : direction === 'max' ? dz > 1e-6
+    : dz < -1e-6;
+
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-3xl mx-auto space-y-5">
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5">
-          <h3 className="text-lg font-semibold text-emerald-200 mb-2">Debrief</h3>
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-5 space-y-3">
+          <h3 className="text-lg font-semibold text-emerald-200">Debrief</h3>
           <p className="text-sm text-foreground leading-relaxed">
             {problem.debriefTemplate}
           </p>
-          <p className="text-xs text-muted-foreground italic mt-3">
-            (Placeholder values shown — the debrief will be filled in with the student&apos;s committed answers once Phase 2 is built.)
-          </p>
         </div>
+
+        {/* Numeric summary pulled from the Reveal layer's last state. */}
+        {baseline && current && (
+          <div className="bg-card/40 border border-border rounded-xl p-5 space-y-3 font-mono text-sm">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold not-italic">
+              Numbers
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-muted/30 border border-border rounded p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Baseline</p>
+                <p className="tabular-nums">x₁* = {baseline.x1.toFixed(2)}</p>
+                <p className="tabular-nums">x₂* = {baseline.x2.toFixed(2)}</p>
+                <p className="tabular-nums text-foreground font-semibold">z* = {baseline.z.toFixed(2)}</p>
+              </div>
+              <div className="bg-muted/30 border border-border rounded p-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">After change</p>
+                <p className="tabular-nums">x₁* = {current.x1.toFixed(2)}</p>
+                <p className="tabular-nums">x₂* = {current.x2.toFixed(2)}</p>
+                <p className="tabular-nums text-foreground font-semibold">z* = {current.z.toFixed(2)}</p>
+              </div>
+            </div>
+            {dz != null && (
+              <p className="text-xs not-italic">
+                Δz ={' '}
+                <span className={improved ? 'text-emerald-300 font-semibold' : 'text-rose-300 font-semibold'}>
+                  {dz >= 0 ? '+' : ''}{dz.toFixed(2)}
+                </span>
+                {' '}
+                <span className="text-muted-foreground">
+                  ({improved ? 'improved' : Math.abs(dz) < 1e-6 ? 'unchanged' : 'worsened'})
+                </span>
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <Button onClick={onExit} variant="outline">
