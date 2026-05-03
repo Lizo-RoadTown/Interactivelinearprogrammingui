@@ -371,13 +371,38 @@ export default function AirlineModel() {
                 return (
                   <SliderRow
                     key={`cost-${n}`}
-                    label={`${VAR_LABELS[i]}  →  profit ${fmt(obj[i])}`}
+                    label={`${VAR_LABELS[i]}`}
                     baseValue={BASE_COSTS[i]}
                     value={costs[i]}
                     min={r.min}
                     max={r.max}
                     step={r.step}
                     onChange={v => setCostFor(i as 0 | 1 | 2, v)}
+                  />
+                );
+              })}
+            </div>
+
+            <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 space-y-3">
+              <p className="text-[10px] uppercase tracking-wider text-emerald-300 font-bold">
+                Profit per unit (objective function — drag directly to override)
+              </p>
+              {VAR_NAMES.map((n, i) => {
+                const r = sliderRange(BASE_OBJECTIVE[i]);
+                return (
+                  <SliderRow
+                    key={n}
+                    label={`${n} — ${VAR_LABELS[i]}`}
+                    baseValue={BASE_OBJECTIVE[i]}
+                    value={obj[i]}
+                    min={r.min}
+                    max={r.max}
+                    step={r.step}
+                    onChange={v => setObj(prev => {
+                      const next: [number, number, number] = [...prev];
+                      next[i] = v;
+                      return next;
+                    })}
                   />
                 );
               })}
