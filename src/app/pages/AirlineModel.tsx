@@ -19,10 +19,27 @@
  * LP). Sliders for objective coefficients and RHS values re-solve live.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router';
 import { Button } from '../components/ui/button';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
+
+// localStorage keys — persist slider state across reloads so a what-if
+// scenario isn't wiped by a tab close or accidental refresh.
+const LS_OBJ = 'airline-demo.obj';
+const LS_RHS = 'airline-demo.rhs';
+
+function loadJSON<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 // ── The LP, as code ─────────────────────────────────────────────────────────
 
@@ -156,8 +173,25 @@ interface SolveView {
 }
 
 export default function AirlineModel() {
-  const [obj, setObj] = useState<[number, number, number]>([...BASE_OBJECTIVE]);
-  const [rhs, setRhs] = useState<number[]>(CONSTRAINTS.map(c => c.baseRhs));
+  const [obj, setObj] = useState<[number, number, number]>(
+    () => loadJSON<[number, number, number]>(LS_OBJ, [...BASE_OBJECTIVE]),
+  );
+  const [rhs, setRhs] = useState<number[]>(
+    () => loadJSON<number[]>(LS_RHS, CONSTRAINTS.map(c => c.baseRhs)),
+  );
+
+  // Persist slider state on every change so reloads/tab closes don't
+  // wipe a what-if scenario.
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_OBJ, JSON.stringify(obj));
+    }
+  }, [obj]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_RHS, JSON.stringify(rhs));
+    }
+  }, [rhs]);
 
   // Solve synchronously on every render — the LP is tiny (3 vars, 5
   // constraints), simplex converges in a handful of iterations,
