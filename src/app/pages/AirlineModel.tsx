@@ -56,6 +56,18 @@ const VAR_LABELS = ['Coach passengers', 'Business passengers', 'Cargo (lb)'] as 
 
 const BASE_OBJECTIVE: [number, number, number] = [300, 1980, 0.335];
 
+// Per-unit total costs from the team's final-presentation cost breakdown
+// (fuel + catering + labor + equipment + airport fees, summed). Implied
+// revenue per unit = baseline profit + baseline cost. The cost sliders
+// below derive profit from cost so dragging cost ↑ pushes profit ↓.
+const BASE_COSTS: [number, number, number] = [60, 150, 0.30];
+const BASE_REVENUES: [number, number, number] = [
+  BASE_OBJECTIVE[0] + BASE_COSTS[0],   // 360
+  BASE_OBJECTIVE[1] + BASE_COSTS[1],   // 2130
+  BASE_OBJECTIVE[2] + BASE_COSTS[2],   // 0.635
+];
+const LS_COSTS = 'airline-demo.costs';
+
 const CONSTRAINTS: ConstraintDef[] = [
   { label: 'Cabin space',     coefficients: [3.8, 11.1, 0], baseRhs: 2688 },
   { label: 'Weight',          coefficients: [240, 340, 1],  baseRhs: 120000 },
@@ -227,6 +239,9 @@ export default function AirlineModel() {
   const [rhs, setRhs] = useState<number[]>(
     () => loadJSON<number[]>(LS_RHS, CONSTRAINTS.map(c => c.baseRhs)),
   );
+  const [costs, setCosts] = useState<[number, number, number]>(
+    () => loadJSON<[number, number, number]>(LS_COSTS, [...BASE_COSTS]),
+  );
 
   // Persist slider state on every change so reloads/tab closes don't
   // wipe a what-if scenario.
@@ -240,6 +255,28 @@ export default function AirlineModel() {
       localStorage.setItem(LS_RHS, JSON.stringify(rhs));
     }
   }, [rhs]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_COSTS, JSON.stringify(costs));
+    }
+  }, [costs]);
+
+  // When a cost slider moves, derive profit = revenue − cost and update
+  // the objective coefficient. This is the "slider that affects this
+  // slider" link the user asked for: drag fuel/catering/etc. up, watch
+  // the corresponding profit drop, watch the optimum and graph shift.
+  const setCostFor = (i: 0 | 1 | 2, newCost: number) => {
+    setCosts(prev => {
+      const a = [...prev] as [number, number, number];
+      a[i] = newCost;
+      return a;
+    });
+    setObj(prev => {
+      const a = [...prev] as [number, number, number];
+      a[i] = BASE_REVENUES[i] - newCost;
+      return a;
+    });
+  };
 
   // Solve synchronously on every render — the LP is tiny (3 vars, 5
   // constraints), simplex converges in a handful of iterations,
@@ -265,6 +302,7 @@ export default function AirlineModel() {
   const reset = () => {
     setObj([...BASE_OBJECTIVE]);
     setRhs(CONSTRAINTS.map(c => c.baseRhs));
+    setCosts([...BASE_COSTS]);
   };
 
   return (
@@ -316,11 +354,38 @@ export default function AirlineModel() {
             </p>
           </div>
 
-          {/* Sliders column — objective then RHS */}
+          {/* Sliders column — costs (drives profit) then objective then RHS */}
           <div className="space-y-6">
+            <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 space-y-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">
+                  Per-unit total cost — drives profit (sliders below)
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                  From the cost-breakdown slide. Drag a cost up — the matching profit slider
+                  drops automatically because <span className="font-mono">profit = revenue − cost</span>.
+                </p>
+              </div>
+              {VAR_NAMES.map((n, i) => {
+                const r = sliderRange(BASE_COSTS[i]);
+                return (
+                  <SliderRow
+                    key={`cost-${n}`}
+                    label={`${VAR_LABELS[i]} — total cost`}
+                    baseValue={BASE_COSTS[i]}
+                    value={costs[i]}
+                    min={r.min}
+                    max={r.max}
+                    step={r.step}
+                    onChange={v => setCostFor(i as 0 | 1 | 2, v)}
+                  />
+                );
+              })}
+            </div>
+
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
               <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                Objective coefficients — what each variable contributes to profit
+                Objective coefficients — profit per unit (auto-driven by cost above; can also be dragged directly)
               </p>
               {VAR_NAMES.map((n, i) => {
                 const r = sliderRange(BASE_OBJECTIVE[i]);
