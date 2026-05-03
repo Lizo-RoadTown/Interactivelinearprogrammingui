@@ -441,6 +441,28 @@ export default function MainWorkspace() {
             </div>
           </div>
 
+          {/* Final-presentation airline LP — standalone page that solves
+              entirely in the browser (no backend). One-click access. */}
+          <div className="w-full max-w-2xl mt-3">
+            <div
+              onClick={() => navigate('/airline-demo')}
+              className="cursor-pointer bg-slate-900 border border-amber-500/30 rounded-xl p-4 hover:border-amber-400/60 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-300">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-100">Airline final-presentation demo</h3>
+                  <p className="text-slate-400 text-xs leading-snug mt-0.5">
+                    The 3-variable airline LP from the team&apos;s final. Constraint
+                    bars + sliders, no backend needed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Student bank picker — choose your professor's bank. */}
           <BankPickerStudent />
 
