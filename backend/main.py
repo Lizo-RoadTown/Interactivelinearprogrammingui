@@ -65,6 +65,13 @@ if os.path.isdir(_DIST):
 
     @app.get('/{full_path:path}', include_in_schema=False)
     def _spa(full_path: str):
+        # Don't shadow API routes — the catch-all is registered before
+        # they are (this if-block runs at import time, the API endpoints
+        # below are decorated later), so without this guard /api/* would
+        # serve index.html instead of routing into FastAPI.
+        if full_path.startswith('api/'):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not Found")
         candidate = os.path.join(_DIST, full_path)
         if os.path.isfile(candidate):
             return FileResponse(candidate)
