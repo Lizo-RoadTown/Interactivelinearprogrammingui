@@ -315,12 +315,14 @@ export default function MainWorkspace() {
 
       {/* ── HERO: two tiles, Workspace dominant ─────────────────────────── */}
       {!showSolver && (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-950 relative overflow-hidden">
+        <div className="flex-1 overflow-y-auto bg-slate-950 relative">
           {/* Background gradient accents */}
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-0 left-1/4 w-[600px] h-[600px] rounded-full bg-fuchsia-600/10 blur-3xl"></div>
             <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-3xl"></div>
           </div>
+          <div className="min-h-full flex flex-col items-center justify-center p-8 relative">
+
 
           {/* Guided walkthrough — the primary learning path */}
           <div
@@ -494,6 +496,7 @@ export default function MainWorkspace() {
             Other pages:{' '}
             <a className="underline underline-offset-2 hover:text-slate-300 cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate('/practice'); }}>Practice</a>
           </p>
+          </div>
         </div>
       )}
 
