@@ -519,15 +519,36 @@ const ALL_LINES_2D: Set<number> = new Set([0, 1, 2, 3, 4, 5]);
 
 type SolveView = SolveOutput;
 
+// Coerce localStorage payloads to the shapes the page expects. The bank of
+// constraints grew from 5 → 6, so users with old `airline-demo.rhs` arrays
+// in localStorage would otherwise see undefined for index 5 and crash on
+// `(undefined).toFixed`. Re-pad against current CONSTRAINTS, validate each
+// entry is a real number, fall back to baseline otherwise.
+function sanitizeRhs(saved: unknown): number[] {
+  const arr = Array.isArray(saved) ? saved : [];
+  return CONSTRAINTS.map((c, i) => {
+    const v = arr[i];
+    return typeof v === 'number' && Number.isFinite(v) ? v : c.baseRhs;
+  });
+}
+
+function sanitizeTriple(saved: unknown, baseline: readonly [number, number, number]): [number, number, number] {
+  const arr = Array.isArray(saved) ? saved : [];
+  return [0, 1, 2].map(i => {
+    const v = arr[i];
+    return typeof v === 'number' && Number.isFinite(v) ? v : baseline[i];
+  }) as [number, number, number];
+}
+
 export default function AirlineModel() {
   const [obj, setObj] = useState<[number, number, number]>(
-    () => loadJSON<[number, number, number]>(LS_OBJ, [...BASE_OBJECTIVE]),
+    () => sanitizeTriple(loadJSON<unknown>(LS_OBJ, null), BASE_OBJECTIVE),
   );
   const [rhs, setRhs] = useState<number[]>(
-    () => loadJSON<number[]>(LS_RHS, CONSTRAINTS.map(c => c.baseRhs)),
+    () => sanitizeRhs(loadJSON<unknown>(LS_RHS, null)),
   );
   const [costs, setCosts] = useState<[number, number, number]>(
-    () => loadJSON<[number, number, number]>(LS_COSTS, [...BASE_COSTS]),
+    () => sanitizeTriple(loadJSON<unknown>(LS_COSTS, null), BASE_COSTS),
   );
 
   // Persist slider state on every change so reloads/tab closes don't
