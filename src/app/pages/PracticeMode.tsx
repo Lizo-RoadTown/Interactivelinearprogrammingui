@@ -217,7 +217,7 @@ const DIFFICULTY_TIERS: { level: WPDifficulty; desc: string; icon: string; borde
 ];
 
 function ProblemBrowser({ onSelect }: { onSelect: (p: WordProblem) => void }) {
-  const { problems: allProblems } = useAllProblems();
+  const { problems: allProblems, bankProblems, activeBank } = useAllProblems();
 
   const pickRandom = (level: WPDifficulty) => {
     const pool = allProblems.filter(p => p.difficulty === level);
@@ -231,35 +231,86 @@ function ProblemBrowser({ onSelect }: { onSelect: (p: WordProblem) => void }) {
     Advanced: allProblems.filter(p => p.difficulty === 'Advanced').length,
   };
 
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground mb-2">Choose a Difficulty</h2>
-        <p className="text-muted-foreground text-sm max-w-md">
-          You'll get a random word problem at the level you choose.
-          Formulate the LP, pick the method, and solve it step by step.
-        </p>
-      </div>
+  const hasBankProblems = bankProblems.length > 0;
 
-      <div className="flex flex-col sm:flex-row gap-5 w-full max-w-3xl">
-        {DIFFICULTY_TIERS.map(tier => (
-          <button
-            key={tier.level}
-            onClick={() => pickRandom(tier.level)}
-            className={`flex-1 ${tier.bg} border-2 ${tier.border} ${tier.hover}
-                       rounded-2xl p-6 text-left transition-all cursor-pointer`}
-          >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-lg font-bold
-                            ${tier.level === 'Beginner' ? 'bg-emerald-500/30 text-emerald-200' :
-                              tier.level === 'Intermediate' ? 'bg-amber-500/30 text-amber-200' :
-                              'bg-destructive/30 text-destructive'}`}>
-              {tier.icon}
+  return (
+    <div className="flex-1 overflow-y-auto p-8">
+      <div className="max-w-4xl mx-auto space-y-10">
+
+        {/* ── Your professor's bank — direct list, click any problem to start ── */}
+        {hasBankProblems && (
+          <section>
+            <div className="text-center mb-5">
+              <p className="text-[11px] uppercase tracking-wider text-cyan-400 font-bold mb-1">
+                {activeBank ? `From your professor's bank: ${activeBank}` : 'From your bank'}
+              </p>
+              <h2 className="text-2xl font-bold text-foreground">
+                {bankProblems.length === 1 ? '1 problem' : `${bankProblems.length} problems`} ready for you
+              </h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Click any problem to read the scenario and start solving.
+              </p>
             </div>
-            <h3 className="text-lg font-bold text-foreground mb-1">{tier.level}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">{tier.desc}</p>
-            <p className="text-xs text-muted-foreground mt-3">{counts[tier.level]} problems</p>
-          </button>
-        ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {bankProblems.map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => onSelect(p)}
+                  className="text-left bg-cyan-500/5 border-2 border-cyan-500/30 hover:border-cyan-400/70 hover:bg-cyan-500/10 rounded-2xl p-5 transition-all cursor-pointer"
+                >
+                  <div className="flex items-baseline justify-between gap-3 mb-2">
+                    <h3 className="text-base font-bold text-foreground leading-tight">{p.title}</h3>
+                    <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full border font-medium ${DIFFICULTY_BADGE[p.difficulty]}`}>
+                      {p.difficulty}
+                    </span>
+                  </div>
+                  {p.scenario && (
+                    <p className="text-sm text-muted-foreground leading-snug line-clamp-3">
+                      {p.scenario}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-cyan-400/80 font-semibold mt-3">Open →</p>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Random pick from the broader (built-in + bank) pool by difficulty ── */}
+        <section>
+          <div className="text-center mb-5">
+            <h2 className="text-2xl font-bold text-foreground mb-1">
+              {hasBankProblems ? 'Or try a random built-in problem' : 'Choose a Difficulty'}
+            </h2>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">
+              You'll get a random word problem at the level you choose.
+              Formulate the LP, pick the method, and solve it step by step.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-5">
+            {DIFFICULTY_TIERS.map(tier => (
+              <button
+                key={tier.level}
+                type="button"
+                onClick={() => pickRandom(tier.level)}
+                className={`flex-1 ${tier.bg} border-2 ${tier.border} ${tier.hover}
+                           rounded-2xl p-6 text-left transition-all cursor-pointer`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 text-lg font-bold
+                                ${tier.level === 'Beginner' ? 'bg-emerald-500/30 text-emerald-200' :
+                                  tier.level === 'Intermediate' ? 'bg-amber-500/30 text-amber-200' :
+                                  'bg-destructive/30 text-destructive'}`}>
+                  {tier.icon}
+                </div>
+                <h3 className="text-lg font-bold text-foreground mb-1">{tier.level}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{tier.desc}</p>
+                <p className="text-xs text-muted-foreground mt-3">{counts[tier.level]} problems</p>
+              </button>
+            ))}
+          </div>
+        </section>
+
       </div>
     </div>
   );

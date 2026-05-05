@@ -214,5 +214,5 @@ export function useAllProblems() {
     ? WORD_PROBLEMS
     : mergeBankWithBuiltins(bankProblems);
 
-  return { problems, loading, activeBank };
+  return { problems, bankProblems, loading, activeBank };
 }
