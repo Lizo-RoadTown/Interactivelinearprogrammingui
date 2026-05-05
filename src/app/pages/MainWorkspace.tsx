@@ -325,10 +325,7 @@ export default function MainWorkspace() {
 
 
           {/* Guided walkthrough — the primary learning path */}
-          <div
-            onClick={() => navigate('/learn/wp-toy-factory')}
-            className="group relative cursor-pointer w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-10 shadow-2xl hover:border-fuchsia-500/40 hover:shadow-fuchsia-500/20 transition-all duration-200 mb-6 overflow-hidden"
-          >
+          <div className="group relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-10 shadow-2xl hover:border-fuchsia-500/40 hover:shadow-fuchsia-500/20 transition-all duration-200 mb-6 overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-600/20 via-purple-600/10 to-transparent opacity-60 pointer-events-none"></div>
             <div className="relative">
               <div className="flex items-center gap-4 mb-4">
@@ -353,8 +350,31 @@ export default function MainWorkspace() {
                   </span>
                 ))}
               </div>
-              <div className="flex items-center gap-2 text-fuchsia-300 font-semibold text-base group-hover:gap-3 transition-all">
-                Start walkthrough <span className="text-xl">→</span>
+
+              {/* Class problem bank — pick your professor's bank, then click
+                  the matching button below to start with their problems. */}
+              <div className="mb-5">
+                <BankPickerStudent />
+              </div>
+
+              {/* Two explicit CTAs: built-in walkthrough vs. browse the bank.
+                  Replaces the old "click anywhere on the tile" behavior so
+                  the bank dropdown above can be interacted with safely. */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/learn/wp-toy-factory')}
+                  className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-fuchsia-500 to-purple-600 hover:from-fuchsia-400 hover:to-purple-500 text-white font-semibold text-base px-5 py-3 rounded-xl shadow-lg shadow-fuchsia-500/30 transition-all"
+                >
+                  Start the walkthrough <span className="text-xl">→</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/practice')}
+                  className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/40 text-slate-100 font-semibold text-base px-5 py-3 rounded-xl transition-all"
+                >
+                  Browse problems <span className="text-xl">→</span>
+                </button>
               </div>
             </div>
           </div>
@@ -465,8 +485,8 @@ export default function MainWorkspace() {
             </div>
           </div>
 
-          {/* Student bank picker — choose your professor's bank. */}
-          <BankPickerStudent />
+          {/* (Bank picker now lives inside the "Learn by solving" tile
+              above, so the dropdown is right next to the CTAs that use it.) */}
 
           {/* Professor-facing entry point. Whatever a professor saves
               into their bank shows up for students who pick it above. */}
