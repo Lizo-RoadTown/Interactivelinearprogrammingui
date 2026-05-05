@@ -9,10 +9,12 @@
 
 import { useAllBanks, getActiveBank, setActiveBank } from '../data/bankProblems';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { isConfigured } from '../lib/supabase';
 import { GraduationCap } from 'lucide-react';
 
 export default function BankPickerStudent() {
+  const navigate = useNavigate();
   const { banks, loading } = useAllBanks();
   const [active, setActive] = useState<string>(() => getActiveBank());
 
@@ -65,6 +67,14 @@ export default function BankPickerStudent() {
                 ))}
               </select>
             </label>
+            <button
+              type="button"
+              onClick={() => navigate('/practice')}
+              className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-cyan-300 hover:text-cyan-200 transition-colors"
+            >
+              {active ? 'Browse problems' : 'Browse built-in problems'}
+              <span className="text-base">→</span>
+            </button>
           </div>
         </div>
       </div>
