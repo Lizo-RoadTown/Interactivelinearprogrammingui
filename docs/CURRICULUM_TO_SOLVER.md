@@ -39,6 +39,58 @@ effect — none of which would be possible with a black-box library call.
 
 ---
 
+## Curriculum coverage status
+
+A frank read of where the user-facing pages stand vs. where the curriculum
+goes. Pages marked **scaffolded** were created by the AI assistant ahead of
+where I have personally worked through the textbook — the routes exist and
+load, but I have not yet validated their behavior against the textbook
+material, and the demo presentation deliberately does not take audiences
+through them. They are placeholders for upcoming work.
+
+| Route | Maps to | Status | Notes |
+|---|---|---|---|
+| `/` (splash) | Entry point | **Working** | Bank picker is embedded in the Learn-by-solving tile; two CTAs (start walkthrough / browse problems). |
+| `/admin` | Professor authoring | **Working** | Sign-in, claim a bank slug, write problems. Live validation runs against the deployed `validate_problem`. BYO LLM agent draft works. |
+| `/practice` | Chapters 3–6 | **Working** | Pick a difficulty (or pick a specific bank problem by name), formulate the LP, solve it step by step. The educational core. |
+| `/airline-demo` | Chapter 8.3 sensitivity demo | **Working** | The presentation centerpiece. Standalone in-browser solver with full §8.3 deliverable: shadow prices, allowable RHS ranges, allowable c-ranges, optimal tableau, live re-solve on slider drag. |
+| `/sensitivity` | Chapters 7–8 (intended) | **Scaffolded** | AI-generated UI ahead of curriculum reading. I have not validated this against the textbook. Not part of the demo. |
+| `/matrix-method` | Chapter 8.2 (intended) | **Scaffolded** | Same — AI-generated gameboard concept ahead of where I am. Not part of the demo. |
+| `/educator` | Beginner A–D portal | **Partial** | The endpoints work and the live validator runs in the admin form. The student-facing exercise UI was originally meant for a group project and the only beginner script that runs as a live presentation is `validation.py`. |
+
+### What this means for the demo
+
+The presentation deliberately stays inside the working routes:
+
+1. `/airline-demo` for the sensitivity / shadow-price story (Chapter 8.3).
+2. `/admin` and `/practice` for the curriculum-to-tool story (Chapters 3–6).
+3. `validate_problem` as a code-level walkthrough (mapping Python type
+   checking onto the schema students need to author).
+
+I do not run `/sensitivity` or `/matrix-method` live, because I have not
+yet read through Chapters 7 and 8.2 carefully enough to say what those
+pages should look like. They exist as starting points for future work,
+not as completed teaching tools.
+
+### Why those routes exist at all
+
+The AI assistant scaffolded them when the project was first laid out, on
+the assumption the curriculum walkthrough would extend through Chapter 8
+end-to-end. Once I started taking the project seriously as a presentation
+deliverable, I narrowed the focus to what I had personally mastered:
+Chapters 3–6 (the simplex foundation) and Chapter 8.3 (sensitivity, the
+piece I find most compelling). The scaffolded routes are still on the
+deployed site because removing them is busywork — they cause no harm,
+they just are not part of the demo.
+
+This is exactly the kind of pain point I am learning to identify and
+articulate: the difference between "this code exists" and "I have
+validated this code against the source it claims to teach." Those are
+not the same status, and pretending they are is the failure mode I am
+explicitly avoiding here.
+
+---
+
 ## Chapter-by-chapter map
 
 ### Chapter 3 — Graphical Method
