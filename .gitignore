@@ -20,8 +20,12 @@ __pycache__/
 .env.local
 .env.*.local
 
-# Claude Code (dev tooling, not part of the app)
-.claude/
+# Claude Code (dev tooling — local settings stay private, but
+# skills/agents committed under .claude/ ship with the repo so the
+# whole team gets them).
+.claude/*
+!.claude/skills/
+!.claude/agents/
 CLAUDE.md
 
 # Reference materials (copyrighted textbook PDFs — not for public repo)
