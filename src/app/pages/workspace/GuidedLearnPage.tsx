@@ -16,12 +16,13 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Button } from '../../components/ui/button';
-import { WORD_PROBLEMS } from '../../data/wordProblems';
+import { useAllProblems } from '../../data/bankProblems';
 import {
   getScript, Question, TextQuestion, NumberQuestion, MCQuestion, FieldsQuestion, DragQuestion,
   ClickTableauQuestion, ClickVertexQuestion, ClickMatrixColumnQuestion,
   CommitPayload, QuestionHighlight, PhaseMeta,
 } from '../../data/tutorialScripts';
+import { buildScript } from '../../data/buildScript';
 import DiscoveryGraph, { FeasibleVertex } from './DiscoveryGraph';
 import VertexBasisPanel from './VertexBasisPanel';
 import BuildBPanel, { basisLabelsAtVertex } from './BuildBPanel';
@@ -199,14 +200,22 @@ export default function GuidedLearnPage() {
   const navigate = useNavigate();
   const { problemId } = useParams<{ problemId: string }>();
 
+  // Look up the problem in built-ins AND any active bank — so a problem
+  // a professor saved into Supabase reaches this page, not just the
+  // hand-curated WORD_PROBLEMS array.
+  const { problems: allProblems, loading: problemsLoading } = useAllProblems();
   const problem = useMemo(
-    () => WORD_PROBLEMS.find(p => p.id === problemId),
-    [problemId],
+    () => allProblems.find(p => p.id === problemId),
+    [problemId, allProblems],
   );
-  const script = useMemo(
-    () => (problemId ? getScript(problemId) : undefined),
-    [problemId],
-  );
+  // Hand-authored scripts (TOY_FACTORY_SCRIPT) take priority. For any
+  // problem without one, generate a Phase 1 (formulation) script from
+  // the problem definition. Phases 2–6 are present in the auto-script's
+  // metadata as "in development" stubs but contain no questions.
+  const script = useMemo(() => {
+    if (!problemId || !problem) return undefined;
+    return getScript(problemId) ?? buildScript(problem);
+  }, [problemId, problem]);
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<AnswerState>({});
@@ -261,13 +270,23 @@ export default function GuidedLearnPage() {
   const correctSeedRef = useRef(0);
 
   if (!problem || !script) {
+    // While bank problems are still being fetched from Supabase, show a
+    // loader rather than the "no script" error — the URL might point to
+    // a perfectly valid bank problem that just hasn't loaded yet.
+    if (problemsLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
+          <p className="text-sm text-muted-foreground">Loading problem…</p>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
         <div className="max-w-md text-center space-y-3">
-          <h1 className="text-lg font-semibold">No guided script for this problem yet</h1>
+          <h1 className="text-lg font-semibold">No problem found for this URL</h1>
           <p className="text-sm text-muted-foreground">
-            This problem doesn&apos;t have a walkthrough script. Pick a different problem or open it in
-            the free workspace.
+            The id &quot;{problemId}&quot; isn&apos;t in the built-in problems or in your active
+            bank. Pick a different problem from the home page.
           </p>
           <Button onClick={() => navigate('/')} variant="outline">Home</Button>
         </div>
@@ -657,7 +676,39 @@ export default function GuidedLearnPage() {
             )}
 
             {/* Done state — end-to-end celebration */}
-            {isDone && (
+            {isDone && script.id.startsWith('auto-') && (
+              <div className="bg-gradient-to-br from-emerald-500/15 via-primary/10 to-accent/15 border border-emerald-500/50 rounded-2xl p-6 space-y-4 shadow-2xl shadow-emerald-500/20 animate-fill-pop">
+                <div className="flex items-center gap-2 text-emerald-300 font-bold text-lg">
+                  <Sparkles className="w-6 h-6" />
+                  Phase 1 complete — formulation done.
+                </div>
+                <p className="text-sm text-emerald-100 leading-relaxed">
+                  You translated the word problem into a complete LP: decision variables,
+                  objective sense and coefficients, and every constraint with its label,
+                  coefficients, operator, and RHS. The right-hand canvas shows your full
+                  formulation as it accumulated.
+                </p>
+                <div className="bg-card/50 border border-border rounded-lg p-3 text-xs text-muted-foreground leading-relaxed">
+                  <strong className="text-foreground">Next phases (in development):</strong>
+                  graph build, simplex tableau setup, pivot walkthrough, matrix form, and
+                  sensitivity analysis. They&apos;ll come online for auto-generated walkthroughs
+                  in upcoming work — for now, this Stage 1 cut proves a bank problem can
+                  reach the same formulation flow as the hand-authored toy-factory walkthrough.
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => navigate(`/workspace?problem=${problem.id}`)}
+                    className="bg-accent hover:bg-accent/90 text-white"
+                  >
+                    Open the free workspace (continue exploring)
+                  </Button>
+                  <Button onClick={() => navigate('/')} variant="outline">
+                    Back home
+                  </Button>
+                </div>
+              </div>
+            )}
+            {isDone && !script.id.startsWith('auto-') && (
               <div className="bg-gradient-to-br from-emerald-500/15 via-primary/10 to-accent/15 border border-emerald-500/50 rounded-2xl p-6 space-y-4 shadow-2xl shadow-emerald-500/20 animate-fill-pop">
                 <div className="flex items-center gap-2 text-emerald-300 font-bold text-lg">
                   <Sparkles className="w-6 h-6" />
