@@ -1,14 +1,20 @@
 /**
  * AirlineModel.tsx — Dreamliner LP demo for the final presentation.
  *
+ * Matches the team's final PuLP model exactly:
+ *
  *   Max  z = 300 x1 + 1980 x2 + 0.335 x3
  *   s.t. 3.8 x1 + 11.1 x2              ≤ 2,688     (cabin space)
- *        240 x1 + 340 x2 + 36 x3       ≤ 120,000   (payload weight)
- *                          0.0429 x3   ≤ 126,000   (cargo volume capacity)
+ *        240 x1 + 340 x2 +    x3       ≤ 120,000   (payload weight)
+ *                          0.0429 x3   ≤ 6,090     (cargo volume)
  *        x1 + x2                       ≤ 420       (FAA passenger limit)
- *               x2                     ≤ 22        (business demand max)
  *               x2                     ≥ 20        (business demand min)
+ *               x2                     ≤ 22        (business demand max)
  *        x1, x2, x3 ≥ 0
+ *
+ * (In the PuLP source x1 and x2 are declared integer and x3 continuous;
+ *  the simplex below solves the LP relaxation. Because every binding
+ *  constraint has integer RHS, integer optima fall out at the corners.)
  *
  * Self-contained: solves the LP entirely in the browser. The lower bound
  * x2 ≥ 20 is handled by variable substitution y2 = x2 − 20 (so y2 ≥ 0),
@@ -75,12 +81,12 @@ const LS_COSTS = 'airline-demo.costs';
 // last one (Business demand minimum, x2 ≥ 20) is handled by variable
 // substitution y2 = x2 − 20 inside solveLP.
 const CONSTRAINTS: ConstraintDef[] = [
-  { label: 'Cabin space',          coefficients: [3.8, 11.1, 0],   op: '<=', baseRhs: 2688   },
-  { label: 'Payload weight',       coefficients: [240, 340, 36],   op: '<=', baseRhs: 120000 },
-  { label: 'Cargo volume capacity',coefficients: [0, 0, 0.0429],   op: '<=', baseRhs: 126000 },
-  { label: 'FAA passenger limit',  coefficients: [1, 1, 0],        op: '<=', baseRhs: 420    },
-  { label: 'Business demand max',  coefficients: [0, 1, 0],        op: '<=', baseRhs: 22     },
-  { label: 'Business demand min',  coefficients: [0, 1, 0],        op: '>=', baseRhs: 20     },
+  { label: 'Cabin space',          coefficients: [3.8, 11.1, 0],     op: '<=', baseRhs: 2688   },
+  { label: 'Payload weight',       coefficients: [240, 340, 1],      op: '<=', baseRhs: 120000 },
+  { label: 'Cargo volume',         coefficients: [0, 0, 0.0429],     op: '<=', baseRhs: 6090   },
+  { label: 'FAA passenger limit',  coefficients: [1, 1, 0],          op: '<=', baseRhs: 420    },
+  { label: 'Business demand max',  coefficients: [0, 1, 0],          op: '<=', baseRhs: 22     },
+  { label: 'Business demand min',  coefficients: [0, 1, 0],          op: '>=', baseRhs: 20     },
 ];
 
 function sliderRange(value: number): { min: number; max: number; step: number } {
